@@ -142,8 +142,8 @@ ranking:
     default-limit: ${RANKING_REDIS_DEFAULT_LIMIT:10}
 
 sentry:
-  dsn: https://3c2d00ad8634c583774f7c17d1ce2889@o4511672295882752.ingest.us.sentry.io/4511672308727808
-  send-default-pii: true
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
 
 logging:
   config: classpath:logback-spring.xml
