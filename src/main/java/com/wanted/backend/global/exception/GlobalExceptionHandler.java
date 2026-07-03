@@ -1,6 +1,7 @@
 package com.wanted.backend.global.exception;
 
 import com.wanted.backend.domain.cource.domain.model.InvalidCoursePriceException;
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -228,6 +229,7 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         log.error("[System Error] Path: {}, Message: {}", request.getRequestURI(), e.getMessage(), e);
+        Sentry.captureException(e);
 
         ErrorResponse response = ErrorResponse.create()
                 .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
