@@ -59,6 +59,7 @@ jobs:
             S3_PRESIGN_SECRET_KEY=${{ secrets.S3_PRESIGN_SECRET_KEY }}
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             ENVEOF
 
             cd ~/hard-click

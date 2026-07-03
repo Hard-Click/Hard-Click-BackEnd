@@ -141,6 +141,10 @@ ranking:
     key-prefix: ${RANKING_REDIS_KEY_PREFIX:${spring.profiles.active:local}:ranking}
     default-limit: ${RANKING_REDIS_DEFAULT_LIMIT:10}
 
+sentry:
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
+
 logging:
   config: classpath:logback-spring.xml
   level:
