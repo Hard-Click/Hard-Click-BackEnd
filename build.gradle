@@ -12,10 +12,8 @@ plugins {
 }
 
 sentry {
-    includeSourceContext = true
     org = "hard-click"
     projectName = "java-spring-boot"
-    authToken = System.getenv("SENTRY_AUTH_TOKEN")
 }
 
 group = 'com.wanted'
