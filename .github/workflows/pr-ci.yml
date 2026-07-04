@@ -59,3 +59,106 @@ jobs:
         if: always()
         with:
           files: build/test-results/**/*.xml
+
+  schema-validation:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_DATABASE: Hard-Click
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: HardClick
+          MYSQL_PASSWORD: HardClick
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build jar
+        run: ./gradlew bootJar -x test --no-daemon
+
+      - name: 스키마 드리프트 게이트 — Flyway(V1+V2) 적용 후 Hibernate validate 부팅
+        env:
+          SPRING_PROFILES_ACTIVE: ci
+          DB_URL: "jdbc:mysql://127.0.0.1:3306/Hard-Click?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8"
+          DB_USERNAME: HardClick
+          DB_PASSWORD: HardClick
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: "6379"
+          REDIS_PASSWORD: ""
+          JWT_SECRET: "ci-dummy-secret-key-must-be-at-least-256-bits-long-for-hs256-000000"
+          MAIL_USERNAME: "ci@example.com"
+          MAIL_PASSWORD: "dummy"
+          S3_BUCKET: "ci-dummy-bucket"
+          AWS_REGION: "ap-northeast-2"
+          AWS_ACCESS_KEY_ID: "dummy"
+          AWS_SECRET_ACCESS_KEY: "dummy"
+          S3_PRESIGN_ACCESS_KEY: "dummy"
+          S3_PRESIGN_SECRET_KEY: "dummy"
+          TOSS_SECRET_KEY: "ci-dummy"
+          SENTRY_DSN: ""
+        run: |
+          JAR=$(ls build/libs/*.jar | grep -v plain | head -1)
+          echo "부팅할 jar: $JAR"
+          java -jar "$JAR" > app.log 2>&1 &
+          APP_PID=$!
+          for i in $(seq 1 60); do
+            if grep -q "Started .*Application in" app.log; then
+              echo "✅ 부팅 성공 — Flyway V1+V2 적용 + Hibernate validate 통과 (스키마 드리프트 없음)"
+              kill $APP_PID 2>/dev/null || true
+              exit 0
+            fi
+            if grep -qiE "Schema-validation|SchemaManagementException|APPLICATION FAILED TO START|Migration .* failed|FlywayException" app.log; then
+              echo "❌ 스키마 드리프트/마이그레이션 오류 감지 — 아래 로그 확인"
+              tail -n 60 app.log
+              kill $APP_PID 2>/dev/null || true
+              exit 1
+            fi
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "❌ 앱이 부팅 중 종료됨 — 아래 로그 확인"
+              tail -n 60 app.log
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "❌ 타임아웃 (120s 내 부팅 실패) — 아래 로그 확인"
+          tail -n 60 app.log
+          kill $APP_PID 2>/dev/null || true
+          exit 1
