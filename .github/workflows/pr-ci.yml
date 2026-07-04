@@ -123,7 +123,7 @@ jobs:
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: "6379"
           REDIS_PASSWORD: ""
-          JWT_SECRET: "ci-dummy-secret-key-must-be-at-least-256-bits-long-for-hs256-000000"
+          JWT_SECRET: "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
           MAIL_USERNAME: "ci@example.com"
           MAIL_PASSWORD: "dummy"
           S3_BUCKET: "ci-dummy-bucket"
