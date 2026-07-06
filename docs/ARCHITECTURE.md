@@ -9,7 +9,9 @@
 - **타 도메인 참조는 Port + ReferenceEntity 패턴**: 다른 도메인 `JpaEntity` 직접 참조 금지.
   결합도 낮추려는 의도적 제약. (DEV_RULES 아키텍처 체크리스트 참조)
   - ReferenceEntity 작성 시 V1 baseline이 아닌 **최신 마이그레이션 기준** 테이블명 사용.
-- **`id_sequences` 테이블**: 일부 도메인이 애플리케이션 레벨 ID 발번 사용 `<TODO: 의도/적용 범위 확인>`
+- **`id_sequences` 테이블**: `order` 도메인의 `orders`/`order_items`만 사용. 기존 테이블에
+  AUTO_INCREMENT가 없어 JPA `GenerationType.TABLE`(`@TableGenerator`, allocationSize=50)로
+  앱 레벨 발번 — 스키마 변경 없이 호환 유지하려는 의도. 다른 도메인은 IDENTITY 사용.
 
 ## 이벤트 부수효과 흐름
 - 도메인 이벤트로 부수효과 처리(알림 생성 등). **동기 이벤트**라 리스너에서 무거운 작업 주의.

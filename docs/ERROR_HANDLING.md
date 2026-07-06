@@ -24,12 +24,12 @@
 | RP | 신고(report) | 5 |
 | N | 공지(notice) | 5 |
 | L | 강의/학습(lesson) | 5 |
-| CR | `<TODO: 코스/강좌 확인>` | 4 |
-| R | `<TODO: 리뷰 확인>` | 4 |
+| CR | 강의(course) | 4 |
+| R | 리뷰(review) | 4 |
 | DS | 일일 학습통계 | 4 |
 | NT | 알림(notification) | 2 |
 | CART / WISH / SUB | 장바구니 / 위시리스트 / 구독 | 각 2 |
-| CO / EN | `<TODO 확인>` / 수강(enrollment) | 각 1 |
+| CO / EN | 커뮤니티(community) / 수강(enrollment) | 각 1 |
 
 ## 새 ErrorCode 추가 규칙
 - 도메인 접두어 + 3자리 번호 (예: `ORD011`)
