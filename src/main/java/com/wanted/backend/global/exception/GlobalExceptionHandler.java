@@ -228,14 +228,33 @@ public class GlobalExceptionHandler {
             Exception e,
             HttpServletRequest request) {
 
-        log.error("[System Error] Path: {}, Message: {}", request.getRequestURI(), e.getMessage(), e);
+        String path = request.getRequestURI();
+        log.error("[System Error] Path: {}, Message: {}", path, e.getMessage(), e);
+
+        // Slack 알림(Sentry 연동)에 도메인/URL/예외타입을 태그로 남겨, 어느 담당자가
+        // 봐야 하는지 클릭 없이 바로 판단할 수 있게 한다.
+        Sentry.configureScope(scope -> {
+            scope.setTag("domain", extractDomain(path));
+            scope.setTag("exceptionType", e.getClass().getSimpleName());
+            scope.setTag("path", path);
+            scope.setTag("method", request.getMethod());
+        });
         Sentry.captureException(e);
 
         ErrorResponse response = ErrorResponse.create()
                 .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
                 .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
-                .path(request.getRequestURI());
+                .path(path);
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    /**
+     * URL 경로에서 담당 도메인을 추론한다 (예: /api/orders/123 -> "orders").
+     * 완벽한 매핑은 아니지만, Slack 알림만 보고 담당자를 좁히는 용도로 충분하다.
+     */
+    private String extractDomain(String path) {
+        String[] segments = path.replaceFirst("^/api/", "").split("/");
+        return (segments.length > 0 && !segments[0].isBlank()) ? segments[0] : "unknown";
     }
 }
