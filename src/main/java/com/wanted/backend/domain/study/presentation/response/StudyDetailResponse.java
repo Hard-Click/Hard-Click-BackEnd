@@ -1,4 +1,4 @@
-package com.wanted.backend.domain.community.presentation.response;
+package com.wanted.backend.domain.study.presentation.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
