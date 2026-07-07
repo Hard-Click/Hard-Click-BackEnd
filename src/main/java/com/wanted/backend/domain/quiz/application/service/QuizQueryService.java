@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +26,8 @@ public class QuizQueryService implements QuizQueryUseCase {
     public List<InstructorQuizSummary> getInstructorQuizzes(Long instructorId, Long courseId, Long sectionId) {
         List<Quiz> quizzes = quizRepository.findAllByInstructor(instructorId, courseId, sectionId);
 
-        Map<Long, String> courseTitles = quizzes.stream()
-                .map(Quiz::getCourseId)
-                .distinct()
-                .collect(Collectors.toMap(Function.identity(),
-                        id -> courseTitlePort.findTitleByCourseId(id).orElse("강의 #" + id)));
+        Map<Long, String> courseTitles = courseTitlePort.findTitlesByCourseIds(
+                quizzes.stream().map(Quiz::getCourseId).distinct().toList());
 
         Map<Long, String> sectionTitles = courseSectionTitlePort.findTitlesBySectionIds(
                 quizzes.stream().map(Quiz::getSectionId).distinct().toList());
@@ -42,7 +37,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                         quiz.getId(),
                         quiz.getTitle(),
                         quiz.getCourseId(),
-                        courseTitles.get(quiz.getCourseId()),
+                        courseTitles.getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId()),
                         quiz.getSectionId(),
                         sectionTitles.getOrDefault(quiz.getSectionId(), "섹션 #" + quiz.getSectionId()),
                         quiz.getQuestions().size(),

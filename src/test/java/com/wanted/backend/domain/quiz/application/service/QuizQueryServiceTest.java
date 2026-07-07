@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -54,7 +53,8 @@ class QuizQueryServiceTest {
                 quiz(90L, COURSE_ID, SECTION_ID, "1주차 퀴즈", 8),
                 quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5)
         ));
-        when(courseTitlePort.findTitleByCourseId(COURSE_ID)).thenReturn(Optional.of("React 완벽 가이드"));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
         when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
                 .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초", 101L, "섹션 2: Hooks"));
 
@@ -75,7 +75,7 @@ class QuizQueryServiceTest {
     void instructorQuizzesFallBackToPlaceholderTitlesWhenReferencesAreMissing() {
         when(quizRepository.findAllByInstructor(INSTRUCTOR_ID, null, null))
                 .thenReturn(List.of(quiz(90L, 999L, 888L, "퀴즈", 1)));
-        when(courseTitlePort.findTitleByCourseId(999L)).thenReturn(Optional.empty());
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
         when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection())).thenReturn(Map.of());
 
         List<InstructorQuizSummary> summaries = service.getInstructorQuizzes(INSTRUCTOR_ID, null, null);

@@ -1,21 +1,27 @@
 package com.wanted.backend.domain.quiz.infrastructure.cource;
 
-import com.wanted.backend.domain.cource.domain.model.Course;
-import com.wanted.backend.domain.cource.domain.repository.CourseRepository;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class CourseTitleAdapter implements CourseTitlePort {
 
-    private final CourseRepository courseRepository;
+    private final CourseReferenceJpaRepository courseReferenceJpaRepository;
 
     @Override
-    public Optional<String> findTitleByCourseId(Long courseId) {
-        return courseRepository.findById(courseId).map(Course::getTitle);
+    public Map<Long, String> findTitlesByCourseIds(Collection<Long> courseIds) {
+        if (courseIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return courseReferenceJpaRepository.findAllById(courseIds).stream()
+                .collect(Collectors.toMap(CourseReferenceJpaEntity::getId,
+                        CourseReferenceJpaEntity::getTitle));
     }
 }

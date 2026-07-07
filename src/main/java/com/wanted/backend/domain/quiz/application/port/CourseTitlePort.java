@@ -1,8 +1,9 @@
 package com.wanted.backend.domain.quiz.application.port;
 
-import java.util.Optional;
+import java.util.Collection;
+import java.util.Map;
 
 public interface CourseTitlePort {
 
-    Optional<String> findTitleByCourseId(Long courseId);
+    Map<Long, String> findTitlesByCourseIds(Collection<Long> courseIds);
 }
