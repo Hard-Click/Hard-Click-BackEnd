@@ -43,10 +43,11 @@ spring:
     # (지금 끄면 아직 baseline 안 된 환경의 마이그레이션이 실패하므로 당장은 유지)
     baseline-on-migrate: true
     baseline-version: 1
-    # 담당자별 버전 영역(V3.1.x~V3.4.x) 병렬 개발 허용을 위해 out-of-order 활성화.
-    # 낮은 버전이 높은 버전보다 늦게 머지돼도 migrate 실패 없이 순서에 끼워 적용된다.
-    # (docs/DB_MIGRATION_RULES.md 참고)
-    out-of-order: true
+    # out-of-order는 profile별로 분리 (docs/DB_MIGRATION_RULES.md 11번 참고)
+    # - local/dev: true (병렬 개발 편의)
+    # - prod: false (순서 의존성 안정성)
+    # 기본값은 false (안전장치로 운영 우선)
+    out-of-order: false
 
 
   mail:

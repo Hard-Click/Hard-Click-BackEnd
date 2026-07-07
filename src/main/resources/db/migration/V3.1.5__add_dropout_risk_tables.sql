@@ -3,7 +3,7 @@
 --       V3 dropout_risk 를 정답 소스로 사용하고 churn_risk 는 legacy 취급(문서화 필요).
 
 -- E-1) 이탈 위험 산출물 (rule / cox)
-CREATE TABLE dropout_risk (
+CREATE TABLE IF NOT EXISTS dropout_risk (
     id            BIGINT   NOT NULL AUTO_INCREMENT,
     enrollment_id BIGINT   NOT NULL,
     computed_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -17,7 +17,7 @@ CREATE TABLE dropout_risk (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- E-2) Cox PH 종속변수 라벨 (생존분석). enrollment 당 1행.
-CREATE TABLE dropout_event (
+CREATE TABLE IF NOT EXISTS dropout_event (
     id             BIGINT     NOT NULL AUTO_INCREMENT,
     enrollment_id  BIGINT     NOT NULL,
     event_occurred TINYINT(1) NOT NULL DEFAULT 0,
@@ -25,5 +25,10 @@ CREATE TABLE dropout_event (
     censored       TINYINT(1) NOT NULL DEFAULT 0,
     observed_days  INT        NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_dropout_event_enrollment (enrollment_id)
+    UNIQUE KEY uq_dropout_event_enrollment (enrollment_id),
+    -- 이탈 발생(1)이면 event_date 필수, 중도절단(0)이면 event_date NULL 이어야 함 (MySQL 8.0.16+ 에서 강제).
+    CONSTRAINT chk_dropout_event_date CHECK (
+        (event_occurred = 1 AND event_date IS NOT NULL)
+        OR (event_occurred = 0 AND event_date IS NULL)
+    )
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

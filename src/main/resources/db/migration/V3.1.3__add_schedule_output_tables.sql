@@ -3,7 +3,7 @@
 --       V3 산출물을 '정답 소스'로 사용하고 기존 테이블은 legacy 로 취급한다(문서화 필요).
 
 -- C-1) 주간 스케줄 스냅샷 (리플로우 이력)
-CREATE TABLE weekly_schedule (
+CREATE TABLE IF NOT EXISTS weekly_schedule (
     id            BIGINT       NOT NULL AUTO_INCREMENT,
     enrollment_id BIGINT       NOT NULL,
     week_no       INT          NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE weekly_schedule (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- C-2) 배치된 슬롯 (weekly_schedule 자식 → 같은 도메인이라 FK 사용)
-CREATE TABLE schedule_slot (
+CREATE TABLE IF NOT EXISTS schedule_slot (
     id                 BIGINT NOT NULL AUTO_INCREMENT,
     weekly_schedule_id BIGINT NOT NULL,
     lesson_id          BIGINT NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE schedule_slot (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- C-3) 일별 달성 기록 (스트릭 산출 원천). 'date' 는 예약어라 achieved_date 로 명명.
-CREATE TABLE daily_achievement (
+CREATE TABLE IF NOT EXISTS daily_achievement (
     id            BIGINT     NOT NULL AUTO_INCREMENT,
     enrollment_id BIGINT     NOT NULL,
     achieved_date DATE       NOT NULL,
