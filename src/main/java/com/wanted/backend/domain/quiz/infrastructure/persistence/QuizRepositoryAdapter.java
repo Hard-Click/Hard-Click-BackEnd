@@ -4,6 +4,8 @@ import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,13 +34,14 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Quiz> findById(Long id) {
-        return quizJpaRepository.findById(id).map(this::toDomain);
+        return quizJpaRepository.findByIdWithQuestions(id).map(this::toDomain);
     }
 
     @Override
     @Transactional
     public Quiz update(Quiz quiz) {
-        QuizJpaEntity entity = quizJpaRepository.findById(quiz.getId()).orElseThrow();
+        QuizJpaEntity entity = quizJpaRepository.findByIdWithQuestions(quiz.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
         entity.update(quiz.getCourseId(), quiz.getSectionId(), quiz.getTitle());
 
         entity.clearQuestions();

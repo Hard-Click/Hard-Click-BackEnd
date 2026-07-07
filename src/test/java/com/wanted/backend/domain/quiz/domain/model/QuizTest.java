@@ -71,7 +71,7 @@ class QuizTest {
     }
 
     @Test
-    void updateRejectsABlankTitleOrEmptyQuestions() {
+    void updateRejectsABlankTitleEmptyQuestionsOrMissingIds() {
         QuizQuestion question = QuizQuestion.create(1, "질문", null, 1,
                 List.of("보기1", "보기2", "보기3", "보기4"));
         Quiz quiz = Quiz.create(1L, 10L, 100L, "제목", List.of(question));
@@ -80,7 +80,11 @@ class QuizTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", null))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> quiz.update(null, 100L, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(10L, null, "제목", List.of(question)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
