@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.infrastructure.persistence;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface QuizJpaRepository extends JpaRepository<QuizJpaEntity, Long> {
@@ -13,4 +14,14 @@ public interface QuizJpaRepository extends JpaRepository<QuizJpaEntity, Long> {
     // options는 컬렉션 @BatchSize로 IN 조회한다 (다중→batch size).
     @EntityGraph(attributePaths = "questions")
     Optional<QuizJpaEntity> findWithQuestionsById(Long id);
+
+    // 목록 조회는 다중 건이라 fetch join 대신 questions/options 컬렉션의 @BatchSize로 로딩한다.
+    List<QuizJpaEntity> findByInstructorIdOrderByCreatedAtAsc(Long instructorId);
+
+    List<QuizJpaEntity> findByInstructorIdAndCourseIdOrderByCreatedAtAsc(Long instructorId, Long courseId);
+
+    List<QuizJpaEntity> findByInstructorIdAndSectionIdOrderByCreatedAtAsc(Long instructorId, Long sectionId);
+
+    List<QuizJpaEntity> findByInstructorIdAndCourseIdAndSectionIdOrderByCreatedAtAsc(
+            Long instructorId, Long courseId, Long sectionId);
 }

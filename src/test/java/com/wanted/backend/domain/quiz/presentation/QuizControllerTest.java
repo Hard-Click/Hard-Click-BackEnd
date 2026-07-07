@@ -4,8 +4,9 @@ import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
-import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
+import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import com.wanted.backend.global.security.CustomUserDetails;
@@ -25,54 +26,53 @@ import static org.mockito.Mockito.when;
 
 class QuizControllerTest {
 
-    private CourseTitlePort courseTitlePort;
     private QuizCommandUseCase quizCommandUseCase;
+    private QuizQueryUseCase quizQueryUseCase;
     private QuizController controller;
 
     @BeforeEach
     void setUp() {
-        courseTitlePort = mock(CourseTitlePort.class);
         quizCommandUseCase = mock(QuizCommandUseCase.class);
-        controller = new QuizController(courseTitlePort, quizCommandUseCase);
+        quizQueryUseCase = mock(QuizQueryUseCase.class);
+        controller = new QuizController(quizCommandUseCase, quizQueryUseCase);
     }
 
     @Test
-    void instructorQuizzesUseTheRequestedCourseRealTitleInsteadOfAHardcodedUnrelatedTopic() {
-        when(courseTitlePort.findTitleByCourseId(17L)).thenReturn(Optional.of("왕초보 중국어 회화"));
+    void instructorQuizzesMapTheQuerySummariesToTheListResponse() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getInstructorQuizzes(1L, 10L, null)).thenReturn(List.of(
+                new InstructorQuizSummary(90L, "1주차 퀴즈", 10L, "React 완벽 가이드", 100L,
+                        "섹션 1: React 기초", 8, java.time.LocalDateTime.of(2026, 5, 10, 15, 30))
+        ));
 
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizListResponse>> result =
-                controller.getInstructorQuizzes(null, 17L, null);
+                controller.getInstructorQuizzes(userDetails, 10L, null);
 
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
         QuizController.InstructorQuizListResponse response = result.getBody().data();
-        assertThat(response.courseId()).isEqualTo(17L);
-        assertThat(response.quizzes()).isNotEmpty();
-        assertThat(response.quizzes())
-                .allSatisfy(item -> {
-                    assertThat(item.courseTitle()).isEqualTo("왕초보 중국어 회화");
-                    assertThat(item.quizTitle()).contains("왕초보 중국어 회화");
-                });
+        assertThat(response.courseId()).isEqualTo(10L);
+        assertThat(response.quizzes()).hasSize(1);
+        QuizController.InstructorQuizListResponse.InstructorQuizItem item = response.quizzes().get(0);
+        assertThat(item.quizId()).isEqualTo(90L);
+        assertThat(item.quizTitle()).isEqualTo("1주차 퀴즈");
+        assertThat(item.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(item.sectionTitle()).isEqualTo("섹션 1: React 기초");
+        assertThat(item.questionCount()).isEqualTo(8);
+        assertThat(item.createdAt().toLocalDateTime())
+                .isEqualTo(java.time.LocalDateTime.of(2026, 5, 10, 15, 30));
     }
 
     @Test
-    void instructorQuizzesFallBackToAPlaceholderWhenCourseIdDoesNotExist() {
-        when(courseTitlePort.findTitleByCourseId(999L)).thenReturn(Optional.empty());
+    void instructorQuizzesReturnAnEmptyListWhenTheInstructorHasNoQuizzes() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getInstructorQuizzes(1L, null, null)).thenReturn(List.of());
 
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizListResponse>> result =
-                controller.getInstructorQuizzes(null, 999L, null);
+                controller.getInstructorQuizzes(userDetails, null, null);
 
-        QuizController.InstructorQuizListResponse response = result.getBody().data();
-        assertThat(response.quizzes())
-                .allSatisfy(item -> assertThat(item.courseTitle()).isEqualTo("강의 #999"));
-    }
-
-    @Test
-    void instructorQuizzesFallBackToAPlaceholderWhenCourseIdIsNull() {
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizListResponse>> result =
-                controller.getInstructorQuizzes(null, null, null);
-
-        QuizController.InstructorQuizListResponse response = result.getBody().data();
-        assertThat(response.quizzes())
-                .allSatisfy(item -> assertThat(item.courseTitle()).isEqualTo("전체 강의"));
+        assertThat(result.getBody().data().quizzes()).isEmpty();
     }
 
     @Test

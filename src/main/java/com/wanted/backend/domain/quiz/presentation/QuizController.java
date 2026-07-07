@@ -4,8 +4,9 @@ import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
-import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
+import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,8 +33,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.stream.IntStream;
 
 @RestController
 @RequiredArgsConstructor
@@ -44,11 +45,9 @@ public class QuizController {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int MAX_PAGE_SIZE = 50;
-    private static final int INSTRUCTOR_QUIZ_WEEK_COUNT = 5;
-    private static final long INSTRUCTOR_QUIZ_ID_BASE = 90L;
 
-    private final CourseTitlePort courseTitlePort;
     private final QuizCommandUseCase quizCommandUseCase;
+    private final QuizQueryUseCase quizQueryUseCase;
 
     @GetMapping("/members/me/quizzes")
     @Operation(summary = "내 퀴즈 목록 조회", description = "현재 로그인한 회원의 퀴즈 목록을 조회합니다.")
@@ -144,10 +143,21 @@ public class QuizController {
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) Long sectionId
     ) {
+        List<InstructorQuizSummary> summaries = quizQueryUseCase
+                .getInstructorQuizzes(userDetails.getMemberId(), courseId, sectionId);
+
         InstructorQuizListResponse response = new InstructorQuizListResponse(
                 courseId,
                 sectionId,
-                instructorQuizItems(courseId)
+                summaries.stream()
+                        .map(summary -> new InstructorQuizListResponse.InstructorQuizItem(
+                                summary.quizId(),
+                                summary.quizTitle(),
+                                summary.courseTitle(),
+                                summary.sectionTitle(),
+                                summary.questionCount(),
+                                summary.createdAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
+                        .toList()
         );
 
         return ApiResponse.success("강사 퀴즈 목록을 조회했습니다.", response);
@@ -431,33 +441,6 @@ public class QuizController {
                         new QuizReportResponse.Option(32L, 4, "CSS 파일을 JavaScript로 변환하기 위해")
                 ))
         );
-    }
-
-    // Mock 컨트롤러라 실제 퀴즈 문항은 없지만, courseId로 실제 강의명을 조회해서
-    // 퀴즈 제목·강의명이 요청한 강의와 무관한 값으로 나가지 않도록 한다.
-    private List<InstructorQuizListResponse.InstructorQuizItem> instructorQuizItems(Long courseId) {
-        String courseTitle = resolveCourseTitle(courseId);
-        OffsetDateTime baseCreatedAt = OffsetDateTime.parse("2026-05-10T15:30:00+09:00");
-
-        return IntStream.rangeClosed(1, INSTRUCTOR_QUIZ_WEEK_COUNT)
-                .mapToObj(week -> new InstructorQuizListResponse.InstructorQuizItem(
-                        INSTRUCTOR_QUIZ_ID_BASE + week,
-                        courseTitle + " " + week + "주차 퀴즈",
-                        courseTitle,
-                        "섹션 " + week,
-                        8,
-                        baseCreatedAt.plusDays(week - 1)
-                ))
-                .toList();
-    }
-
-    private String resolveCourseTitle(Long courseId) {
-        if (courseId == null) {
-            return "전체 강의";
-        }
-
-        return courseTitlePort.findTitleByCourseId(courseId)
-                .orElse("강의 #" + courseId);
     }
 
     private InstructorQuizStatisticsResponse instructorQuizStatistics() {
