@@ -48,6 +48,6 @@ k6/
 
 ### Grafana & Monitoring ###
 
-CLAUDE.md
+# CLAUDE.md는 팀 공유 AI 컨텍스트로 레포에서 추적한다 (기존 ignore 해제)
 benchmark_post_list.sql
 k6_post_list_load_test.js

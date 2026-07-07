@@ -62,6 +62,13 @@ import org.springframework.http.HttpStatus;
     INVALID_COURSE_PRICE(HttpStatus.BAD_REQUEST, "CR002", "강의 가격 설정이 올바르지 않습니다."),
     LESSON_NOT_FOUND(HttpStatus.NOT_FOUND, "CR003", "존재하지 않는 회차입니다."),
     COURSE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CR004", "해당 강의에 대한 권한이 없습니다."),
+    COURSE_SECTION_NOT_FOUND(HttpStatus.NOT_FOUND, "CR005", "존재하지 않는 섹션입니다."),
+
+    /* =========================================================================
+       4-1. 퀴즈(Quiz) 관련 예외 (QZ000)
+       ========================================================================= */
+    QUIZ_NOT_FOUND(HttpStatus.NOT_FOUND, "QZ001", "존재하지 않는 퀴즈입니다."),
+    QUIZ_NOT_AUTHORIZED(HttpStatus.FORBIDDEN, "QZ002", "본인이 등록한 퀴즈만 수정/삭제할 수 있습니다."),
 
     /* =========================================================================
        5. 리뷰 도메인 관련 예외 (R000)

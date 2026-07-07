@@ -1,10 +1,22 @@
 package com.wanted.backend.domain.quiz.presentation;
 
+import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
+import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,8 +37,8 @@ import java.util.stream.IntStream;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
-@Tag(name = "Quiz Mock", description = "학생/강사 퀴즈 Mock API")
-public class QuizMockController {
+@Tag(name = "Quiz", description = "학생/강사 퀴즈 API")
+public class QuizController {
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_PAGE_SIZE = 10;
@@ -35,6 +47,7 @@ public class QuizMockController {
     private static final long INSTRUCTOR_QUIZ_ID_BASE = 90L;
 
     private final CourseTitlePort courseTitlePort;
+    private final QuizCommandUseCase quizCommandUseCase;
 
     @GetMapping("/members/me/quizzes")
     @Operation(summary = "내 퀴즈 목록 조회", description = "현재 로그인한 회원의 퀴즈 목록을 조회합니다.")
@@ -152,13 +165,23 @@ public class QuizMockController {
     @Operation(summary = "강사 퀴즈 등록", description = "강사가 강의/섹션에 연결된 퀴즈를 등록합니다.")
     public ResponseEntity<ApiResponse<InstructorQuizMutationResponse>> createInstructorQuiz(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody(required = false) InstructorQuizRequest request
+            @Valid @RequestBody InstructorQuizRequest request
     ) {
+        CreateQuizCommand command = new CreateQuizCommand(
+                userDetails.getMemberId(),
+                request.courseId(),
+                request.sectionId(),
+                request.quizTitle(),
+                toQuestionCommands(request.questions())
+        );
+
+        Long quizId = quizCommandUseCase.create(command);
+
         InstructorQuizMutationResponse response = new InstructorQuizMutationResponse(
-                90L,
-                request == null || request.quizTitle() == null ? "React 기초 개념 퀴즈" : request.quizTitle(),
-                request == null || request.questions() == null ? 8 : request.questions().size(),
-                OffsetDateTime.parse("2026-06-11T16:00:00+09:00")
+                quizId,
+                request.quizTitle(),
+                request.questions().size(),
+                OffsetDateTime.now()
         );
 
         return ApiResponse.created("퀴즈가 등록되었습니다.", response);
@@ -169,13 +192,24 @@ public class QuizMockController {
     public ResponseEntity<ApiResponse<InstructorQuizMutationResponse>> updateInstructorQuiz(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId,
-            @RequestBody(required = false) InstructorQuizRequest request
+            @Valid @RequestBody InstructorQuizRequest request
     ) {
+        UpdateQuizCommand command = new UpdateQuizCommand(
+                quizId,
+                userDetails.getMemberId(),
+                request.courseId(),
+                request.sectionId(),
+                request.quizTitle(),
+                toQuestionCommands(request.questions())
+        );
+
+        quizCommandUseCase.update(command);
+
         InstructorQuizMutationResponse response = new InstructorQuizMutationResponse(
                 quizId,
-                request == null || request.quizTitle() == null ? "React 기초 개념 퀴즈" : request.quizTitle(),
-                request == null || request.questions() == null ? 8 : request.questions().size(),
-                OffsetDateTime.parse("2026-06-11T16:00:00+09:00")
+                request.quizTitle(),
+                request.questions().size(),
+                OffsetDateTime.now()
         );
 
         return ApiResponse.success("퀴즈가 수정되었습니다.", response);
@@ -219,6 +253,17 @@ public class QuizMockController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
+    }
+
+    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
+        return questions.stream()
+                .map(q -> new QuizQuestionCommand(
+                        q.questionText(),
+                        q.explanation(),
+                        q.correctOptionNumber(),
+                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
+                ))
+                .toList();
     }
 
     private int normalizePage(Integer page) {
@@ -627,21 +672,22 @@ public class QuizMockController {
     }
 
     public record InstructorQuizRequest(
-            String quizTitle,
-            Long courseId,
-            Long sectionId,
-            List<Question> questions
+            @NotBlank(message = "퀴즈 제목은 필수입니다.") String quizTitle,
+            @NotNull(message = "강의 ID는 필수입니다.") Long courseId,
+            @NotNull(message = "섹션 ID는 필수입니다.") Long sectionId,
+            @NotEmpty(message = "문항은 최소 1개 이상이어야 합니다.") @Valid List<Question> questions
     ) {
         public record Question(
-                Long questionId,
-                String questionText,
-                Long correctOptionId,
+                @NotBlank(message = "문제 내용은 필수입니다.") String questionText,
                 String explanation,
-                List<Option> options
+                @Min(value = 1, message = "정답 보기 번호는 1~4 사이여야 합니다.")
+                @Max(value = 4, message = "정답 보기 번호는 1~4 사이여야 합니다.")
+                @Schema(description = "정답 보기 번호(1~4)", example = "2") int correctOptionNumber,
+                @Size(min = 4, max = 4, message = "보기는 4개가 필요합니다.") @Valid List<Option> options
         ) {
         }
 
-        public record Option(Long optionId, String optionText) {
+        public record Option(@NotBlank(message = "보기 내용은 필수입니다.") String optionText) {
         }
     }
 
