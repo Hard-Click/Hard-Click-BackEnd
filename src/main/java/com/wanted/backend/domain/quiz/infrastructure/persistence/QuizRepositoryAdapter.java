@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -35,6 +36,24 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Transactional(readOnly = true)
     public Optional<Quiz> findById(Long id) {
         return quizJpaRepository.findWithQuestionsById(id).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Quiz> findAllByInstructor(Long instructorId, Long courseId, Long sectionId) {
+        List<QuizJpaEntity> entities;
+        if (courseId != null && sectionId != null) {
+            entities = quizJpaRepository.findByInstructorIdAndCourseIdAndSectionIdOrderByCreatedAtAsc(
+                    instructorId, courseId, sectionId);
+        } else if (courseId != null) {
+            entities = quizJpaRepository.findByInstructorIdAndCourseIdOrderByCreatedAtAsc(instructorId, courseId);
+        } else if (sectionId != null) {
+            entities = quizJpaRepository.findByInstructorIdAndSectionIdOrderByCreatedAtAsc(instructorId, sectionId);
+        } else {
+            entities = quizJpaRepository.findByInstructorIdOrderByCreatedAtAsc(instructorId);
+        }
+
+        return entities.stream().map(this::toDomain).toList();
     }
 
     @Override
