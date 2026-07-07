@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseOwnershipPort;
@@ -49,6 +50,18 @@ public class QuizCommandService implements QuizCommandUseCase {
                 toQuestions(command.questions()));
 
         return quizRepository.update(quiz).getId();
+    }
+
+    @Override
+    public void delete(DeleteQuizCommand command) {
+        Quiz quiz = quizRepository.findById(command.quizId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        if (!quiz.getInstructorId().equals(command.instructorId())) {
+            throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
+        }
+
+        quizRepository.deleteById(command.quizId());
     }
 
     private void validateCourseOwnership(Long courseId, Long sectionId, Long instructorId) {

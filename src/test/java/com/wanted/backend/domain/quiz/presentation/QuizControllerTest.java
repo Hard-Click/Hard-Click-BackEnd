@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
@@ -160,6 +161,37 @@ class QuizControllerTest {
         QuizQuestionCommand question = command.questions().get(0);
         assertThat(question.questionText()).isEqualTo("React의 가상 DOM이란?");
         assertThat(question.optionTexts()).containsExactly("보기1", "보기2", "보기3", "보기4");
+    }
+
+    @Test
+    void deleteInstructorQuizDelegatesToTheUseCaseAndReturnsTheDeletedStatus() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizDeleteResponse>> result =
+                controller.deleteInstructorQuiz(userDetails, 90L);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.InstructorQuizDeleteResponse response = result.getBody().data();
+        assertThat(response.quizId()).isEqualTo(90L);
+        assertThat(response.status()).isEqualTo("DELETED");
+
+        ArgumentCaptor<DeleteQuizCommand> captor = ArgumentCaptor.forClass(DeleteQuizCommand.class);
+        verify(quizCommandUseCase).delete(captor.capture());
+        assertThat(captor.getValue().quizId()).isEqualTo(90L);
+        assertThat(captor.getValue().instructorId()).isEqualTo(1L);
+    }
+
+    @Test
+    void deleteInstructorQuizPropagatesTheUseCasesBusinessExceptionWhenNotTheQuizOwner() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(999L);
+        org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED))
+                .when(quizCommandUseCase).delete(org.mockito.ArgumentMatchers.any());
+
+        assertThatThrownBy(() -> controller.deleteInstructorQuiz(userDetails, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
     }
 
     @Test

@@ -11,4 +11,6 @@ public interface QuizRepository {
     Optional<Quiz> findById(Long id);
 
     Quiz update(Quiz quiz);
+
+    void deleteById(Long id);
 }

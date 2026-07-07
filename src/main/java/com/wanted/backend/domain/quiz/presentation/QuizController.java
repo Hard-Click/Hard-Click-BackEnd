@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
@@ -221,10 +222,12 @@ public class QuizController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId
     ) {
+        quizCommandUseCase.delete(new DeleteQuizCommand(quizId, userDetails.getMemberId()));
+
         InstructorQuizDeleteResponse response = new InstructorQuizDeleteResponse(
                 quizId,
                 "DELETED",
-                OffsetDateTime.parse("2026-06-11T16:00:00+09:00")
+                OffsetDateTime.now()
         );
 
         return ApiResponse.success("퀴즈가 삭제되었습니다.", response);
