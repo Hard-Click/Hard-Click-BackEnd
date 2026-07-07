@@ -4,6 +4,7 @@ import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
@@ -73,6 +74,50 @@ class QuizControllerTest {
                 controller.getInstructorQuizzes(userDetails, null, null);
 
         assertThat(result.getBody().data().quizzes()).isEmpty();
+    }
+
+    @Test
+    void instructorQuizDetailMapsTheQueryResultIncludingCorrectOptionInfo() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getInstructorQuizDetail(1L, 90L)).thenReturn(new InstructorQuizDetail(
+                90L, "React 기초 개념 퀴즈", 10L, "React 완벽 가이드", 100L, "섹션 1: React 기초", 1,
+                java.time.LocalDateTime.of(2026, 5, 10, 15, 30),
+                List.of(new InstructorQuizDetail.QuestionDetail(
+                        5L, 1, "React의 가상 DOM이란?", 7L, "가상 DOM 설명",
+                        List.of(
+                                new InstructorQuizDetail.OptionDetail(6L, 1, "실제 DOM의 복사본", false),
+                                new InstructorQuizDetail.OptionDetail(7L, 2, "메모리에 존재하는 DOM의 표현", true))))
+        ));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizDetailResponse>> result =
+                controller.getInstructorQuizDetail(userDetails, 90L);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.InstructorQuizDetailResponse response = result.getBody().data();
+        assertThat(response.quizId()).isEqualTo(90L);
+        assertThat(response.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(response.sectionTitle()).isEqualTo("섹션 1: React 기초");
+        assertThat(response.questionCount()).isEqualTo(1);
+        assertThat(response.questions()).hasSize(1);
+        QuizController.InstructorQuizDetailResponse.Question question = response.questions().get(0);
+        assertThat(question.questionId()).isEqualTo(5L);
+        assertThat(question.correctOptionId()).isEqualTo(7L);
+        assertThat(question.explanation()).isEqualTo("가상 DOM 설명");
+        assertThat(question.options()).hasSize(2);
+        assertThat(question.options().get(1).correct()).isTrue();
+    }
+
+    @Test
+    void instructorQuizDetailPropagatesTheUseCasesBusinessExceptionWhenNotTheQuizOwner() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(999L);
+        when(quizQueryUseCase.getInstructorQuizDetail(999L, 90L))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED));
+
+        assertThatThrownBy(() -> controller.getInstructorQuizDetail(userDetails, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
     }
 
     @Test

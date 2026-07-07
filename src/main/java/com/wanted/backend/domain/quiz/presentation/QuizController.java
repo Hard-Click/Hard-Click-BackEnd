@@ -4,6 +4,7 @@ import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
@@ -169,7 +170,36 @@ public class QuizController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId
     ) {
-        return ApiResponse.success("강사 퀴즈 상세 정보를 조회했습니다.", instructorQuizDetail(quizId));
+        InstructorQuizDetail detail = quizQueryUseCase
+                .getInstructorQuizDetail(userDetails.getMemberId(), quizId);
+
+        InstructorQuizDetailResponse response = new InstructorQuizDetailResponse(
+                detail.quizId(),
+                detail.quizTitle(),
+                detail.courseId(),
+                detail.courseTitle(),
+                detail.sectionId(),
+                detail.sectionTitle(),
+                detail.questionCount(),
+                detail.createdAt().atZone(ZoneId.systemDefault()).toOffsetDateTime(),
+                detail.questions().stream()
+                        .map(question -> new InstructorQuizDetailResponse.Question(
+                                question.questionId(),
+                                question.questionNumber(),
+                                question.questionText(),
+                                question.correctOptionId(),
+                                question.explanation(),
+                                question.options().stream()
+                                        .map(option -> new InstructorQuizDetailResponse.Option(
+                                                option.optionId(),
+                                                option.optionNumber(),
+                                                option.optionText(),
+                                                option.correct()))
+                                        .toList()))
+                        .toList()
+        );
+
+        return ApiResponse.success("강사 퀴즈 상세 정보를 조회했습니다.", response);
     }
 
     @PostMapping("/instructor/quizzes")
@@ -302,22 +332,6 @@ public class QuizController {
         int fromIndex = (int) offset;
         int toIndex = Math.min(fromIndex + size, items.size());
         return items.subList(fromIndex, toIndex);
-    }
-
-    private InstructorQuizDetailResponse instructorQuizDetail(Long quizId) {
-        List<InstructorQuizDetailResponse.Question> questions = instructorQuizDetailQuestions();
-
-        return new InstructorQuizDetailResponse(
-                quizId,
-                "React 기초 개념 퀴즈",
-                1L,
-                "React 완벽 가이드",
-                1L,
-                "섹션 1: React 기초",
-                questions.size(),
-                OffsetDateTime.parse("2026-05-10T15:30:00+09:00"),
-                questions
-        );
     }
 
     private List<MyQuizListResponse.MyQuizItem> myQuizItems() {
@@ -479,59 +493,6 @@ public class QuizController {
                         new InstructorQuizStatisticsResponse.StudentScore("@yoonseo2", "윤*서", false, null, null),
                         new InstructorQuizStatisticsResponse.StudentScore("@minjun0", "민*준", false, null, null)
                 )
-        );
-    }
-
-    private List<InstructorQuizDetailResponse.Question> instructorQuizDetailQuestions() {
-        return List.of(
-                new InstructorQuizDetailResponse.Question(1L, 1, "React의 가상 DOM이란 무엇인가요?", 2L, "가상 DOM은 메모리에 존재하는 UI 표현이며 실제 DOM 변경을 효율화합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(1L, 1, "실제 DOM의 복사본", false),
-                        new InstructorQuizDetailResponse.Option(2L, 2, "메모리에 존재하는 DOM의 표현", true),
-                        new InstructorQuizDetailResponse.Option(3L, 3, "HTML 파일", false),
-                        new InstructorQuizDetailResponse.Option(4L, 4, "CSS 스타일시트", false)
-                )),
-                new InstructorQuizDetailResponse.Question(2L, 2, "JSX는 무엇의 약자인가요?", 5L, "JSX는 JavaScript XML의 약자로 JavaScript 안에서 UI 구조를 표현합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(5L, 1, "JavaScript XML", true),
-                        new InstructorQuizDetailResponse.Option(6L, 2, "Java Syntax Extension", false),
-                        new InstructorQuizDetailResponse.Option(7L, 3, "JSON XML", false),
-                        new InstructorQuizDetailResponse.Option(8L, 4, "JavaScript Extension", false)
-                )),
-                new InstructorQuizDetailResponse.Question(3L, 3, "useState 훅이 반환하는 값의 조합으로 올바른 것은 무엇인가요?", 9L, "useState는 현재 상태값과 해당 상태를 갱신하는 함수를 배열로 반환합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(9L, 1, "현재 상태와 상태 변경 함수", true),
-                        new InstructorQuizDetailResponse.Option(10L, 2, "렌더링 함수와 DOM 노드", false),
-                        new InstructorQuizDetailResponse.Option(11L, 3, "이전 props와 현재 props", false),
-                        new InstructorQuizDetailResponse.Option(12L, 4, "컴포넌트 이름과 이벤트 객체", false)
-                )),
-                new InstructorQuizDetailResponse.Question(4L, 4, "useEffect의 의존성 배열을 빈 배열로 전달하면 언제 실행되나요?", 13L, "빈 의존성 배열은 최초 마운트 이후 한 번만 effect를 실행하게 합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(13L, 1, "컴포넌트가 처음 마운트된 뒤 한 번", true),
-                        new InstructorQuizDetailResponse.Option(14L, 2, "상태가 바뀔 때마다 항상", false),
-                        new InstructorQuizDetailResponse.Option(15L, 3, "이벤트가 발생할 때마다", false),
-                        new InstructorQuizDetailResponse.Option(16L, 4, "브라우저가 종료될 때 한 번", false)
-                )),
-                new InstructorQuizDetailResponse.Question(5L, 5, "리스트 렌더링에서 key prop을 사용하는 주된 이유는 무엇인가요?", 18L, "key는 React가 리스트 항목의 추가, 삭제, 이동을 안정적으로 식별하도록 돕습니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(17L, 1, "CSS 우선순위를 높이기 위해", false),
-                        new InstructorQuizDetailResponse.Option(18L, 2, "각 항목의 변경을 안정적으로 식별하기 위해", true),
-                        new InstructorQuizDetailResponse.Option(19L, 3, "API 호출을 자동으로 캐싱하기 위해", false),
-                        new InstructorQuizDetailResponse.Option(20L, 4, "컴포넌트를 서버에서만 렌더링하기 위해", false)
-                )),
-                new InstructorQuizDetailResponse.Question(6L, 6, "제어 컴포넌트의 설명으로 가장 알맞은 것은 무엇인가요?", 22L, "제어 컴포넌트는 입력값을 React state로 관리하고 변경 이벤트로 state를 갱신합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(21L, 1, "DOM이 입력값을 직접 관리하는 컴포넌트", false),
-                        new InstructorQuizDetailResponse.Option(22L, 2, "React 상태가 입력값을 관리하는 컴포넌트", true),
-                        new InstructorQuizDetailResponse.Option(23L, 3, "서버 상태만 관리하는 컴포넌트", false),
-                        new InstructorQuizDetailResponse.Option(24L, 4, "렌더링을 하지 않는 컴포넌트", false)
-                )),
-                new InstructorQuizDetailResponse.Question(7L, 7, "props의 일반적인 역할은 무엇인가요?", 25L, "props는 부모 컴포넌트가 자식 컴포넌트에 값을 전달하는 기본 수단입니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(25L, 1, "부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달한다", true),
-                        new InstructorQuizDetailResponse.Option(26L, 2, "브라우저 쿠키를 암호화한다", false),
-                        new InstructorQuizDetailResponse.Option(27L, 3, "데이터베이스 트랜잭션을 관리한다", false),
-                        new InstructorQuizDetailResponse.Option(28L, 4, "번들 파일을 압축한다", false)
-                )),
-                new InstructorQuizDetailResponse.Question(8L, 8, "Context API를 사용하는 대표적인 목적은 무엇인가요?", 30L, "Context API는 props drilling을 줄이고 여러 컴포넌트에 공통 값을 전달할 때 사용합니다.", List.of(
-                        new InstructorQuizDetailResponse.Option(29L, 1, "이미지 파일을 최적화하기 위해", false),
-                        new InstructorQuizDetailResponse.Option(30L, 2, "깊은 컴포넌트 트리에 공통 상태를 전달하기 위해", true),
-                        new InstructorQuizDetailResponse.Option(31L, 3, "HTTP 요청을 자동 재시도하기 위해", false),
-                        new InstructorQuizDetailResponse.Option(32L, 4, "CSS 파일을 JavaScript로 변환하기 위해", false)
-                ))
         );
     }
 
