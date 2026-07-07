@@ -43,6 +43,11 @@ spring:
     # (지금 끄면 아직 baseline 안 된 환경의 마이그레이션이 실패하므로 당장은 유지)
     baseline-on-migrate: true
     baseline-version: 1
+    # out-of-order는 profile별로 분리 (docs/DB_MIGRATION_RULES.md 11번 참고)
+    # - local/dev: true (병렬 개발 편의)
+    # - prod: false (순서 의존성 안정성)
+    # 기본값은 false (안전장치로 운영 우선)
+    out-of-order: false
 
 
   mail:

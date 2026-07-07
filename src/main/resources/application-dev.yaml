@@ -1,0 +1,4 @@
+spring:
+  flyway:
+    # dev: 로컬과 동일하게 개발 편의를 위해 out-of-order 활성화
+    out-of-order: true

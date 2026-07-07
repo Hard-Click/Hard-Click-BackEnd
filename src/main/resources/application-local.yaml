@@ -1,0 +1,6 @@
+spring:
+  flyway:
+    # 로컬 개발: 담당자별 버전 영역(V3.1.x~V3.4.x) 병렬 개발 허용을 위해 out-of-order 활성화.
+    # 낮은 버전이 높은 버전보다 늦게 머지돼도 migrate 실패 없이 순서에 끼워 적용된다.
+    # (docs/DB_MIGRATION_RULES.md 참고)
+    out-of-order: true
