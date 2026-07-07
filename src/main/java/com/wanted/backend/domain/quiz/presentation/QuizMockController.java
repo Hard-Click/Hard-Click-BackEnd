@@ -9,9 +9,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -660,8 +663,10 @@ public class QuizMockController {
         public record Question(
                 @NotBlank(message = "문제 내용은 필수입니다.") String questionText,
                 String explanation,
+                @Min(value = 1, message = "정답 보기 번호는 1~4 사이여야 합니다.")
+                @Max(value = 4, message = "정답 보기 번호는 1~4 사이여야 합니다.")
                 @Schema(description = "정답 보기 번호(1~4)", example = "2") int correctOptionNumber,
-                @NotEmpty(message = "보기는 4개가 필요합니다.") @Valid List<Option> options
+                @Size(min = 4, max = 4, message = "보기는 4개가 필요합니다.") @Valid List<Option> options
         ) {
         }
 

@@ -18,6 +18,9 @@ public class Quiz {
 
     public static Quiz create(Long instructorId, Long courseId, Long sectionId, String title,
                                List<QuizQuestion> questions) {
+        if (instructorId == null || courseId == null || sectionId == null) {
+            throw new IllegalArgumentException("강사/강의/섹션 식별자는 필수입니다.");
+        }
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("퀴즈 제목은 필수입니다.");
         }

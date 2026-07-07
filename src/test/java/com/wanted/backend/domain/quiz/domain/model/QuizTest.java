@@ -29,6 +29,19 @@ class QuizTest {
     }
 
     @Test
+    void createRejectsMissingInstructorCourseOrSectionIds() {
+        QuizQuestion question = QuizQuestion.create(1, "질문", null, 1,
+                List.of("보기1", "보기2", "보기3", "보기4"));
+
+        assertThatThrownBy(() -> Quiz.create(null, 10L, 100L, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Quiz.create(1L, null, 100L, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Quiz.create(1L, 10L, null, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void createRejectsABlankTitle() {
         QuizQuestion question = QuizQuestion.create(1, "질문", null, 1,
                 List.of("보기1", "보기2", "보기3", "보기4"));

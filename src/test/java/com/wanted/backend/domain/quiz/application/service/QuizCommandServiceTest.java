@@ -63,6 +63,8 @@ class QuizCommandServiceTest {
         verify(quizRepository).save(captor.capture());
         assertThat(captor.getValue().getCourseId()).isEqualTo(COURSE_ID);
         assertThat(captor.getValue().getSectionId()).isEqualTo(SECTION_ID);
+        assertThat(captor.getValue().getInstructorId()).isEqualTo(INSTRUCTOR_ID);
+        assertThat(captor.getValue().getTitle()).isEqualTo("React 기초 개념 퀴즈");
         assertThat(captor.getValue().getQuestions()).hasSize(1);
     }
 

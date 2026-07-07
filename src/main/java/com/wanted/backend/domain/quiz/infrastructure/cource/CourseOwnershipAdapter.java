@@ -1,6 +1,5 @@
 package com.wanted.backend.domain.quiz.infrastructure.cource;
 
-import com.wanted.backend.domain.cource.domain.model.CourseSection;
 import com.wanted.backend.domain.cource.domain.repository.CourseRepository;
 import com.wanted.backend.domain.quiz.application.port.CourseOwnershipPort;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +12,7 @@ import java.util.Optional;
 public class CourseOwnershipAdapter implements CourseOwnershipPort {
 
     private final CourseRepository courseRepository;
+    private final CourseSectionReferenceJpaRepository courseSectionReferenceJpaRepository;
 
     @Override
     public Optional<CourseSectionOwnership> findOwnership(Long courseId, Long sectionId) {
@@ -20,9 +20,7 @@ public class CourseOwnershipAdapter implements CourseOwnershipPort {
                 .filter(course -> !course.isDeleted())
                 .map(course -> new CourseSectionOwnership(
                         course.getAuthorId(),
-                        course.getSections().stream()
-                                .map(CourseSection::getId)
-                                .anyMatch(sectionId::equals)
+                        courseSectionReferenceJpaRepository.existsByIdAndCourseId(sectionId, courseId)
                 ));
     }
 }

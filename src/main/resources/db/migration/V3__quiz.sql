@@ -22,7 +22,8 @@ CREATE TABLE quiz_question (
     explanation     TEXT,
     PRIMARY KEY (question_id),
     KEY idx_quiz_question_quiz_id (quiz_id),
-    CONSTRAINT fk_quiz_question_quiz FOREIGN KEY (quiz_id) REFERENCES quiz (quiz_id)
+    UNIQUE KEY uq_quiz_question_quiz_number (quiz_id, question_number),
+    CONSTRAINT fk_quiz_question_quiz FOREIGN KEY (quiz_id) REFERENCES quiz (quiz_id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE quiz_option (
@@ -33,5 +34,6 @@ CREATE TABLE quiz_option (
     is_correct    TINYINT(1)   NOT NULL DEFAULT 0,
     PRIMARY KEY (option_id),
     KEY idx_quiz_option_question_id (question_id),
-    CONSTRAINT fk_quiz_option_question FOREIGN KEY (question_id) REFERENCES quiz_question (question_id)
+    UNIQUE KEY uq_quiz_option_question_number (question_id, option_number),
+    CONSTRAINT fk_quiz_option_question FOREIGN KEY (question_id) REFERENCES quiz_question (question_id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
