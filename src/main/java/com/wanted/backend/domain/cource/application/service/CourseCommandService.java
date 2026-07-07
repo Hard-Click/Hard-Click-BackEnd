@@ -143,7 +143,7 @@ public class CourseCommandService implements CourseCommandUseCase {
 
         course.softDelete();
         courseRepository.save(course);
-        notificationRepository.deleteByRedirectUrlStartingWith("/admin/courses/" + courseId);
+        notificationRepository.deleteByRedirectUrlStartingWith("/admin/courses/manage/" + courseId);
     }
 
     @Override
@@ -218,7 +218,7 @@ public class CourseCommandService implements CourseCommandUseCase {
         }
 
         // video_url에는 s3Key를 저장하고 COMPLETED로 전이 — presigned URL 직접 업로드는 별도 처리 단계 없음
-        lesson.attachVideo(command.s3Key(), command.s3Key());
+        lesson.attachVideo(command.s3Key(), command.s3Key(), command.durationSeconds());
         lesson.completeProcessing();
         lessonRepository.save(lesson);
 

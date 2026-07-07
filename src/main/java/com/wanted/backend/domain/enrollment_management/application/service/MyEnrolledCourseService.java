@@ -2,7 +2,6 @@ package com.wanted.backend.domain.enrollment_management.application.service;
 
 import com.wanted.backend.domain.enrollment_management.application.port.MyEnrolledCourseQueryPort;
 import com.wanted.backend.domain.enrollment_management.application.usecase.GetMyEnrolledCourseUseCase;
-import com.wanted.backend.domain.enrollment_management.domain.model.EnrollmentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +19,8 @@ public class MyEnrolledCourseService implements GetMyEnrolledCourseUseCase {
     @Override
     public List<MyEnrolledCourseView> handle(Long memberId) {
         return myEnrolledCourseQueryPort.findByMemberId(memberId).stream()
-                // 수강 완료(COMPLETED)는 별도 엔드포인트에서 조회 — 여기서는 제외
-                .filter(data -> !EnrollmentStatus.COMPLETED.equals(data.enrollmentStatus()))
+                // 수강 완료는 별도 엔드포인트에서 조회 — 진도 기준으로 판단(status는 현재 항상 IN_PROGRESS)
+                .filter(data -> !isProgressCompleted(data))
                 .map(this::toView)
                 // 최근 학습한 강의가 목록 상단에 오도록 정렬한다.
                 .sorted(Comparator.comparing(
@@ -29,6 +28,12 @@ public class MyEnrolledCourseService implements GetMyEnrolledCourseUseCase {
                         Comparator.nullsLast(Comparator.reverseOrder())
                 ))
                 .toList();
+    }
+
+    private boolean isProgressCompleted(MyEnrolledCourseQueryPort.MyEnrolledCourseData data) {
+        return data.totalLessonCount() != null
+                && data.totalLessonCount() > 0
+                && data.totalLessonCount().equals(data.completedLessonCount());
     }
 
     // 어댑터에서 조합한 조회 데이터를 화면 응답에 가까운 유스케이스 View로 변환한다.

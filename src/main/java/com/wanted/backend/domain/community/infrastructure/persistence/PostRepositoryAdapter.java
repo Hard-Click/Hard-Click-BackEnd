@@ -34,10 +34,20 @@ public class PostRepositoryAdapter implements PostRepository {
 
     @Override
     public Post save(Post post) {
-        PostJpaEntity entity = new PostJpaEntity(
-                post.getAuthorId(), post.getBoardType(), post.getSubject(),
-                post.getTitle(), post.getContent(), post.getViewCount(),
-                post.isAccepted(), post.getCreatedAt(), post.getUpdatedAt()
+        if (post.getId() == null) {
+            PostJpaEntity entity = new PostJpaEntity(
+                    post.getAuthorId(), post.getBoardType(), post.getSubject(),
+                    post.getTitle(), post.getContent(), post.getViewCount(),
+                    post.isAccepted(), post.getCreatedAt(), post.getUpdatedAt()
+            );
+            return toDomain(repository.save(entity));
+        }
+
+        PostJpaEntity entity = repository.findById(post.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+        entity.update(
+                post.getSubject(), post.getTitle(), post.getContent(),
+                post.getViewCount(), post.getStatus(), post.isAccepted(), post.getUpdatedAt()
         );
         return toDomain(repository.save(entity));
     }

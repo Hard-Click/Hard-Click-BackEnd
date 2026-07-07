@@ -10,4 +10,5 @@ public interface EnrollmentRepository {
     Enrollment save(Enrollment enrollment);
     List<Enrollment> findByMemberId(Long memberId);
     List<Enrollment> findByMemberIdAndStatus(Long memberId, EnrollmentStatus status);
+    java.util.Optional<Enrollment> findByMemberIdAndCourseId(Long memberId, Long courseId);
 }

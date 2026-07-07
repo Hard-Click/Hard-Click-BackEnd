@@ -89,6 +89,44 @@ class MyEnrolledCourseServiceTest {
         assertThat(result.get(0).progressRate()).isZero();
     }
 
+    @Test
+    void 진도율이_100퍼센트인_강의는_수강중_목록에서_제외된다() {
+        when(queryPort.findByMemberId(1L)).thenReturn(List.of(
+                new MyEnrolledCourseQueryPort.MyEnrolledCourseData(
+                        10L, "완료 강의", null,
+                        3, 3,
+                        LocalDateTime.of(2026, 5, 27, 10, 0),
+                        30L, 0, EnrollmentStatus.IN_PROGRESS
+                ),
+                new MyEnrolledCourseQueryPort.MyEnrolledCourseData(
+                        20L, "진행중 강의", null,
+                        1, 3,
+                        LocalDateTime.of(2026, 5, 26, 10, 0),
+                        31L, 0, EnrollmentStatus.IN_PROGRESS
+                )
+        ));
+
+        List<MyEnrolledCourseView> result = service.handle(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).courseId()).isEqualTo(20L);
+    }
+
+    @Test
+    void 레슨이_없는_강의는_수강중_목록에_포함된다() {
+        when(queryPort.findByMemberId(1L)).thenReturn(List.of(
+                new MyEnrolledCourseQueryPort.MyEnrolledCourseData(
+                        10L, "빈 강의", null,
+                        0, 0,
+                        null, null, 0, EnrollmentStatus.IN_PROGRESS
+                )
+        ));
+
+        List<MyEnrolledCourseView> result = service.handle(1L);
+
+        assertThat(result).hasSize(1);
+    }
+
     private MyEnrolledCourseQueryPort.MyEnrolledCourseData data(Long courseId, LocalDateTime lastStudiedAt) {
         return new MyEnrolledCourseQueryPort.MyEnrolledCourseData(
                 courseId,

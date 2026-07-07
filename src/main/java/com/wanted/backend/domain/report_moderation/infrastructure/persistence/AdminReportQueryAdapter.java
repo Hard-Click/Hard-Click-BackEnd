@@ -161,7 +161,7 @@ public class AdminReportQueryAdapter implements AdminReportQueryPort {
                 yield new DetailTargetContent(
                         post.getTitle(),
                         postDetailContent(post),
-                        "/posts/" + post.getId(),
+                        "/community/" + post.getId(),
                         post.getAuthorId()
                 );
             }
@@ -180,7 +180,7 @@ public class AdminReportQueryAdapter implements AdminReportQueryPort {
                         comment.getStatus() == CommentStatus.ACTIVE
                                 ? comment.getContent()
                                 : DELETED_COMMENT_CONTENT,
-                        "/posts/" + comment.getPostId(),
+                        "/community/" + comment.getPostId(),
                         comment.getAuthorId()
                 );
             }

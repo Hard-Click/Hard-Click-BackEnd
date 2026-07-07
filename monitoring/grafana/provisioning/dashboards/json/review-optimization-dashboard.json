@@ -1,0 +1,239 @@
+{
+  "uid": "review-stats-6panel",
+  "title": "리뷰 API — Live Metrics",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-5m", "to": "now" },
+  "style": "dark",
+  "templating": {
+    "list": [
+      {
+        "name": "endpoint",
+        "type": "custom",
+        "label": "Endpoint",
+        "query": "/api/courses/{courseId}/reviews",
+        "current": { "text": "/api/courses/{courseId}/reviews", "value": "/api/courses/{courseId}/reviews" },
+        "options": [
+          { "text": "/api/courses/{courseId}/reviews", "value": "/api/courses/{courseId}/reviews", "selected": true }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "AVG LATENCY",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "#37872D", "value": null },
+            { "color": "#E0B400", "value": 100 },
+            { "color": "#C4162A", "value": 500 }
+          ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "1000 * sum(rate(http_server_requests_seconds_sum{uri=\"$endpoint\"}[1m])) / sum(rate(http_server_requests_seconds_count{uri=\"$endpoint\"}[1m]))",
+        "legendFormat": "avg",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "P95 LATENCY",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "#37872D", "value": null },
+            { "color": "#E0B400", "value": 200 },
+            { "color": "#C4162A", "value": 800 }
+          ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "1000 * histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri=\"$endpoint\"}[1m])) by (le))",
+        "legendFormat": "p95",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "ERROR RATE",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "#37872D", "value": null },
+            { "color": "#E0B400", "value": 1 },
+            { "color": "#C4162A", "value": 5 }
+          ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "100 * (sum(rate(http_server_requests_seconds_count{uri=\"$endpoint\", outcome!=\"SUCCESS\"}[1m])) or vector(0)) / sum(rate(http_server_requests_seconds_count{uri=\"$endpoint\"}[1m]))",
+        "legendFormat": "errors",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "TPS (APP)",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 1,
+          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#5794F2", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "sum(rate(http_server_requests_seconds_count[1m]))",
+        "legendFormat": "tps",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "RPS",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 1,
+          "color": { "mode": "fixed", "fixedColor": "#B877D9" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#B877D9", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "sum(rate(http_server_requests_seconds_count{uri=\"$endpoint\"}[1m]))",
+        "legendFormat": "rps",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "DB POOL (HIKARI)",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "#37872D", "value": null },
+            { "color": "#E0B400", "value": 7 },
+            { "color": "#C4162A", "value": 9 }
+          ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["max"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "max(hikaricp_connections_active{application=\"hard-click\"})",
+        "refId": "A",
+        "legendFormat": "active"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "P95 Latency Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line", "lineWidth": 2, "fillOpacity": 12,
+            "pointSize": 4, "showPoints": "never", "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "1000 * histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri=\"$endpoint\"}[1m])) by (le))",
+        "legendFormat": "$endpoint p95",
+        "refId": "A"
+      }]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

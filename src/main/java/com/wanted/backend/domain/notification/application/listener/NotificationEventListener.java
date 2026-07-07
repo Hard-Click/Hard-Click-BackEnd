@@ -51,7 +51,7 @@ public class NotificationEventListener {
                     event.postAuthorId(),
                     NotificationType.POST_COMMENT,
                     "내 게시글에 새 댓글이 달렸습니다.",
-                    "/posts/" + event.postId()
+                    "/community/" + event.postId()
             );
         } catch (Exception e) {
             log.error("[Notification] onPostComment 처리 실패. postId={}", event.postId(), e);
@@ -67,7 +67,7 @@ public class NotificationEventListener {
                     event.parentCommentAuthorId(),
                     NotificationType.COMMENT_REPLY,
                     "내 댓글에 대댓글이 달렸습니다.",
-                    "/posts/" + event.postId()
+                    "/community/" + event.postId()
             );
         } catch (Exception e) {
             log.error("[Notification] onCommentReply 처리 실패. postId={}", event.postId(), e);
@@ -82,7 +82,7 @@ public class NotificationEventListener {
                     event.commentAuthorId(),
                     NotificationType.COMMENT_ACCEPTED,
                     "내 댓글이 채택되었습니다.",
-                    "/posts/" + event.postId()
+                    "/community/" + event.postId()
             );
         } catch (Exception e) {
             log.error("[Notification] onCommentAccepted 처리 실패. commentId={}", event.commentId(), e);
@@ -172,7 +172,7 @@ public class NotificationEventListener {
                             adminId,
                             NotificationType.COURSE_REGISTER,
                             "새로운 강좌가 등록되었습니다: " + event.title(),
-                            "/admin/courses/" + event.courseId()
+                            "/admin/courses/manage/" + event.courseId()
                     ))
                     .toList();
             notificationCommandUseCase.sendBatch(requests);

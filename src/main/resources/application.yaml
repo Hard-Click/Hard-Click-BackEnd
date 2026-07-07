@@ -25,13 +25,24 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      # release gate: pr-ci.yml의 schema-validation 잡이 매 PR마다 임시 MySQL에
+      # V1+V2 마이그레이션 적용 후 이 validate 부팅을 먼저 검증한다. 드리프트가 있으면
+      # 여기서 머지 전에 CI가 막으므로, 실제 배포 시 이 값으로 인한 기동 실패는 없다.
+      ddl-auto: validate
     open-in-view: false
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: false
+
+  flyway:
+    enabled: true
+    # 기존 prod RDS(Flyway 도입 전 ddl-auto:update로 생성된 스키마)에 대한 최초 1회
+    # baseline 처리용. prod가 baseline 완료된 뒤 false로 되돌리는 걸 검토할 것.
+    # (지금 끄면 아직 baseline 안 된 환경의 마이그레이션이 실패하므로 당장은 유지)
+    baseline-on-migrate: true
+    baseline-version: 1
 
 
   mail:
@@ -140,6 +151,10 @@ ranking:
   redis:
     key-prefix: ${RANKING_REDIS_KEY_PREFIX:${spring.profiles.active:local}:ranking}
     default-limit: ${RANKING_REDIS_DEFAULT_LIMIT:10}
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
 
 logging:
   config: classpath:logback-spring.xml

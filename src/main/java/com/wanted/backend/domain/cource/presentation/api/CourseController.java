@@ -142,10 +142,11 @@ public class CourseController {
     public ResponseEntity<ApiResponse<Void>> confirmVideoUpload(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "레슨 ID", example = "3") @PathVariable Long lessonId,
-            @Parameter(description = "업로드된 S3 키", example = "videos/3_uuid.mp4") @RequestParam String s3Key
+            @Parameter(description = "업로드된 S3 키", example = "videos/3_uuid.mp4") @RequestParam String s3Key,
+            @Parameter(description = "영상 길이(초)", example = "120") @RequestParam(required = false) Integer durationSeconds
     ) {
         courseCommandUseCase.confirmVideoUpload(
-                new ConfirmVideoUploadCommand(lessonId, userDetails.getMemberId(), s3Key));
+                new ConfirmVideoUploadCommand(lessonId, userDetails.getMemberId(), s3Key, durationSeconds));
         return ApiResponse.successNoContent("영상이 등록되었습니다.");
     }
 }

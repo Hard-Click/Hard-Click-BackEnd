@@ -1,0 +1,9 @@
+# 라이트하우스(Lighthouse) 측정 전용 프로파일
+# 활성화: SPRING_PROFILES_ACTIVE=lighthouse (또는 기존 프로파일에 ,lighthouse 추가)
+# 측정 시 동시 요청을 견디도록 커넥션 풀을 늘리고 풀 대기 타임아웃을 늘린다.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 8
+      connection-timeout: 10000

@@ -5,7 +5,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DB_URL=jdbc:mysql://mysql:3306/Hard-Click?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+      - DB_URL=${DB_URL}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
@@ -17,29 +17,13 @@ services:
       - SPRING_PROFILES_ACTIVE=prod
       - S3_BUCKET=${S3_BUCKET}
       - AWS_REGION=${AWS_REGION:-ap-northeast-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - TOSS_SECRET_KEY=${TOSS_SECRET_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_started
-    restart: unless-stopped
-
-  mysql:
-    image: mysql:8
-    container_name: hard-click-mysql
-    environment:
-      - MYSQL_DATABASE=Hard-Click
-      - MYSQL_USER=${DB_USERNAME}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
 
   redis:
@@ -51,5 +35,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql-data:
   redis-data:

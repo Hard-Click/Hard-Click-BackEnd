@@ -140,7 +140,7 @@ class CourseCommandServiceTest {
         when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(videoStoragePort.getObjectSize("videos/10_uuid.mp4")).thenReturn(1024L);
 
-        confirmInTransaction(new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4"));
+        confirmInTransaction(new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4", 120));
 
         ArgumentCaptor<Lesson> captor = ArgumentCaptor.forClass(Lesson.class);
         verify(lessonRepository).save(captor.capture());
@@ -158,7 +158,7 @@ class CourseCommandServiceTest {
                 .thenReturn(Optional.of(new CourseAuthorInfo(100L, authorId, CourseStatus.PUBLISHED)));
 
         assertThatThrownBy(() -> confirmInTransaction(
-                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/999_other.mp4")))
+                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/999_other.mp4", 120)))
                 .isInstanceOf(BusinessException.class);
 
         verify(lessonRepository, never()).save(any());
@@ -175,7 +175,7 @@ class CourseCommandServiceTest {
         when(videoStoragePort.getObjectSize("videos/10_uuid.mp4")).thenReturn(2L * 1024 * 1024 * 1024); // 2GB
 
         assertThatThrownBy(() -> confirmInTransaction(
-                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4")))
+                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4", 120)))
                 .isInstanceOf(BusinessException.class);
 
         verify(videoStoragePort).delete("videos/10_uuid.mp4");
@@ -197,7 +197,7 @@ class CourseCommandServiceTest {
                 .when(videoCatalogSyncPort).syncByCourse(courseId);
 
         assertThatCode(() -> confirmInTransaction(
-                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4")))
+                new ConfirmVideoUploadCommand(lessonId, authorId, "videos/10_uuid.mp4", 120)))
                 .doesNotThrowAnyException();
 
         verify(lessonRepository).save(any(Lesson.class));

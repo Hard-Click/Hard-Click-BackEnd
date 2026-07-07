@@ -47,6 +47,7 @@ jobs:
               -o ~/hard-click/docker-compose.prod.yml
 
             cat > ~/hard-click/.env << 'ENVEOF'
+            DB_URL=${{ secrets.DB_URL }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
@@ -55,6 +56,11 @@ jobs:
             S3_BUCKET=${{ secrets.S3_BUCKET }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
+            S3_PRESIGN_ACCESS_KEY=${{ secrets.S3_PRESIGN_ACCESS_KEY }}
+            S3_PRESIGN_SECRET_KEY=${{ secrets.S3_PRESIGN_SECRET_KEY }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             ENVEOF
 
             cd ~/hard-click

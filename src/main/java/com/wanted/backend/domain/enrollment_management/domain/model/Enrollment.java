@@ -40,6 +40,11 @@ public class Enrollment {
      * - expiredAt이 현재 시각 이전이면 EXPIRED
      * - 그 외 저장된 status 반환
      */
+    public Enrollment complete() {
+        this.status = EnrollmentStatus.COMPLETED;
+        return this;
+    }
+
     public EnrollmentStatus getEffectiveStatus() {
         if (expiredAt != null && expiredAt.isBefore(LocalDateTime.now())) {
             return EnrollmentStatus.EXPIRED;

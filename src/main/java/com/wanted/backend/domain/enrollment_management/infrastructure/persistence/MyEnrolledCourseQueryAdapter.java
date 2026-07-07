@@ -90,11 +90,20 @@ public class MyEnrolledCourseQueryAdapter implements MyEnrolledCourseQueryPort {
 
         Map<Long, List<EnrolledLessonReferenceEntity>> lessonsByCourseId = new LinkedHashMap<>();
         for (EnrolledCourseSectionReferenceEntity section : sections) {
+            List<EnrolledLessonReferenceEntity> nonPreviewLessons = lessonsBySectionId
+                    .getOrDefault(section.getId(), List.of())
+                    .stream()
+                    .filter(lesson -> !isPreviewLesson(section, lesson))
+                    .toList();
             lessonsByCourseId
                     .computeIfAbsent(section.getCourseId(), key -> new ArrayList<>())
-                    .addAll(lessonsBySectionId.getOrDefault(section.getId(), List.of()));
+                    .addAll(nonPreviewLessons);
         }
         return lessonsByCourseId;
+    }
+
+    private boolean isPreviewLesson(EnrolledCourseSectionReferenceEntity section, EnrolledLessonReferenceEntity lesson) {
+        return section.getOrderIndex() == 0 && lesson.getOrderIndex() == 0;
     }
 
     private MyEnrolledCourseData toData(

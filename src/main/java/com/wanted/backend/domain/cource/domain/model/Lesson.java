@@ -47,9 +47,12 @@ public class Lesson {
     }
 
     // 영상 파일 첨부 + PENDING 상태로 전이
-    public void attachVideo(String videoUrl, String s3Key) {
+    public void attachVideo(String videoUrl, String s3Key, Integer durationSeconds) {
         this.videoUrl = videoUrl;
         this.s3Key = s3Key;
+        if (durationSeconds != null && durationSeconds > 0) {
+            this.durationSeconds = durationSeconds;
+        }
         this.fileProcessingStatus = FileProcessingStatus.PENDING;
     }
 

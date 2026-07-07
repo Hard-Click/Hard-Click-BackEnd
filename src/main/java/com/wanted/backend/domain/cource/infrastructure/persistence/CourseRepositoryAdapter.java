@@ -31,7 +31,21 @@ public class CourseRepositoryAdapter implements CourseRepository {
     @Override
     public Course save(Course course) {
         if (course.getId() == null) {
-            return toDomain(jpaRepository.save(toNewJpaEntity(course)));
+            CourseJpaEntity entity = CourseJpaEntity.from(
+                    course.getAuthorId(), course.getTitle(), course.getSubject(),
+                    course.getDescription(), course.getThumbnailUrl(),
+                    course.getPriceType(), course.getPrice(), course.getStatus(), course.getCreatedAt(),
+                    course.getLearningObjectives(), course.getTargetAudience(),
+                    course.getTechTags(), course.getLevel());
+            CourseJpaEntity saved = jpaRepository.saveAndFlush(entity);
+            course.getSections().forEach(section -> {
+                CourseSectionJpaEntity sectionEntity = saved.addSection(
+                        section.getTitle(), section.getOrderIndex());
+                section.getLessons().forEach(lesson ->
+                        sectionEntity.addLesson(lesson.getTitle(), lesson.getDescription(),
+                                lesson.getOrderIndex(), lesson.getDurationSeconds(), course.getCreatedAt()));
+            });
+            return toDomain(jpaRepository.save(saved));
         }
         // 수정: 기존 엔티티 로드 후 필드 동기화
         CourseJpaEntity entity = jpaRepository.findById(course.getId())

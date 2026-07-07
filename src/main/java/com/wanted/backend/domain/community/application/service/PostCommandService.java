@@ -105,7 +105,7 @@ public class PostCommandService implements PostCommandUseCase {
 
         postFileRepository.deleteByPostId(command.postId());
         postRepository.deleteById(command.postId());
-        notificationRepository.deleteByRedirectUrlStartingWith("/posts/" + command.postId());
+        notificationRepository.deleteByRedirectUrlStartingWith("/community/" + command.postId());
     }
 
     @Override
