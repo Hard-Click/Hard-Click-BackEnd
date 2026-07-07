@@ -65,4 +65,14 @@ public class QuizJpaEntity {
         questions.add(question);
         return question;
     }
+
+    public void update(Long courseId, Long sectionId, String title) {
+        this.courseId = courseId;
+        this.sectionId = sectionId;
+        this.title = title;
+    }
+
+    public void clearQuestions() {
+        questions.clear();
+    }
 }

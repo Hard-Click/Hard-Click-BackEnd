@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 public class QuizRepositoryAdapter implements QuizRepository {
@@ -21,6 +23,34 @@ public class QuizRepositoryAdapter implements QuizRepository {
                 quiz.getCourseId(), quiz.getSectionId(), quiz.getInstructorId(),
                 quiz.getTitle(), quiz.getCreatedAt());
 
+        appendQuestions(entity, quiz);
+
+        QuizJpaEntity saved = quizJpaRepository.save(entity);
+        return toDomain(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Quiz> findById(Long id) {
+        return quizJpaRepository.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public Quiz update(Quiz quiz) {
+        QuizJpaEntity entity = quizJpaRepository.findById(quiz.getId()).orElseThrow();
+        entity.update(quiz.getCourseId(), quiz.getSectionId(), quiz.getTitle());
+
+        entity.clearQuestions();
+        // uq_quiz_question_quiz_number 유니크 키 때문에 기존 문항 DELETE가
+        // 새 문항 INSERT보다 먼저 DB에 반영되어야 한다 (Hibernate는 INSERT를 먼저 실행).
+        quizJpaRepository.flush();
+
+        appendQuestions(entity, quiz);
+        return toDomain(quizJpaRepository.save(entity));
+    }
+
+    private void appendQuestions(QuizJpaEntity entity, Quiz quiz) {
         for (QuizQuestion question : quiz.getQuestions()) {
             QuizQuestionJpaEntity questionEntity = entity.addQuestion(
                     question.getQuestionNumber(), question.getQuestionText(), question.getExplanation());
@@ -28,9 +58,6 @@ public class QuizRepositoryAdapter implements QuizRepository {
                 questionEntity.addOption(option.getOptionNumber(), option.getOptionText(), option.isCorrect());
             }
         }
-
-        QuizJpaEntity saved = quizJpaRepository.save(entity);
-        return toDomain(saved);
     }
 
     private Quiz toDomain(QuizJpaEntity entity) {
