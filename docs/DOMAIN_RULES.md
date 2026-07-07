@@ -9,13 +9,13 @@
 - 이메일: **gmail.com 도메인만 허용** (`identity.email.allowed-domain`)
 - 인증코드 TTL: **5분** (300000ms) · 인증완료 토큰 TTL 5분
 - 비밀번호 재발급: **하루 3회** 제한 (`password-reset-daily-limit`)
-- 로그인 **`<TODO: 실패 횟수>`회 실패 시 계정 잠금** (`members.login_fail_count` / `is_locked`)
+- 로그인 **5회 실패 시 계정 잠금** (`members.login_fail_count` / `is_locked`) — `Member.MAX_LOGIN_FAIL_COUNT`, 잠금 시 `U004 ACCOUNT_LOCKED`
 - JWT: access **30분**(1800000ms) / refresh **14일**(1209600000ms)
 
 ## 파일 업로드
 - 프로필/게시글/댓글 이미지: **5MB** (5242880 bytes)
 - ⚠️ `application.yaml` multipart 한도는 **5GB** — 위 도메인 제한(5MB)과 다름, 혼동 주의
-- 영상 파일 한도: `<TODO: 1GB 여부 확인>`
+- 영상 파일 한도: **1GB** (초과 시 `F005 VIDEO_FILE_SIZE_EXCEEDED`) — multipart 5GB 한도와 별개인 도메인 검증값
 
 ## 구독 (subscription)
 - 연간 패스 가격 = **(다가오는 수능일까지 남은 일수) × 30,000원** (`daily-rate`)
