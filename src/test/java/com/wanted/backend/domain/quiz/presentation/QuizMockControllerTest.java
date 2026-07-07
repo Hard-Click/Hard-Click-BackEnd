@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -14,12 +15,14 @@ import static org.mockito.Mockito.when;
 class QuizMockControllerTest {
 
     private CourseTitlePort courseTitlePort;
+    private QuizCommandUseCase quizCommandUseCase;
     private QuizMockController controller;
 
     @BeforeEach
     void setUp() {
         courseTitlePort = mock(CourseTitlePort.class);
-        controller = new QuizMockController(courseTitlePort);
+        quizCommandUseCase = mock(QuizCommandUseCase.class);
+        controller = new QuizMockController(courseTitlePort, quizCommandUseCase);
     }
 
     @Test

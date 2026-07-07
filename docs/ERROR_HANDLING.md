@@ -24,7 +24,7 @@
 | RP | 신고(report) | 5 |
 | N | 공지(notice) | 5 |
 | L | 강의/학습(lesson) | 5 |
-| CR | `<TODO: 코스/강좌 확인>` | 4 |
+| CR | 강의(course, 섹션 포함) | 5 |
 | R | `<TODO: 리뷰 확인>` | 4 |
 | DS | 일일 학습통계 | 4 |
 | NT | 알림(notification) | 2 |

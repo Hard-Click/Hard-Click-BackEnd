@@ -1,0 +1,28 @@
+package com.wanted.backend.domain.quiz.infrastructure.cource;
+
+import com.wanted.backend.domain.cource.domain.model.CourseSection;
+import com.wanted.backend.domain.cource.domain.repository.CourseRepository;
+import com.wanted.backend.domain.quiz.application.port.CourseOwnershipPort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
+
+@Component
+@RequiredArgsConstructor
+public class CourseOwnershipAdapter implements CourseOwnershipPort {
+
+    private final CourseRepository courseRepository;
+
+    @Override
+    public Optional<CourseSectionOwnership> findOwnership(Long courseId, Long sectionId) {
+        return courseRepository.findById(courseId)
+                .filter(course -> !course.isDeleted())
+                .map(course -> new CourseSectionOwnership(
+                        course.getAuthorId(),
+                        course.getSections().stream()
+                                .map(CourseSection::getId)
+                                .anyMatch(sectionId::equals)
+                ));
+    }
+}
