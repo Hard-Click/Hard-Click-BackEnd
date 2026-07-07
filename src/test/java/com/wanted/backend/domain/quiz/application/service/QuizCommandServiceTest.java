@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseOwnershipPort;
@@ -211,5 +212,34 @@ class QuizCommandServiceTest {
         assertThatThrownBy(() -> service.update(command))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_SECTION_NOT_FOUND);
+    }
+
+    @Test
+    void deleteRemovesTheQuizWhenItBelongsToTheInstructor() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(existingQuiz()));
+
+        service.delete(new DeleteQuizCommand(QUIZ_ID, INSTRUCTOR_ID));
+
+        verify(quizRepository).deleteById(QUIZ_ID);
+    }
+
+    @Test
+    void deleteRejectsWhenTheQuizDoesNotExist() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.delete(new DeleteQuizCommand(QUIZ_ID, INSTRUCTOR_ID)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+        verify(quizRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deleteRejectsWhenTheQuizWasRegisteredByAnotherInstructor() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(existingQuiz()));
+
+        assertThatThrownBy(() -> service.delete(new DeleteQuizCommand(QUIZ_ID, 999L)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+        verify(quizRepository, never()).deleteById(any());
     }
 }

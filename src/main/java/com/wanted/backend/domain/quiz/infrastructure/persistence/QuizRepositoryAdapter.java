@@ -34,13 +34,13 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Quiz> findById(Long id) {
-        return quizJpaRepository.findByIdWithQuestions(id).map(this::toDomain);
+        return quizJpaRepository.findWithQuestionsById(id).map(this::toDomain);
     }
 
     @Override
     @Transactional
     public Quiz update(Quiz quiz) {
-        QuizJpaEntity entity = quizJpaRepository.findByIdWithQuestions(quiz.getId())
+        QuizJpaEntity entity = quizJpaRepository.findWithQuestionsById(quiz.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
         entity.update(quiz.getCourseId(), quiz.getSectionId(), quiz.getTitle());
 
@@ -51,6 +51,12 @@ public class QuizRepositoryAdapter implements QuizRepository {
 
         appendQuestions(entity, quiz);
         return toDomain(quizJpaRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(Long id) {
+        quizJpaRepository.deleteById(id);
     }
 
     private void appendQuestions(QuizJpaEntity entity, Quiz quiz) {
