@@ -1,6 +1,8 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
+import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.global.common.ApiResponse;
@@ -35,8 +37,8 @@ import java.util.stream.IntStream;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
-@Tag(name = "Quiz Mock", description = "학생/강사 퀴즈 Mock API")
-public class QuizMockController {
+@Tag(name = "Quiz", description = "학생/강사 퀴즈 API")
+public class QuizController {
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_PAGE_SIZE = 10;
@@ -170,14 +172,7 @@ public class QuizMockController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                request.questions().stream()
-                        .map(q -> new CreateQuizCommand.QuestionCommand(
-                                q.questionText(),
-                                q.explanation(),
-                                q.correctOptionNumber(),
-                                q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
-                        ))
-                        .toList()
+                toQuestionCommands(request.questions())
         );
 
         Long quizId = quizCommandUseCase.create(command);
@@ -197,13 +192,24 @@ public class QuizMockController {
     public ResponseEntity<ApiResponse<InstructorQuizMutationResponse>> updateInstructorQuiz(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId,
-            @RequestBody(required = false) InstructorQuizRequest request
+            @Valid @RequestBody InstructorQuizRequest request
     ) {
+        UpdateQuizCommand command = new UpdateQuizCommand(
+                quizId,
+                userDetails.getMemberId(),
+                request.courseId(),
+                request.sectionId(),
+                request.quizTitle(),
+                toQuestionCommands(request.questions())
+        );
+
+        quizCommandUseCase.update(command);
+
         InstructorQuizMutationResponse response = new InstructorQuizMutationResponse(
                 quizId,
-                request == null || request.quizTitle() == null ? "React 기초 개념 퀴즈" : request.quizTitle(),
-                request == null || request.questions() == null ? 8 : request.questions().size(),
-                OffsetDateTime.parse("2026-06-11T16:00:00+09:00")
+                request.quizTitle(),
+                request.questions().size(),
+                OffsetDateTime.now()
         );
 
         return ApiResponse.success("퀴즈가 수정되었습니다.", response);
@@ -247,6 +253,17 @@ public class QuizMockController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
+    }
+
+    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
+        return questions.stream()
+                .map(q -> new QuizQuestionCommand(
+                        q.questionText(),
+                        q.explanation(),
+                        q.correctOptionNumber(),
+                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
+                ))
+                .toList();
     }
 
     private int normalizePage(Integer page) {

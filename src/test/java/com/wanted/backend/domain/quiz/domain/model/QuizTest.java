@@ -51,6 +51,44 @@ class QuizTest {
     }
 
     @Test
+    void updateReplacesCourseSectionTitleAndQuestions() {
+        QuizQuestion original = QuizQuestion.create(1, "기존 질문", null, 1,
+                List.of("보기1", "보기2", "보기3", "보기4"));
+        Quiz quiz = Quiz.create(1L, 10L, 100L, "기존 제목", List.of(original));
+
+        QuizQuestion replacement1 = QuizQuestion.create(1, "새 질문1", "설명", 2,
+                List.of("보기1", "보기2", "보기3", "보기4"));
+        QuizQuestion replacement2 = QuizQuestion.create(2, "새 질문2", null, 3,
+                List.of("보기1", "보기2", "보기3", "보기4"));
+
+        quiz.update(20L, 200L, "새 제목", List.of(replacement1, replacement2));
+
+        assertThat(quiz.getCourseId()).isEqualTo(20L);
+        assertThat(quiz.getSectionId()).isEqualTo(200L);
+        assertThat(quiz.getTitle()).isEqualTo("새 제목");
+        assertThat(quiz.getQuestions()).hasSize(2);
+        assertThat(quiz.getQuestions().get(0).getQuestionText()).isEqualTo("새 질문1");
+    }
+
+    @Test
+    void updateRejectsABlankTitleEmptyQuestionsOrMissingIds() {
+        QuizQuestion question = QuizQuestion.create(1, "질문", null, 1,
+                List.of("보기1", "보기2", "보기3", "보기4"));
+        Quiz quiz = Quiz.create(1L, 10L, 100L, "제목", List.of(question));
+
+        assertThatThrownBy(() -> quiz.update(10L, 100L, " ", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(null, 100L, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(10L, null, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void questionCreateRejectsWrongOptionCount() {
         assertThatThrownBy(() -> QuizQuestion.create(1, "질문", null, 1, List.of("보기1", "보기2")))
                 .isInstanceOf(IllegalArgumentException.class);

@@ -24,7 +24,8 @@
 | RP | 신고(report) | 5 |
 | N | 공지(notice) | 5 |
 | L | 강의/학습(lesson) | 5 |
-| CR | 강의(course) | 4 |
+| CR | 강의(course) | 5 |
+| QZ | 퀴즈(quiz) | 2 |
 | R | 리뷰(review) | 4 |
 | DS | 일일 학습통계 | 4 |
 | NT | 알림(notification) | 2 |

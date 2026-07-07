@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +44,7 @@ public class QuizQuestionJpaEntity {
     private String explanation;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 20)
     private List<QuizOptionJpaEntity> options = new ArrayList<>();
 
     static QuizQuestionJpaEntity of(QuizJpaEntity quiz, int questionNumber, String questionText, String explanation) {
