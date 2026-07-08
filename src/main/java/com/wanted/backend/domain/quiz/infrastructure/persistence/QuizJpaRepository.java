@@ -24,4 +24,9 @@ public interface QuizJpaRepository extends JpaRepository<QuizJpaEntity, Long> {
 
     List<QuizJpaEntity> findByInstructorIdAndCourseIdAndSectionIdOrderByCreatedAtAsc(
             Long instructorId, Long courseId, Long sectionId);
+
+    // 학생 '내 퀴즈 목록' — 특정 강의의 전체 퀴즈. questions를 함께 로딩(문항 수 계산)하고,
+    // 주차 정렬은 앱에서 섹션 order_index로 하되 동일 주차 내 순서 결정성을 위해 sectionId,id로 1차 정렬한다.
+    @EntityGraph(attributePaths = "questions")
+    List<QuizJpaEntity> findByCourseIdOrderBySectionIdAscIdAsc(Long courseId);
 }

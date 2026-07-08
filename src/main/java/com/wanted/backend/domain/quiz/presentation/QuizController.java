@@ -7,6 +7,7 @@ import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
+import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
@@ -55,21 +56,28 @@ public class QuizController {
     private final QuizSubmissionUseCase quizSubmissionUseCase;
 
     @GetMapping("/members/me/quizzes")
-    @Operation(summary = "내 퀴즈 목록 조회", description = "현재 로그인한 회원의 퀴즈 목록을 조회합니다.")
+    @Operation(summary = "내 퀴즈 목록 조회", description = "선택한 강의의 주차별 퀴즈와 내 응시 현황(완료 수/평균 점수)을 조회합니다.")
     public ResponseEntity<ApiResponse<MyQuizListResponse>> getMyQuizzes(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
+            @RequestParam Long courseId
     ) {
-        int normalizedPage = normalizePage(page);
-        int normalizedSize = normalizeSize(size);
-        List<MyQuizListResponse.MyQuizItem> quizzes = myQuizItems();
+        MyQuizList myQuizzes = quizQueryUseCase.getMyQuizzes(userDetails.getMemberId(), courseId);
 
         MyQuizListResponse response = new MyQuizListResponse(
-                paginate(quizzes, normalizedPage, normalizedSize),
-                quizzes.size(),
-                normalizedPage,
-                normalizedSize
+                myQuizzes.courseId(),
+                myQuizzes.courseTitle(),
+                new MyQuizListResponse.Summary(myQuizzes.completedCount(), myQuizzes.averageScore()),
+                myQuizzes.quizzes().stream()
+                        .map(item -> new MyQuizListResponse.MyQuizItem(
+                                item.quizId(),
+                                item.weekNumber(),
+                                item.quizTitle(),
+                                item.questionCount(),
+                                item.completed(),
+                                item.score(),
+                                item.submittedAt() == null ? null
+                                        : item.submittedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
+                        .toList()
         );
 
         return ApiResponse.success("내 퀴즈 목록을 조회했습니다.", response);
@@ -347,23 +355,6 @@ public class QuizController {
         return items.subList(fromIndex, toIndex);
     }
 
-    private List<MyQuizListResponse.MyQuizItem> myQuizItems() {
-        return List.of(
-                new MyQuizListResponse.MyQuizItem(90L, "React 기초 개념 퀴즈", 1L, "React 완벽 가이드", "섹션 1: React 기초", 8, true, 75, OffsetDateTime.parse("2026-05-10T15:30:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(91L, "Hooks 활용 퀴즈", 1L, "React 완벽 가이드", "섹션 2: Hooks", 6, false, null, null),
-                new MyQuizListResponse.MyQuizItem(92L, "상태 관리 패턴 퀴즈", 1L, "React 완벽 가이드", "섹션 3: 상태 관리", 7, true, 92, OffsetDateTime.parse("2026-05-12T20:10:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(93L, "React Router 실전 퀴즈", 2L, "프론트엔드 라우팅 마스터", "섹션 2: 동적 라우팅", 5, false, null, null),
-                new MyQuizListResponse.MyQuizItem(94L, "폼 검증과 에러 처리 퀴즈", 3L, "실전 프론트엔드 폼", "섹션 4: 유효성 검증", 9, true, 88, OffsetDateTime.parse("2026-05-18T21:45:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(95L, "Spring Boot REST API 퀴즈", 4L, "Spring Boot 핵심 가이드", "섹션 1: REST API 설계", 10, true, 70, OffsetDateTime.parse("2026-05-20T19:20:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(96L, "JPA 연관관계 퀴즈", 5L, "JPA 실전 입문", "섹션 3: 연관관계 매핑", 8, false, null, null),
-                new MyQuizListResponse.MyQuizItem(97L, "SQL 기본기 퀴즈", 6L, "데이터베이스 첫걸음", "섹션 2: SELECT와 JOIN", 12, true, 95, OffsetDateTime.parse("2026-05-25T22:05:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(98L, "알고리즘 정렬 퀴즈", 7L, "코딩테스트 기본기", "섹션 1: 정렬", 6, true, 83, OffsetDateTime.parse("2026-05-28T18:30:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(99L, "Docker 배포 기초 퀴즈", 8L, "배포 자동화 입문", "섹션 1: 컨테이너 이해", 7, false, null, null),
-                new MyQuizListResponse.MyQuizItem(100L, "Redis 캐싱 전략 퀴즈", 9L, "백엔드 성능 최적화", "섹션 2: 캐시 설계", 8, true, 78, OffsetDateTime.parse("2026-06-01T17:15:00+09:00")),
-                new MyQuizListResponse.MyQuizItem(101L, "JWT 인증 흐름 퀴즈", 10L, "Spring Security 실전", "섹션 3: 토큰 인증", 9, false, null, null)
-        );
-    }
-
     private List<StudentQuizDetailResponse.Question> studentQuizQuestions() {
         return List.of(
                 new StudentQuizDetailResponse.Question(1L, 1, "React의 가상 DOM이란 무엇인가요?", List.of(
@@ -510,19 +501,20 @@ public class QuizController {
     }
 
     public record MyQuizListResponse(
-            List<MyQuizItem> quizzes,
-            int totalCount,
-            int page,
-            int size
+            Long courseId,
+            String courseTitle,
+            Summary summary,
+            List<MyQuizItem> quizzes
     ) {
+        public record Summary(int completedCount, int averageScore) {
+        }
+
         public record MyQuizItem(
                 Long quizId,
+                int weekNumber,
                 String quizTitle,
-                Long courseId,
-                String courseTitle,
-                String sectionTitle,
                 int questionCount,
-                boolean submitted,
+                boolean completed,
                 Integer score,
                 OffsetDateTime submittedAt
         ) {

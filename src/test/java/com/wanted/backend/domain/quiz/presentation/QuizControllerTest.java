@@ -7,6 +7,7 @@ import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
+import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
@@ -187,20 +188,66 @@ class QuizControllerTest {
     }
 
     @Test
-    void myQuizzesIncludeCourseIdForEachItem() {
+    void myQuizzesMapTheQueryResultToTheResponseWithSummaryAndWeekOrder() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizzes(1L, 10L)).thenReturn(new MyQuizList(
+                10L, "React 완벽 가이드", 2, 85,
+                List.of(
+                        new MyQuizList.MyQuizItem(90L, 1, "React 기초 개념", 10, true, 80,
+                                java.time.LocalDateTime.of(2026, 5, 12, 0, 0)),
+                        new MyQuizList.MyQuizItem(92L, 3, "State와 Lifecycle", 10, false, null, null))
+        ));
+
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
-                controller.getMyQuizzes(null, null, null);
+                controller.getMyQuizzes(userDetails, 10L);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.MyQuizListResponse response = result.getBody().data();
+        assertThat(response.courseId()).isEqualTo(10L);
+        assertThat(response.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(response.summary().completedCount()).isEqualTo(2);
+        assertThat(response.summary().averageScore()).isEqualTo(85);
+        assertThat(response.quizzes()).hasSize(2);
+
+        QuizController.MyQuizListResponse.MyQuizItem completed = response.quizzes().get(0);
+        assertThat(completed.weekNumber()).isEqualTo(1);
+        assertThat(completed.completed()).isTrue();
+        assertThat(completed.score()).isEqualTo(80);
+        assertThat(completed.submittedAt()).isNotNull();
+
+        QuizController.MyQuizListResponse.MyQuizItem notSubmitted = response.quizzes().get(1);
+        assertThat(notSubmitted.completed()).isFalse();
+        assertThat(notSubmitted.score()).isNull();
+        assertThat(notSubmitted.submittedAt()).isNull();
+    }
+
+    @Test
+    void myQuizzesMapAnEmptyResultToZeroSummaryAndEmptyList() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizzes(1L, 10L))
+                .thenReturn(new MyQuizList(10L, "React 완벽 가이드", 0, 0, List.of()));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
+                controller.getMyQuizzes(userDetails, 10L);
 
         QuizController.MyQuizListResponse response = result.getBody().data();
-        assertThat(response.quizzes()).isNotEmpty();
-        assertThat(response.quizzes()).allSatisfy(item -> assertThat(item.courseId()).isNotNull());
+        assertThat(response.summary().completedCount()).isZero();
+        assertThat(response.summary().averageScore()).isZero();
+        assertThat(response.quizzes()).isEmpty();
+    }
 
-        QuizController.MyQuizListResponse.MyQuizItem reactQuiz = response.quizzes().stream()
-                .filter(item -> item.quizId().equals(90L))
-                .findFirst()
-                .orElseThrow();
-        assertThat(reactQuiz.courseId()).isEqualTo(1L);
-        assertThat(reactQuiz.courseTitle()).isEqualTo("React 완벽 가이드");
+    @Test
+    void myQuizzesPropagateTheUseCasesBusinessExceptionWhenNotEnrolled() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizzes(1L, 10L))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED));
+
+        assertThatThrownBy(() -> controller.getMyQuizzes(userDetails, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
     }
 
     private QuizController.InstructorQuizRequest quizRequest() {
