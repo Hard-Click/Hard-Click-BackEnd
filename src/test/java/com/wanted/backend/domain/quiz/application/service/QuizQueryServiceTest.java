@@ -1,9 +1,12 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.port.CourseSectionTitlePort;
+import com.wanted.backend.domain.quiz.application.port.CourseStudentPort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
+import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
@@ -45,6 +48,7 @@ class QuizQueryServiceTest {
     private CourseTitlePort courseTitlePort;
     private CourseSectionTitlePort courseSectionTitlePort;
     private EnrollmentAccessPort enrollmentAccessPort;
+    private CourseStudentPort courseStudentPort;
     private QuizQueryService service;
 
     @BeforeEach
@@ -54,8 +58,9 @@ class QuizQueryServiceTest {
         courseTitlePort = mock(CourseTitlePort.class);
         courseSectionTitlePort = mock(CourseSectionTitlePort.class);
         enrollmentAccessPort = mock(EnrollmentAccessPort.class);
+        courseStudentPort = mock(CourseStudentPort.class);
         service = new QuizQueryService(quizRepository, quizSubmissionRepository,
-                courseTitlePort, courseSectionTitlePort, enrollmentAccessPort);
+                courseTitlePort, courseSectionTitlePort, enrollmentAccessPort, courseStudentPort);
     }
 
     private Quiz quiz(Long id, Long courseId, Long sectionId, String title, int questionCount) {
@@ -474,5 +479,88 @@ class QuizQueryServiceTest {
         assertThatThrownBy(() -> service.getStudentQuizDetail(MEMBER_ID, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+    }
+
+    private QuizStatisticsQuery statsQuery(QuizStatisticsQuery.SortType sort, QuizStatisticsQuery.FilterType filter) {
+        return new QuizStatisticsQuery(INSTRUCTOR_ID, 90L, null, sort, filter, 0, 10);
+    }
+
+    private void stubStatsCommon() {
+        Quiz quiz = reportQuiz(90L, SECTION_ID, "React 기초 개념 퀴즈");
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "1주차: React 기초"));
+        // 수강생 3명 (member1/2 응시, member3 미응시)
+        when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of(
+                new CourseStudentPort.CourseStudent(1L, "choiaa", "최아"),
+                new CourseStudentPort.CourseStudent(2L, "kimsu", "김수"),
+                new CourseStudentPort.CourseStudent(3L, "leejin", "이진")));
+        when(quizSubmissionRepository.findByQuizId(90L)).thenReturn(List.of(
+                QuizSubmission.restore(55L, 90L, 1L, 90, 2, 2, LocalDateTime.of(2026, 5, 10, 0, 0), List.of()),
+                QuizSubmission.restore(56L, 90L, 2L, 60, 2, 1, LocalDateTime.of(2026, 5, 12, 0, 0), List.of())));
+    }
+
+    @Test
+    void instructorQuizStatisticsAggregatesSummaryDistributionAndStudents() {
+        stubStatsCommon();
+
+        InstructorQuizStatistics stats = service.getInstructorQuizStatistics(
+                statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL));
+
+        assertThat(stats.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(stats.summary().totalCount()).isEqualTo(3);
+        assertThat(stats.summary().submittedCount()).isEqualTo(2);
+        assertThat(stats.summary().notSubmittedCount()).isEqualTo(1);
+        assertThat(stats.summary().averageScore()).isEqualTo(75); // (90+60)/2
+
+        // 분포: 90~100 1명(50%), 70~89 0명(0%), 50~69 1명(50%), 0~49 0명
+        assertThat(stats.scoreDistribution()).hasSize(4);
+        assertThat(stats.scoreDistribution().get(0).count()).isEqualTo(1);
+        assertThat(stats.scoreDistribution().get(0).percentage()).isEqualTo(50);
+        assertThat(stats.scoreDistribution().get(2).count()).isEqualTo(1);
+
+        // SCORE_DESC 정렬: 90 → 60 → 미응시(null 뒤)
+        assertThat(stats.students()).hasSize(3);
+        assertThat(stats.students().get(0).score()).isEqualTo(90);
+        assertThat(stats.students().get(1).score()).isEqualTo(60);
+        assertThat(stats.students().get(2).submitted()).isFalse();
+        assertThat(stats.students().get(2).score()).isNull();
+        assertThat(stats.students().get(2).submittedAt()).isNull();
+    }
+
+    @Test
+    void instructorQuizStatisticsFilterNotSubmittedReturnsOnlyNonSubmitters() {
+        stubStatsCommon();
+
+        InstructorQuizStatistics stats = service.getInstructorQuizStatistics(
+                statsQuery(QuizStatisticsQuery.SortType.NAME, QuizStatisticsQuery.FilterType.NOT_SUBMITTED));
+
+        assertThat(stats.students()).hasSize(1);
+        assertThat(stats.students().get(0).userId()).isEqualTo("leejin");
+        assertThat(stats.students().get(0).submitted()).isFalse();
+    }
+
+    @Test
+    void instructorQuizStatisticsRejectsWhenNotOwner() {
+        Quiz quiz = reportQuiz(90L, SECTION_ID, "React 기초 개념 퀴즈"); // instructorId = 1L
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+
+        assertThatThrownBy(() -> service.getInstructorQuizStatistics(
+                new QuizStatisticsQuery(999L, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+    }
+
+    @Test
+    void instructorQuizStatisticsRejectsWhenQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getInstructorQuizStatistics(
+                statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
     }
 }

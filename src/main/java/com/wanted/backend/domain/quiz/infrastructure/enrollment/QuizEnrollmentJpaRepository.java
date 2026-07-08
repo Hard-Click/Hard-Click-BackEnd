@@ -13,4 +13,11 @@ public interface QuizEnrollmentJpaRepository extends JpaRepository<QuizEnrollmen
 
     boolean existsByMemberIdAndCourseIdAndStatusInAndExpiredAtGreaterThanEqual(
             Long memberId, Long courseId, Collection<EnrollmentStatus> statuses, LocalDateTime now);
+
+    // 통계용 활성 수강생 목록 — 무기한(만료 null) + 미만료(만료일 미래) 두 갈래를 각각 조회한다.
+    java.util.List<QuizEnrollmentReferenceJpaEntity> findByCourseIdAndStatusInAndExpiredAtIsNull(
+            Long courseId, Collection<EnrollmentStatus> statuses);
+
+    java.util.List<QuizEnrollmentReferenceJpaEntity> findByCourseIdAndStatusInAndExpiredAtGreaterThanEqual(
+            Long courseId, Collection<EnrollmentStatus> statuses, LocalDateTime now);
 }

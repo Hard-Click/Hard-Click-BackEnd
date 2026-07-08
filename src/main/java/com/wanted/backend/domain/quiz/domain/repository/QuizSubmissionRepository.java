@@ -11,4 +11,6 @@ public interface QuizSubmissionRepository {
     boolean existsByQuizIdAndMemberId(Long quizId, Long memberId);
 
     List<QuizSubmission> findByMemberIdAndQuizIdIn(Long memberId, List<Long> quizIds);
+
+    List<QuizSubmission> findByQuizId(Long quizId);
 }
