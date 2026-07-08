@@ -2,6 +2,7 @@ package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
+import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
 import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
@@ -48,25 +49,21 @@ public class StudyController {
         return ApiResponse.success("스터디 목록 조회 완료", StudyListResponse.from(result));
     }
 
-    // TODO(#439): mock 상세 조회 → 실제 조회로 교체 (chatRoomId 포함 예정)
-    @Operation(summary = "스터디 상세 조회", description = "스터디 상세 정보를 조회합니다.")
+    @Operation(
+            summary = "스터디 상세 조회",
+            description = """
+                스터디 상세 정보를 조회합니다.
+                - 연결된 채팅방 ID(chatRoomId)가 함께 반환됩니다.
+                - 참여자 이름 목록(members)은 본인이 참여 중인 경우에만 노출됩니다.
+                """
+    )
     @GetMapping("/{groupId}")
     public ResponseEntity<ApiResponse<StudyDetailResponse>> getStudyDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId) {
 
-        boolean isJoined = true;
-
-        StudyDetailResponse response = new StudyDetailResponse(
-                groupId,
-                "수학 1등급 목표 스터디",
-                "매주 일요일 밤 10시에 모여서 질문 받습니다.",
-                "수학1", "이*연", 2, 5, false, isJoined, false,
-                isJoined ? List.of("이*연", "김*민") : null,
-                LocalDateTime.of(2026, 5, 18, 17, 0)
-        );
-
-        return ApiResponse.success("스터디 상세 조회 완료", response);
+        StudyDetailResult result = studyQueryUseCase.getDetail(groupId, userDetails.getMemberId());
+        return ApiResponse.success("스터디 상세 조회 완료", StudyDetailResponse.from(result));
     }
 
     @Operation(

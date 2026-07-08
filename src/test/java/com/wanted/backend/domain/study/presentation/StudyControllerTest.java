@@ -2,11 +2,14 @@ package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
+import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
 import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
 import com.wanted.backend.global.domain.SubjectType;
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import com.wanted.backend.global.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -127,6 +131,32 @@ class StudyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디 조회 시 404를 반환한다")
+    void getStudyDetail_fail_notFound() throws Exception {
+        given(studyQueryUseCase.getDetail(eq(999L), eq(1L)))
+                .willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND));
+
+        mockMvc.perform(get("/api/study/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("상세 조회 시 조회 결과를 그대로 반환한다")
+    void getStudyDetail_success() throws Exception {
+        StudyDetailResult result = new StudyDetailResult(
+                45L, "수학 1등급 목표 스터디", "매주 일요일 밤 10시에 모여서 질문 받습니다.", "MATH_1", "이*연",
+                2, 5, false, true, false, List.of("이*연", "김*민"), 12L, LocalDateTime.now());
+        given(studyQueryUseCase.getDetail(eq(45L), eq(1L))).willReturn(result);
+
+        mockMvc.perform(get("/api/study/45"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupId").value(45))
+                .andExpect(jsonPath("$.data.chatRoomId").value(12))
+                .andExpect(jsonPath("$.data.isJoined").value(true));
     }
 
     @Test
