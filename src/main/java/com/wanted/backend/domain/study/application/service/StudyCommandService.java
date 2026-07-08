@@ -50,8 +50,7 @@ public class StudyCommandService implements StudyCommandUseCase {
         Study study = studyRepository.findById(command.groupId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_NOT_FOUND));
 
-        study.validateUpdatable(command.memberId());
-        study.update(command.title(), command.subject(), command.maxCount(), command.content());
+        study.update(command.memberId(), command.title(), command.subject(), command.maxCount(), command.content());
 
         studyRepository.save(study);
     }

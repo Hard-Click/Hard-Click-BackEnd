@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -27,11 +29,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -136,7 +140,7 @@ class StudyControllerTest {
     }
 
     @Test
-    @DisplayName("정상 요청 시 200과 함께 수정이 반영된다")
+    @DisplayName("정상 요청 시 200과 함께 use case에 올바른 값이 전달된다")
     void updateStudy_success() throws Exception {
         CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 5, "수정된 내용");
 
@@ -144,6 +148,29 @@ class StudyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
+
+        ArgumentCaptor<UpdateStudyCommand> captor = ArgumentCaptor.forClass(UpdateStudyCommand.class);
+        verify(studyCommandUseCase).update(captor.capture());
+        assertThat(captor.getValue().groupId()).isEqualTo(45L);
+        assertThat(captor.getValue().memberId()).isEqualTo(1L);
+        assertThat(captor.getValue().title()).isEqualTo("수정된 제목");
+        assertThat(captor.getValue().subject()).isEqualTo("MATH_1");
+        assertThat(captor.getValue().maxCount()).isEqualTo(5);
+        assertThat(captor.getValue().content()).isEqualTo("수정된 내용");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 수정하려 하면 404를 반환한다")
+    void updateStudy_fail_notFound() throws Exception {
+        CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 5, "수정된 내용");
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).update(any());
+
+        mockMvc.perform(patch("/api/study/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
     }
 
     @Test

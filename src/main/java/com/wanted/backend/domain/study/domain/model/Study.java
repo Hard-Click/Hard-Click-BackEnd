@@ -51,13 +51,8 @@ public class Study {
         return this.hostId.equals(memberId);
     }
 
-    public void validateUpdatable(Long memberId) {
-        if (!isOwner(memberId)) {
-            throw new BusinessException(ErrorCode.STUDY_UPDATE_FORBIDDEN);
-        }
-    }
-
-    public void update(String title, String subject, int maxCount, String content) {
+    public void update(Long requesterId, String title, String subject, int maxCount, String content) {
+        validateUpdatable(requesterId);
         if (maxCount < 2) {
             throw new BusinessException(ErrorCode.STUDY_MIN_COUNT_INVALID);
         }
@@ -69,6 +64,12 @@ public class Study {
         this.maxCount = maxCount;
         this.content = content;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    private void validateUpdatable(Long memberId) {
+        if (!isOwner(memberId)) {
+            throw new BusinessException(ErrorCode.STUDY_UPDATE_FORBIDDEN);
+        }
     }
 
     public Long getId() { return id; }
