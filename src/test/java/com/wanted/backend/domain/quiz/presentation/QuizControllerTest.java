@@ -8,6 +8,7 @@ import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
@@ -186,6 +187,50 @@ class QuizControllerTest {
         assertThatThrownBy(() -> controller.submitQuiz(userDetails, 90L, request))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ALREADY_SUBMITTED);
+    }
+
+    @Test
+    void quizReportMapsTheQueryResultIncludingWrongNotesAndScoreDiff() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        QuizReport.QuestionResult wrong = new QuizReport.QuestionResult(
+                20L, 2, "질문2", 201L, 202L, false, "해설2",
+                List.of(new QuizReport.OptionView(201L, 1, "보기1"),
+                        new QuizReport.OptionView(202L, 2, "보기2")));
+        QuizReport.QuestionResult correctQ = new QuizReport.QuestionResult(
+                10L, 1, "질문1", 102L, 102L, true, "해설1",
+                List.of(new QuizReport.OptionView(101L, 1, "보기1"),
+                        new QuizReport.OptionView(102L, 2, "보기2")));
+        when(quizQueryUseCase.getMyQuizReport(1L, 90L)).thenReturn(new QuizReport(
+                90L, 2, "2주차 퀴즈", java.time.LocalDateTime.of(2026, 5, 12, 0, 0),
+                60, 100, 1, 1, -15, List.of(wrong), List.of(correctQ, wrong)));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.QuizReportResponse>> result =
+                controller.getMyQuizReport(userDetails, 90L);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.QuizReportResponse response = result.getBody().data();
+        assertThat(response.quizId()).isEqualTo(90L);
+        assertThat(response.week()).isEqualTo(2);
+        assertThat(response.score()).isEqualTo(60);
+        assertThat(response.totalScore()).isEqualTo(100);
+        assertThat(response.scoreDiff()).isEqualTo(-15);
+        assertThat(response.wrongNotes()).hasSize(1);
+        assertThat(response.wrongNotes().get(0).questionId()).isEqualTo(20L);
+        assertThat(response.wrongNotes().get(0).correctOptionId()).isEqualTo(201L);
+        assertThat(response.questions()).hasSize(2);
+    }
+
+    @Test
+    void quizReportPropagatesTheUseCasesBusinessExceptionWhenNotSubmitted() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizReport(1L, 90L))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_SUBMISSION_NOT_FOUND));
+
+        assertThatThrownBy(() -> controller.getMyQuizReport(userDetails, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_SUBMISSION_NOT_FOUND);
     }
 
     @Test

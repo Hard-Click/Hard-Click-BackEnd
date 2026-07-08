@@ -6,11 +6,14 @@ import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
+import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.model.QuizSubmission;
+import com.wanted.backend.domain.quiz.domain.model.QuizSubmissionAnswer;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
 import com.wanted.backend.domain.quiz.domain.repository.QuizSubmissionRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -29,6 +32,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class QuizQueryService implements QuizQueryUseCase {
+
+    // 퀴즈 점수는 정답률 백분율(0~100)이므로 만점은 100 고정.
+    private static final int MAX_QUIZ_SCORE = 100;
 
     private final QuizRepository quizRepository;
     private final QuizSubmissionRepository quizSubmissionRepository;
@@ -200,5 +206,100 @@ public class QuizQueryService implements QuizQueryUseCase {
                 answeredCount,
                 submitted,
                 questions);
+    }
+
+    @Override
+    public QuizReport getMyQuizReport(Long memberId, Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        // 수강 중인 강의의 퀴즈 리포트만 조회 가능 (비수강자의 정답/해설 열람 차단)
+        if (!enrollmentAccessPort.hasActiveEnrollment(memberId, quiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
+
+        // 같은 강의의 퀴즈/섹션/내 제출을 한 번에 확보 (현재 제출 확인 + scoreDiff 계산 공용)
+        List<Quiz> courseQuizzes = quizRepository.findAllByCourseId(quiz.getCourseId());
+        Map<Long, CourseSectionTitlePort.SectionInfo> sections = courseSectionTitlePort
+                .findSectionsByIds(courseQuizzes.stream().map(Quiz::getSectionId).distinct().toList());
+        Map<Long, QuizSubmission> submissionByQuizId = quizSubmissionRepository
+                .findByMemberIdAndQuizIdIn(memberId, courseQuizzes.stream().map(Quiz::getId).toList()).stream()
+                .collect(Collectors.toMap(QuizSubmission::getQuizId, Function.identity()));
+
+        QuizSubmission submission = submissionByQuizId.get(quizId);
+        if (submission == null) {
+            throw new BusinessException(ErrorCode.QUIZ_SUBMISSION_NOT_FOUND);
+        }
+
+        int week = weekOf(sections, quiz.getSectionId());
+        int scoreDiff = calculateScoreDiff(quiz, submission.getScore(), courseQuizzes, sections, submissionByQuizId);
+
+        Map<Long, QuizSubmissionAnswer> answerByQuestionId = submission.getAnswers().stream()
+                .collect(Collectors.toMap(QuizSubmissionAnswer::getQuestionId, Function.identity()));
+
+        // 리포트는 제출 후 조회이므로 정답/해설을 노출한다. 문항/보기는 번호순 정렬.
+        List<QuizReport.QuestionResult> questions = quiz.getQuestions().stream()
+                .sorted(Comparator.comparingInt(QuizQuestion::getQuestionNumber))
+                .map(question -> {
+                    QuizSubmissionAnswer answer = answerByQuestionId.get(question.getId());
+                    Long correctOptionId = question.getOptions().stream()
+                            .filter(QuizOption::isCorrect)
+                            .map(QuizOption::getId)
+                            .findFirst()
+                            .orElse(null);
+                    return new QuizReport.QuestionResult(
+                            question.getId(),
+                            question.getQuestionNumber(),
+                            question.getQuestionText(),
+                            correctOptionId,
+                            answer == null ? null : answer.getSelectedOptionId(),
+                            answer != null && answer.isCorrect(),
+                            question.getExplanation(),
+                            question.getOptions().stream()
+                                    .sorted(Comparator.comparingInt(QuizOption::getOptionNumber))
+                                    .map(option -> new QuizReport.OptionView(
+                                            option.getId(), option.getOptionNumber(), option.getOptionText()))
+                                    .toList());
+                })
+                .toList();
+
+        List<QuizReport.QuestionResult> wrongNotes = questions.stream()
+                .filter(q -> !q.correct())
+                .toList();
+
+        return new QuizReport(
+                quiz.getId(),
+                week,
+                quiz.getTitle(),
+                submission.getSubmittedAt(),
+                submission.getScore(),
+                MAX_QUIZ_SCORE,
+                submission.getCorrectCount(),
+                submission.getIncorrectCount(),
+                scoreDiff,
+                wrongNotes,
+                questions);
+    }
+
+    private int weekOf(Map<Long, CourseSectionTitlePort.SectionInfo> sections, Long sectionId) {
+        CourseSectionTitlePort.SectionInfo info = sections.get(sectionId);
+        return info == null ? 0 : info.orderIndex();
+    }
+
+    // scoreDiff = 현재 점수 − 바로 이전 주차(내가 제출한) 퀴즈 점수. 이전 주차 제출이 없으면 0.
+    private int calculateScoreDiff(Quiz currentQuiz, int currentScore, List<Quiz> courseQuizzes,
+                                    Map<Long, CourseSectionTitlePort.SectionInfo> sections,
+                                    Map<Long, QuizSubmission> submissionByQuizId) {
+        int currentWeek = weekOf(sections, currentQuiz.getSectionId());
+
+        Integer previousScore = courseQuizzes.stream()
+                .filter(q -> !q.getId().equals(currentQuiz.getId()))
+                .filter(q -> submissionByQuizId.containsKey(q.getId()))
+                .filter(q -> weekOf(sections, q.getSectionId()) < currentWeek)
+                .max(Comparator.comparingInt(q -> weekOf(sections, q.getSectionId())))
+                .map(q -> submissionByQuizId.get(q.getId()).getScore())
+                .orElse(null);
+
+        return previousScore == null ? 0 : currentScore - previousScore;
     }
 }

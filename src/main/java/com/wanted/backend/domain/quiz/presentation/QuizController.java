@@ -8,6 +8,7 @@ import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
@@ -152,22 +153,38 @@ public class QuizController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId
     ) {
-        List<QuizReportResponse.QuestionResult> questions = quizReportQuestions();
+        QuizReport report = quizQueryUseCase.getMyQuizReport(userDetails.getMemberId(), quizId);
 
         QuizReportResponse response = new QuizReportResponse(
-                quizId,
-                "React 기초 개념 퀴즈",
-                "React 완벽 가이드",
-                "섹션 1: React 기초",
-                75,
-                questions.size(),
-                6,
-                2,
-                OffsetDateTime.parse("2026-05-10T15:30:00+09:00"),
-                questions
+                report.quizId(),
+                report.week(),
+                report.quizTitle(),
+                report.submittedAt() == null ? null
+                        : report.submittedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime(),
+                report.score(),
+                report.totalScore(),
+                report.correctCount(),
+                report.incorrectCount(),
+                report.scoreDiff(),
+                report.wrongNotes().stream().map(QuizController::toQuestionResultResponse).toList(),
+                report.questions().stream().map(QuizController::toQuestionResultResponse).toList()
         );
 
         return ApiResponse.success("오답노트 및 리포트를 조회했습니다.", response);
+    }
+
+    private static QuizReportResponse.QuestionResult toQuestionResultResponse(QuizReport.QuestionResult q) {
+        return new QuizReportResponse.QuestionResult(
+                q.questionId(),
+                q.questionNumber(),
+                q.questionText(),
+                q.correctOptionId(),
+                q.selectedOptionId(),
+                q.correct(),
+                q.explanation(),
+                q.options().stream()
+                        .map(o -> new QuizReportResponse.Option(o.optionId(), o.optionNumber(), o.optionText()))
+                        .toList());
     }
 
     @GetMapping("/instructor/quizzes")
@@ -367,59 +384,6 @@ public class QuizController {
         return items.subList(fromIndex, toIndex);
     }
 
-    private List<QuizReportResponse.QuestionResult> quizReportQuestions() {
-        return List.of(
-                new QuizReportResponse.QuestionResult(1L, 1, "React의 가상 DOM이란 무엇인가요?", 2L, 2L, true, "가상 DOM은 메모리에 존재하는 UI 표현이며 실제 DOM 변경을 효율화합니다.", List.of(
-                        new QuizReportResponse.Option(1L, 1, "실제 DOM의 복사본"),
-                        new QuizReportResponse.Option(2L, 2, "메모리에 존재하는 DOM의 표현"),
-                        new QuizReportResponse.Option(3L, 3, "HTML 파일"),
-                        new QuizReportResponse.Option(4L, 4, "CSS 스타일시트")
-                )),
-                new QuizReportResponse.QuestionResult(2L, 2, "JSX는 무엇의 약자인가요?", 5L, 6L, false, "JSX는 JavaScript XML의 약자로 JavaScript 안에서 UI 구조를 표현합니다.", List.of(
-                        new QuizReportResponse.Option(5L, 1, "JavaScript XML"),
-                        new QuizReportResponse.Option(6L, 2, "Java Syntax Extension"),
-                        new QuizReportResponse.Option(7L, 3, "JSON XML"),
-                        new QuizReportResponse.Option(8L, 4, "JavaScript Extension")
-                )),
-                new QuizReportResponse.QuestionResult(3L, 3, "useState 훅이 반환하는 값의 조합으로 올바른 것은 무엇인가요?", 9L, 9L, true, "useState는 현재 상태값과 해당 상태를 갱신하는 함수를 배열로 반환합니다.", List.of(
-                        new QuizReportResponse.Option(9L, 1, "현재 상태와 상태 변경 함수"),
-                        new QuizReportResponse.Option(10L, 2, "렌더링 함수와 DOM 노드"),
-                        new QuizReportResponse.Option(11L, 3, "이전 props와 현재 props"),
-                        new QuizReportResponse.Option(12L, 4, "컴포넌트 이름과 이벤트 객체")
-                )),
-                new QuizReportResponse.QuestionResult(4L, 4, "useEffect의 의존성 배열을 빈 배열로 전달하면 언제 실행되나요?", 13L, 13L, true, "빈 의존성 배열은 최초 마운트 이후 한 번만 effect를 실행하게 합니다.", List.of(
-                        new QuizReportResponse.Option(13L, 1, "컴포넌트가 처음 마운트된 뒤 한 번"),
-                        new QuizReportResponse.Option(14L, 2, "상태가 바뀔 때마다 항상"),
-                        new QuizReportResponse.Option(15L, 3, "이벤트가 발생할 때마다"),
-                        new QuizReportResponse.Option(16L, 4, "브라우저가 종료될 때 한 번")
-                )),
-                new QuizReportResponse.QuestionResult(5L, 5, "리스트 렌더링에서 key prop을 사용하는 주된 이유는 무엇인가요?", 18L, 18L, true, "key는 React가 리스트 항목의 추가, 삭제, 이동을 안정적으로 식별하도록 돕습니다.", List.of(
-                        new QuizReportResponse.Option(17L, 1, "CSS 우선순위를 높이기 위해"),
-                        new QuizReportResponse.Option(18L, 2, "각 항목의 변경을 안정적으로 식별하기 위해"),
-                        new QuizReportResponse.Option(19L, 3, "API 호출을 자동으로 캐싱하기 위해"),
-                        new QuizReportResponse.Option(20L, 4, "컴포넌트를 서버에서만 렌더링하기 위해")
-                )),
-                new QuizReportResponse.QuestionResult(6L, 6, "제어 컴포넌트의 설명으로 가장 알맞은 것은 무엇인가요?", 22L, 21L, false, "제어 컴포넌트는 입력값을 React state로 관리하고 변경 이벤트로 state를 갱신합니다.", List.of(
-                        new QuizReportResponse.Option(21L, 1, "DOM이 입력값을 직접 관리하는 컴포넌트"),
-                        new QuizReportResponse.Option(22L, 2, "React 상태가 입력값을 관리하는 컴포넌트"),
-                        new QuizReportResponse.Option(23L, 3, "서버 상태만 관리하는 컴포넌트"),
-                        new QuizReportResponse.Option(24L, 4, "렌더링을 하지 않는 컴포넌트")
-                )),
-                new QuizReportResponse.QuestionResult(7L, 7, "props의 일반적인 역할은 무엇인가요?", 25L, 25L, true, "props는 부모 컴포넌트가 자식 컴포넌트에 값을 전달하는 기본 수단입니다.", List.of(
-                        new QuizReportResponse.Option(25L, 1, "부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달한다"),
-                        new QuizReportResponse.Option(26L, 2, "브라우저 쿠키를 암호화한다"),
-                        new QuizReportResponse.Option(27L, 3, "데이터베이스 트랜잭션을 관리한다"),
-                        new QuizReportResponse.Option(28L, 4, "번들 파일을 압축한다")
-                )),
-                new QuizReportResponse.QuestionResult(8L, 8, "Context API를 사용하는 대표적인 목적은 무엇인가요?", 30L, 30L, true, "Context API는 props drilling을 줄이고 여러 컴포넌트에 공통 값을 전달할 때 사용합니다.", List.of(
-                        new QuizReportResponse.Option(29L, 1, "이미지 파일을 최적화하기 위해"),
-                        new QuizReportResponse.Option(30L, 2, "깊은 컴포넌트 트리에 공통 상태를 전달하기 위해"),
-                        new QuizReportResponse.Option(31L, 3, "HTTP 요청을 자동 재시도하기 위해"),
-                        new QuizReportResponse.Option(32L, 4, "CSS 파일을 JavaScript로 변환하기 위해")
-                ))
-        );
-    }
-
     private InstructorQuizStatisticsResponse instructorQuizStatistics() {
         return new InstructorQuizStatisticsResponse(
                 "React 완벽 가이드",
@@ -515,14 +479,15 @@ public class QuizController {
 
     public record QuizReportResponse(
             Long quizId,
+            int week,
             String quizTitle,
-            String courseTitle,
-            String sectionTitle,
+            OffsetDateTime submittedAt,
             int score,
-            int totalQuestionCount,
+            int totalScore,
             int correctCount,
             int incorrectCount,
-            OffsetDateTime submittedAt,
+            int scoreDiff,
+            List<QuestionResult> wrongNotes,
             List<QuestionResult> questions
     ) {
         public record QuestionResult(
