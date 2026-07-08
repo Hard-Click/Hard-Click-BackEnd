@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -45,6 +46,7 @@ public class QuizQuestionJpaEntity {
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 20)
+    @OrderBy("optionNumber ASC")
     private List<QuizOptionJpaEntity> options = new ArrayList<>();
 
     static QuizQuestionJpaEntity of(QuizJpaEntity quiz, int questionNumber, String questionText, String explanation) {

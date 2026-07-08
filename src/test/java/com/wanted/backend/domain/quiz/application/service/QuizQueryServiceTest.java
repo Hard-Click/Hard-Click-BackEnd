@@ -7,6 +7,7 @@ import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
+import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
@@ -287,7 +288,7 @@ class QuizQueryServiceTest {
         assertThat(result.quizzes()).allSatisfy(item -> assertThat(item.completed()).isTrue());
     }
 
-    // 2문항 퀴즈: Q1(id10) 정답=id102, Q2(id20) 정답=id201, 해설 보유
+    // 2문항 퀴즈 헬퍼: Q1(id10) 정답=id102, Q2(id20) 정답=id201, 해설 보유
     private Quiz reportQuiz(Long id, Long sectionId, String title) {
         QuizQuestion q1 = QuizQuestion.restore(10L, 1, "질문1", "해설1", List.of(
                 QuizOption.restore(101L, 1, "보기1", false),
@@ -301,6 +302,10 @@ class QuizQueryServiceTest {
                 QuizOption.restore(204L, 4, "보기4", false)));
         return Quiz.restore(id, INSTRUCTOR_ID, COURSE_ID, sectionId, title,
                 List.of(q1, q2), LocalDateTime.of(2026, 5, 10, 15, 30));
+    }
+
+    private Quiz studentQuiz() {
+        return reportQuiz(90L, SECTION_ID, "React 기초 개념 퀴즈");
     }
 
     @Test
@@ -399,6 +404,74 @@ class QuizQueryServiceTest {
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+    }
+
+    @Test
+    void studentQuizDetailReturnsQuestionsWithoutAnswerInfoWhenNotSubmitted() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(studentQuiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초"));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of());
+
+        StudentQuizDetail detail = service.getStudentQuizDetail(MEMBER_ID, 90L);
+
+        assertThat(detail.quizId()).isEqualTo(90L);
+        assertThat(detail.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(detail.sectionTitle()).isEqualTo("섹션 1: React 기초");
+        assertThat(detail.totalQuestionCount()).isEqualTo(2);
+        assertThat(detail.submitted()).isFalse();
+        assertThat(detail.answeredCount()).isZero();
+        // 응시 화면 DTO에는 정답/해설 필드 자체가 없어야 한다 (컴파일 타임 보장) — 값 노출만 재확인
+        assertThat(detail.questions()).hasSize(2);
+        assertThat(detail.questions().get(0).options()).hasSize(4);
+        assertThat(detail.questions().get(0).options())
+                .allSatisfy(o -> assertThat(o.optionText()).isNotBlank());
+    }
+
+    @Test
+    void studentQuizDetailReflectsSubmittedStateAndAnsweredCount() {
+        // 2문항 중 1문항만 응답한 제출 이력
+        QuizSubmission submission = QuizSubmission.restore(55L, 90L, MEMBER_ID, 50, 2, 1,
+                LocalDateTime.of(2026, 5, 12, 0, 0),
+                List.of(
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
+                        QuizSubmissionAnswer.restore(2L, 20L, null, false)));
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(studentQuiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초"));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(submission));
+
+        StudentQuizDetail detail = service.getStudentQuizDetail(MEMBER_ID, 90L);
+
+        assertThat(detail.submitted()).isTrue();
+        assertThat(detail.answeredCount()).isEqualTo(1);
+    }
+
+    @Test
+    void studentQuizDetailRejectsWhenQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getStudentQuizDetail(MEMBER_ID, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
+    void studentQuizDetailRejectsWhenNotEnrolled() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(studentQuiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getStudentQuizDetail(MEMBER_ID, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
     }

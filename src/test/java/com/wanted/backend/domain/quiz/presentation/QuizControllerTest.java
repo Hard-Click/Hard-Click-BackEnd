@@ -10,6 +10,7 @@ import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
+import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
@@ -230,6 +231,42 @@ class QuizControllerTest {
         assertThatThrownBy(() -> controller.getMyQuizReport(userDetails, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_SUBMISSION_NOT_FOUND);
+    }
+
+    @Test
+    void studentQuizDetailMapsTheQueryResultWithoutAnswerInfo() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getStudentQuizDetail(1L, 90L)).thenReturn(new StudentQuizDetail(
+                90L, "React 기초 개념 퀴즈", "React 완벽 가이드", "섹션 1: React 기초", 1, 0, false,
+                List.of(new StudentQuizDetail.Question(10L, 1, "React의 가상 DOM이란?",
+                        List.of(
+                                new StudentQuizDetail.Option(101L, 1, "보기1"),
+                                new StudentQuizDetail.Option(102L, 2, "보기2"))))));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.StudentQuizDetailResponse>> result =
+                controller.getStudentQuizDetail(userDetails, 90L);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.StudentQuizDetailResponse response = result.getBody().data();
+        assertThat(response.quizId()).isEqualTo(90L);
+        assertThat(response.submitted()).isFalse();
+        assertThat(response.answeredCount()).isZero();
+        assertThat(response.questions()).hasSize(1);
+        assertThat(response.questions().get(0).options()).hasSize(2);
+        assertThat(response.questions().get(0).options().get(0).optionText()).isEqualTo("보기1");
+    }
+
+    @Test
+    void studentQuizDetailPropagatesTheUseCasesBusinessExceptionWhenNotEnrolled() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getStudentQuizDetail(1L, 90L))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED));
+
+        assertThatThrownBy(() -> controller.getStudentQuizDetail(userDetails, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
     }
 
     @Test
