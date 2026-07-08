@@ -563,4 +563,70 @@ class QuizQueryServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
     }
+
+    @Test
+    void instructorQuizStatisticsPaginatesStudents() {
+        stubStatsCommon(); // 수강생 3명
+
+        // page=1, size=2 → 3명 중 2번째 페이지엔 1명만
+        InstructorQuizStatistics stats = service.getInstructorQuizStatistics(
+                new QuizStatisticsQuery(INSTRUCTOR_ID, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 1, 2));
+
+        assertThat(stats.students()).hasSize(1);
+        // 요약은 페이지와 무관하게 전체 기준
+        assertThat(stats.summary().totalCount()).isEqualTo(3);
+        assertThat(stats.summary().submittedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void instructorQuizStatisticsBreaksScoreTiesByUserIdDeterministically() {
+        Quiz quiz = reportQuiz(90L, SECTION_ID, "React 기초 개념 퀴즈");
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "1주차"));
+        // 세 명 모두 동점(80) — userId 오름차순(aaa, bbb, ccc)으로 확정돼야 함
+        when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of(
+                new CourseStudentPort.CourseStudent(3L, "ccc", "병"),
+                new CourseStudentPort.CourseStudent(1L, "aaa", "갑"),
+                new CourseStudentPort.CourseStudent(2L, "bbb", "을")));
+        when(quizSubmissionRepository.findByQuizId(90L)).thenReturn(List.of(
+                QuizSubmission.restore(51L, 90L, 1L, 80, 2, 2, LocalDateTime.of(2026, 5, 10, 0, 0), List.of()),
+                QuizSubmission.restore(52L, 90L, 2L, 80, 2, 2, LocalDateTime.of(2026, 5, 10, 0, 0), List.of()),
+                QuizSubmission.restore(53L, 90L, 3L, 80, 2, 2, LocalDateTime.of(2026, 5, 10, 0, 0), List.of())));
+
+        InstructorQuizStatistics stats = service.getInstructorQuizStatistics(
+                statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL));
+
+        assertThat(stats.students()).extracting(InstructorQuizStatistics.StudentScore::userId)
+                .containsExactly("aaa", "bbb", "ccc");
+    }
+
+    @Test
+    void instructorQuizStatisticsReturnsZeroWhenNoStudents() {
+        Quiz quiz = reportQuiz(90L, SECTION_ID, "React 기초 개념 퀴즈");
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "1주차"));
+        when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of());
+        when(quizSubmissionRepository.findByQuizId(90L)).thenReturn(List.of());
+
+        InstructorQuizStatistics stats = service.getInstructorQuizStatistics(
+                statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL));
+
+        assertThat(stats.summary().totalCount()).isZero();
+        assertThat(stats.summary().submittedCount()).isZero();
+        assertThat(stats.summary().averageScore()).isZero();
+        assertThat(stats.students()).isEmpty();
+        // 분포 4구간은 유지하되 전부 0
+        assertThat(stats.scoreDistribution()).hasSize(4);
+        assertThat(stats.scoreDistribution()).allSatisfy(d -> {
+            assertThat(d.count()).isZero();
+            assertThat(d.percentage()).isZero();
+        });
+    }
 }

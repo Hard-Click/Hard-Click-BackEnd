@@ -380,7 +380,8 @@ public class QuizQueryService implements QuizQueryUseCase {
     }
 
     private Comparator<InstructorQuizStatistics.StudentScore> studentComparator(QuizStatisticsQuery.SortType sort) {
-        return switch (sort) {
+        // 동점자/동명 순서 결정성을 위해 userId를 2차 정렬 키로 사용 (페이지네이션 안정성 보장).
+        Comparator<InstructorQuizStatistics.StudentScore> primary = switch (sort) {
             // 미응시(score null)는 항상 뒤로
             case SCORE_DESC -> Comparator.comparing(InstructorQuizStatistics.StudentScore::score,
                     Comparator.nullsLast(Comparator.reverseOrder()));
@@ -388,6 +389,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                     Comparator.nullsLast(Comparator.naturalOrder()));
             case NAME -> Comparator.comparing(InstructorQuizStatistics.StudentScore::name);
         };
+        return primary.thenComparing(InstructorQuizStatistics.StudentScore::userId);
     }
 
     private <T> List<T> paginate(List<T> items, int page, int size) {
