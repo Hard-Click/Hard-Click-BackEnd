@@ -22,7 +22,7 @@ public class StudyRepositoryAdapter implements StudyRepository {
     @Override
     public Study save(Study study) {
         StudyJpaEntity entity = new StudyJpaEntity(
-                study.getHostId(), study.getTitle(), study.getSubject(), study.getContent(),
+                study.getId(), study.getHostId(), study.getTitle(), study.getSubject(), study.getContent(),
                 study.getMaxCount(), study.getCurrentCount(), study.getStatus(),
                 study.getCreatedAt(), study.getUpdatedAt()
         );

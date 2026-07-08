@@ -51,6 +51,27 @@ public class Study {
         return this.hostId.equals(memberId);
     }
 
+    public void update(Long requesterId, String title, String subject, int maxCount, String content) {
+        validateUpdatable(requesterId);
+        if (maxCount < 2) {
+            throw new BusinessException(ErrorCode.STUDY_MIN_COUNT_INVALID);
+        }
+        if (maxCount < currentCount) {
+            throw new BusinessException(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT);
+        }
+        this.title = title;
+        this.subject = subject;
+        this.maxCount = maxCount;
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    private void validateUpdatable(Long memberId) {
+        if (!isOwner(memberId)) {
+            throw new BusinessException(ErrorCode.STUDY_UPDATE_FORBIDDEN);
+        }
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }

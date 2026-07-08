@@ -48,9 +48,10 @@ public class StudyJpaEntity {
 
     protected StudyJpaEntity() {}
 
-    public StudyJpaEntity(Long hostId, String title, String subject, String content,
+    public StudyJpaEntity(Long id, Long hostId, String title, String subject, String content,
                           int maxCount, int currentCount, StudyStatus status,
                           LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
         this.hostId = hostId;
         this.title = title;
         this.subject = subject;
