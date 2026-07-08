@@ -31,7 +31,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -128,6 +130,56 @@ class StudyControllerTest {
         CreateStudyRequest request = new CreateStudyRequest("제목", SubjectType.MATH_1, 5, "");
 
         mockMvc.perform(post("/api/study")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("정상 요청 시 200과 함께 수정이 반영된다")
+    void updateStudy_success() throws Exception {
+        CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 5, "수정된 내용");
+
+        mockMvc.perform(patch("/api/study/45")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("방장이 아니면 403을 반환한다")
+    void updateStudy_fail_forbidden() throws Exception {
+        CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 5, "수정된 내용");
+        willThrow(new BusinessException(ErrorCode.STUDY_UPDATE_FORBIDDEN))
+                .given(studyCommandUseCase).update(any());
+
+        mockMvc.perform(patch("/api/study/45")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_UPDATE_FORBIDDEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("정원을 현재 인원 미만으로 줄이면 400을 반환한다")
+    void updateStudy_fail_maxCountBelowCurrent() throws Exception {
+        CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 3, "수정된 내용");
+        willThrow(new BusinessException(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT))
+                .given(studyCommandUseCase).update(any());
+
+        mockMvc.perform(patch("/api/study/45")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT.getCode()));
+    }
+
+    @Test
+    @DisplayName("정원이 2명 미만이면 400을 반환한다")
+    void updateStudy_fail_maxCountTooSmall() throws Exception {
+        CreateStudyRequest request = new CreateStudyRequest("수정된 제목", SubjectType.MATH_1, 1, "수정된 내용");
+
+        mockMvc.perform(patch("/api/study/45")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

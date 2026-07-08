@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
@@ -92,12 +93,28 @@ public class StudyController {
                 new CreateStudyResponse(result.studyId(), result.chatRoomId()));
     }
 
-    // TODO(#440): mock 수정 → 실제 로직으로 교체
+    @Operation(
+            summary = "스터디 모집글 수정",
+            description = """
+                스터디 모집글을 수정합니다.
+                - 방장만 수정할 수 있습니다.
+                - 정원(maxCount)은 현재 참여 인원 이상이어야 합니다.
+                """
+    )
     @PatchMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> updateStudy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId,
             @Valid @RequestBody CreateStudyRequest request) {
+
+        studyCommandUseCase.update(new UpdateStudyCommand(
+                groupId,
+                userDetails.getMemberId(),
+                request.title(),
+                request.subject().name(),
+                request.maxCount(),
+                request.content()
+        ));
 
         return ApiResponse.success("스터디가 수정되었습니다.", null);
     }
