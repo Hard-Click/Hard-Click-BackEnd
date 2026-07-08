@@ -99,6 +99,13 @@ toss:
     base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
     secret-key: ${TOSS_SECRET_KEY}
 
+quiz:
+  ai:
+    # 퀴즈 제출 내용을 전송할 AI(Python/FastAPI) 서버. 스펙 확정 전까지 기본값은 로컬.
+    base-url: ${QUIZ_AI_BASE_URL:http://localhost:8000}
+    submission-path: ${QUIZ_AI_SUBMISSION_PATH:/quiz/submissions}
+    enabled: ${QUIZ_AI_ENABLED:false}
+
 server:
   port: 8080
   tomcat:
