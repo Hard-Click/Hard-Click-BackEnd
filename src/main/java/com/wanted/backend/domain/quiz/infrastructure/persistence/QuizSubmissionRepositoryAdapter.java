@@ -24,7 +24,10 @@ public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository
             entity.addAnswer(answer.getQuestionId(), answer.getSelectedOptionId(), answer.isCorrect());
         }
 
-        return toDomain(quizSubmissionJpaRepository.save(entity));
+        // saveAndFlush로 즉시 INSERT를 실행해, UNIQUE(quiz_id, member_id) 위반이
+        // 트랜잭션 커밋 시점이 아니라 이 호출 안에서 발생하도록 한다
+        // (서비스가 DataIntegrityViolationException을 잡아 QZ003으로 변환할 수 있게).
+        return toDomain(quizSubmissionJpaRepository.saveAndFlush(entity));
     }
 
     @Override

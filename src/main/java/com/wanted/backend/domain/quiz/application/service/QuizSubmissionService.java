@@ -12,6 +12,7 @@ import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,14 @@ public class QuizSubmissionService implements QuizSubmissionUseCase {
         }
 
         QuizSubmission submission = QuizSubmission.grade(command.memberId(), quiz, answersByQuestionId);
-        QuizSubmission saved = quizSubmissionRepository.save(submission);
+
+        QuizSubmission saved;
+        try {
+            saved = quizSubmissionRepository.save(submission);
+        } catch (DataIntegrityViolationException e) {
+            // exists 사전 체크와 save 사이 경쟁(TOCTOU) — UNIQUE 제약이 중복을 막았다.
+            throw new BusinessException(ErrorCode.QUIZ_ALREADY_SUBMITTED);
+        }
 
         // 채점 결과를 AI(Python) 서버로 비동기 전송 (트랜잭션 커밋 후 리스너에서 처리)
         eventPublisher.publishEvent(QuizSubmittedEvent.of(

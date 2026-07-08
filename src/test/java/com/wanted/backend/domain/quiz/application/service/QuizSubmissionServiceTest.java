@@ -56,15 +56,34 @@ class QuizSubmissionServiceTest {
                 LocalDateTime.of(2026, 5, 10, 15, 30));
     }
 
-    @Test
-    void submitGradesSavesAndPublishesEvent() {
-        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(quiz()));
-        when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
+    private Quiz twoQuestionQuiz() {
+        QuizQuestion q1 = QuizQuestion.restore(10L, 1, "질문1", "해설1", List.of(
+                QuizOption.restore(101L, 1, "오답", false),
+                QuizOption.restore(102L, 2, "정답", true),
+                QuizOption.restore(103L, 3, "오답", false),
+                QuizOption.restore(104L, 4, "오답", false)));
+        QuizQuestion q2 = QuizQuestion.restore(20L, 2, "질문2", "해설2", List.of(
+                QuizOption.restore(201L, 1, "정답", true),
+                QuizOption.restore(202L, 2, "오답", false),
+                QuizOption.restore(203L, 3, "오답", false),
+                QuizOption.restore(204L, 4, "오답", false)));
+        return Quiz.restore(QUIZ_ID, 1L, 10L, 100L, "퀴즈", List.of(q1, q2),
+                LocalDateTime.of(2026, 5, 10, 15, 30));
+    }
+
+    private void stubSavePassthrough() {
         when(quizSubmissionRepository.save(any())).thenAnswer(invocation -> {
             QuizSubmission s = invocation.getArgument(0);
             return QuizSubmission.restore(55L, s.getQuizId(), s.getMemberId(), s.getScore(),
                     s.getTotalQuestionCount(), s.getCorrectCount(), s.getSubmittedAt(), s.getAnswers());
         });
+    }
+
+    @Test
+    void submitGradesSavesAndPublishesEvent() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(quiz()));
+        when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
+        stubSavePassthrough();
 
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
                 List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
@@ -85,6 +104,31 @@ class QuizSubmissionServiceTest {
         assertThat(event.memberId()).isEqualTo(MEMBER_ID);
         assertThat(event.score()).isEqualTo(100);
         assertThat(event.answers()).hasSize(1);
+    }
+
+    @Test
+    void submitGradesUnansweredQuestionsAsIncorrectAndPublishesThemInTheEvent() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(twoQuestionQuiz()));
+        when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
+        stubSavePassthrough();
+
+        // 2문항 중 Q1만 정답 제출, Q2는 미응답
+        SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+
+        QuizSubmissionResult result = service.submit(command);
+
+        assertThat(result.totalQuestionCount()).isEqualTo(2);
+        assertThat(result.correctCount()).isEqualTo(1);
+        assertThat(result.incorrectCount()).isEqualTo(1);
+        assertThat(result.score()).isEqualTo(50);
+
+        ArgumentCaptor<QuizSubmittedEvent> eventCaptor = ArgumentCaptor.forClass(QuizSubmittedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        QuizSubmittedEvent.AnsweredQuestion unanswered = eventCaptor.getValue().answers().stream()
+                .filter(a -> a.questionId().equals(20L)).findFirst().orElseThrow();
+        assertThat(unanswered.selectedOptionId()).isNull();
+        assertThat(unanswered.correct()).isFalse();
     }
 
     @Test

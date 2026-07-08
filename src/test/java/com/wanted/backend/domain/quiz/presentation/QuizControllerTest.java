@@ -172,6 +172,21 @@ class QuizControllerTest {
     }
 
     @Test
+    void submitQuizPropagatesTheUseCasesBusinessExceptionWhenAlreadySubmitted() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizSubmissionUseCase.submit(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_ALREADY_SUBMITTED));
+
+        QuizController.QuizSubmissionRequest request = new QuizController.QuizSubmissionRequest(
+                List.of(new QuizController.QuizSubmissionRequest.Answer(11L, 22L)));
+
+        assertThatThrownBy(() -> controller.submitQuiz(userDetails, 90L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ALREADY_SUBMITTED);
+    }
+
+    @Test
     void myQuizzesIncludeCourseIdForEachItem() {
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
                 controller.getMyQuizzes(null, null, null);
