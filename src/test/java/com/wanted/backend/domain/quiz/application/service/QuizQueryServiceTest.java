@@ -4,10 +4,13 @@ import com.wanted.backend.domain.quiz.application.port.CourseSectionTitlePort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
+import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
+import com.wanted.backend.domain.quiz.domain.model.QuizSubmission;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
+import com.wanted.backend.domain.quiz.domain.repository.QuizSubmissionRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +24,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,8 +34,10 @@ class QuizQueryServiceTest {
     private static final Long INSTRUCTOR_ID = 1L;
     private static final Long COURSE_ID = 10L;
     private static final Long SECTION_ID = 100L;
+    private static final Long MEMBER_ID = 7L;
 
     private QuizRepository quizRepository;
+    private QuizSubmissionRepository quizSubmissionRepository;
     private CourseTitlePort courseTitlePort;
     private CourseSectionTitlePort courseSectionTitlePort;
     private QuizQueryService service;
@@ -38,9 +45,11 @@ class QuizQueryServiceTest {
     @BeforeEach
     void setUp() {
         quizRepository = mock(QuizRepository.class);
+        quizSubmissionRepository = mock(QuizSubmissionRepository.class);
         courseTitlePort = mock(CourseTitlePort.class);
         courseSectionTitlePort = mock(CourseSectionTitlePort.class);
-        service = new QuizQueryService(quizRepository, courseTitlePort, courseSectionTitlePort);
+        service = new QuizQueryService(quizRepository, quizSubmissionRepository,
+                courseTitlePort, courseSectionTitlePort);
     }
 
     private Quiz quiz(Long id, Long courseId, Long sectionId, String title, int questionCount) {
@@ -167,5 +176,56 @@ class QuizQueryServiceTest {
         assertThatThrownBy(() -> service.getInstructorQuizDetail(999L, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+    }
+
+    @Test
+    void myQuizzesJoinSubmissionStatusSortByWeekAndSummarizeCompletion() {
+        // 강의에 3주차/1주차 퀴즈(정렬 뒤섞임). 1주만 제출(80점), 3주 미제출.
+        Quiz week3 = quiz(93L, COURSE_ID, 300L, "State와 Lifecycle", 10);
+        Quiz week1 = quiz(90L, COURSE_ID, 100L, "React 기초 개념", 10);
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(week3, week1));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1),
+                300L, new CourseSectionTitlePort.SectionInfo("섹션 3", 3)));
+        QuizSubmission week1Submission = QuizSubmission.restore(55L, 90L, MEMBER_ID, 80, 10, 8,
+                LocalDateTime.of(2026, 5, 12, 0, 0), List.of());
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(week1Submission));
+
+        MyQuizList result = service.getMyQuizzes(MEMBER_ID, COURSE_ID);
+
+        assertThat(result.courseId()).isEqualTo(COURSE_ID);
+        assertThat(result.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(result.completedCount()).isEqualTo(1);
+        assertThat(result.averageScore()).isEqualTo(80);
+        // 주차 오름차순 정렬 확인 (1주 먼저)
+        assertThat(result.quizzes().get(0).weekNumber()).isEqualTo(1);
+        assertThat(result.quizzes().get(0).completed()).isTrue();
+        assertThat(result.quizzes().get(0).score()).isEqualTo(80);
+        assertThat(result.quizzes().get(1).weekNumber()).isEqualTo(3);
+        assertThat(result.quizzes().get(1).completed()).isFalse();
+        assertThat(result.quizzes().get(1).score()).isNull();
+        assertThat(result.quizzes().get(1).submittedAt()).isNull();
+    }
+
+    @Test
+    void myQuizzesReturnZeroSummaryWhenNothingSubmitted() {
+        Quiz week1 = quiz(90L, COURSE_ID, 100L, "React 기초 개념", 10);
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(week1));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of());
+
+        MyQuizList result = service.getMyQuizzes(MEMBER_ID, COURSE_ID);
+
+        assertThat(result.completedCount()).isZero();
+        assertThat(result.averageScore()).isZero();
+        assertThat(result.quizzes()).hasSize(1);
+        assertThat(result.quizzes().get(0).completed()).isFalse();
     }
 }

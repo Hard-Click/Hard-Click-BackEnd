@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository {
@@ -34,6 +36,17 @@ public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository
     @Transactional(readOnly = true)
     public boolean existsByQuizIdAndMemberId(Long quizId, Long memberId) {
         return quizSubmissionJpaRepository.existsByQuizIdAndMemberId(quizId, memberId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<QuizSubmission> findByMemberIdAndQuizIdIn(Long memberId, List<Long> quizIds) {
+        if (quizIds.isEmpty()) {
+            return List.of();
+        }
+        return quizSubmissionJpaRepository.findByMemberIdAndQuizIdIn(memberId, quizIds).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     private QuizSubmission toDomain(QuizSubmissionJpaEntity entity) {

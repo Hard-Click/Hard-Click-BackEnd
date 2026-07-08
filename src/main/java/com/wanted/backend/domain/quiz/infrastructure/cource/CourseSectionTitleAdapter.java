@@ -24,4 +24,15 @@ public class CourseSectionTitleAdapter implements CourseSectionTitlePort {
                 .collect(Collectors.toMap(CourseSectionReferenceJpaEntity::getId,
                         CourseSectionReferenceJpaEntity::getTitle));
     }
+
+    @Override
+    public Map<Long, SectionInfo> findSectionsByIds(Collection<Long> sectionIds) {
+        if (sectionIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return courseSectionReferenceJpaRepository.findAllById(sectionIds).stream()
+                .collect(Collectors.toMap(CourseSectionReferenceJpaEntity::getId,
+                        e -> new SectionInfo(e.getTitle(), e.getOrderIndex())));
+    }
 }
