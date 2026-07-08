@@ -308,6 +308,7 @@ class QuizQueryServiceTest {
         Quiz current = reportQuiz(90L, 200L, "2주차 퀴즈");   // week 2
         Quiz previous = reportQuiz(91L, 100L, "1주차 퀴즈");  // week 1
         when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current, previous));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
                 200L, new CourseSectionTitlePort.SectionInfo("섹션 2", 2),
@@ -349,6 +350,7 @@ class QuizQueryServiceTest {
     void quizReportScoreDiffIsZeroWhenNoPreviousWeekSubmission() {
         Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");   // week 1, 이전 없음
         when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
                 .thenReturn(Map.of(100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
@@ -378,6 +380,7 @@ class QuizQueryServiceTest {
     void quizReportRejectsWhenNotSubmitted() {
         Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");
         when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
                 .thenReturn(Map.of(100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
@@ -387,5 +390,16 @@ class QuizQueryServiceTest {
         assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_SUBMISSION_NOT_FOUND);
+    }
+
+    @Test
+    void quizReportRejectsWhenNotEnrolled() {
+        Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
     }
 }

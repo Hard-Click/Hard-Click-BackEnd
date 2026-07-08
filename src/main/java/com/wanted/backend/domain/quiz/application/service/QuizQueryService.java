@@ -32,6 +32,9 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class QuizQueryService implements QuizQueryUseCase {
 
+    // 퀴즈 점수는 정답률 백분율(0~100)이므로 만점은 100 고정.
+    private static final int MAX_QUIZ_SCORE = 100;
+
     private final QuizRepository quizRepository;
     private final QuizSubmissionRepository quizSubmissionRepository;
     private final CourseTitlePort courseTitlePort;
@@ -160,6 +163,11 @@ public class QuizQueryService implements QuizQueryUseCase {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 
+        // 수강 중인 강의의 퀴즈 리포트만 조회 가능 (비수강자의 정답/해설 열람 차단)
+        if (!enrollmentAccessPort.hasActiveEnrollment(memberId, quiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
+
         // 같은 강의의 퀴즈/섹션/내 제출을 한 번에 확보 (현재 제출 확인 + scoreDiff 계산 공용)
         List<Quiz> courseQuizzes = quizRepository.findAllByCourseId(quiz.getCourseId());
         Map<Long, CourseSectionTitlePort.SectionInfo> sections = courseSectionTitlePort
@@ -215,7 +223,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                 quiz.getTitle(),
                 submission.getSubmittedAt(),
                 submission.getScore(),
-                100,
+                MAX_QUIZ_SCORE,
                 submission.getCorrectCount(),
                 submission.getIncorrectCount(),
                 scoreDiff,
