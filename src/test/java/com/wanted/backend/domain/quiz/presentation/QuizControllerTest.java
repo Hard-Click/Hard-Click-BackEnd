@@ -10,6 +10,8 @@ import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
+import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
 import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
@@ -267,6 +269,70 @@ class QuizControllerTest {
         assertThatThrownBy(() -> controller.getStudentQuizDetail(userDetails, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+    }
+
+    @Test
+    void instructorQuizStatisticsMapsQueryResultAndParsesSortFilterParams() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new InstructorQuizStatistics(
+                        "React 완벽 가이드", "1주차: React 기초", "React 기초 개념 퀴즈",
+                        new InstructorQuizStatistics.Summary(6, 5, 1, 80),
+                        List.of(new InstructorQuizStatistics.ScoreDistribution("90~100", 2, 40)),
+                        List.of(new InstructorQuizStatistics.StudentScore(
+                                "choiyea2026", "최예아", true, 100,
+                                java.time.LocalDateTime.of(2026, 5, 10, 0, 0)))));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizStatisticsResponse>> result =
+                controller.getInstructorQuizStatistics(userDetails, 90L, "최", "SCORE_DESC", "SUBMITTED", 0, 10);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.InstructorQuizStatisticsResponse response = result.getBody().data();
+        assertThat(response.summary().totalCount()).isEqualTo(6);
+        assertThat(response.summary().submittedCount()).isEqualTo(5);
+        assertThat(response.students().get(0).userId()).isEqualTo("choiyea2026");
+        assertThat(response.students().get(0).score()).isEqualTo(100);
+        assertThat(response.students().get(0).submittedAt()).isNotNull();
+
+        // 컨트롤러가 sort/filter 문자열을 enum으로 파싱해 Query로 전달하는지 검증
+        ArgumentCaptor<QuizStatisticsQuery> captor = ArgumentCaptor.forClass(QuizStatisticsQuery.class);
+        verify(quizQueryUseCase).getInstructorQuizStatistics(captor.capture());
+        QuizStatisticsQuery query = captor.getValue();
+        assertThat(query.instructorId()).isEqualTo(1L);
+        assertThat(query.quizId()).isEqualTo(90L);
+        assertThat(query.keyword()).isEqualTo("최");
+        assertThat(query.sort()).isEqualTo(QuizStatisticsQuery.SortType.SCORE_DESC);
+        assertThat(query.filter()).isEqualTo(QuizStatisticsQuery.FilterType.SUBMITTED);
+    }
+
+    @Test
+    void instructorQuizStatisticsDefaultsSortAndFilterWhenParamsInvalid() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new InstructorQuizStatistics("c", "s", "q",
+                        new InstructorQuizStatistics.Summary(0, 0, 0, 0), List.of(), List.of()));
+
+        controller.getInstructorQuizStatistics(userDetails, 90L, null, "이상한값", null, null, null);
+
+        ArgumentCaptor<QuizStatisticsQuery> captor = ArgumentCaptor.forClass(QuizStatisticsQuery.class);
+        verify(quizQueryUseCase).getInstructorQuizStatistics(captor.capture());
+        // 잘못된 sort → SCORE_DESC 기본, filter 미지정 → ALL 기본
+        assertThat(captor.getValue().sort()).isEqualTo(QuizStatisticsQuery.SortType.SCORE_DESC);
+        assertThat(captor.getValue().filter()).isEqualTo(QuizStatisticsQuery.FilterType.ALL);
+    }
+
+    @Test
+    void instructorQuizStatisticsPropagatesBusinessExceptionWhenNotOwner() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(999L);
+        when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED));
+
+        assertThatThrownBy(() -> controller.getInstructorQuizStatistics(userDetails, 90L, null, null, null, null, null))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
     }
 
     @Test

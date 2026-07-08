@@ -116,7 +116,7 @@ public class AdminQuizMockController {
                 "React 완벽 가이드",
                 "1주차: React 기초 개념",
                 "React 기초 개념 퀴즈",
-                new QuizController.InstructorQuizStatisticsResponse.Summary(5, 1, 80),
+                new QuizController.InstructorQuizStatisticsResponse.Summary(6, 5, 1, 80),
                 List.of(
                         new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("90~100", 2, 40),
                         new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("70~89", 2, 40),
@@ -124,12 +124,12 @@ public class AdminQuizMockController {
                         new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("0~49", 0, 0)
                 ),
                 List.of(
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@choiyea2026", "최예아", true, 100, "2026-05-10"),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@kimminsu92", "김민수", true, 90, "2026-05-12"),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@leesujin01", "이수진", true, 80, "2026-05-13"),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@parkjihyun7", "박지현", true, 70, "2026-05-11"),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@jungyumin5", "정유민", true, 60, "2026-05-14"),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("@hanseoyeong3", "한서영", false, null, null)
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("choiyea2026", "최예아", true, 100, OffsetDateTime.parse("2026-05-10T00:00:00+09:00")),
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("kimminsu92", "김민수", true, 90, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("leesujin01", "이수진", true, 80, OffsetDateTime.parse("2026-05-13T00:00:00+09:00")),
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("parkjihyun7", "박지현", true, 70, OffsetDateTime.parse("2026-05-11T00:00:00+09:00")),
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("jungyumin5", "정유민", true, 60, OffsetDateTime.parse("2026-05-14T00:00:00+09:00")),
+                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("hanseoyeong3", "한서영", false, null, null)
                 )
         );
 

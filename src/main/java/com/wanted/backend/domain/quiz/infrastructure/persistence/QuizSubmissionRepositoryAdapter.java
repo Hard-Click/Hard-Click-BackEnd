@@ -49,6 +49,14 @@ public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<QuizSubmission> findByQuizId(Long quizId) {
+        return quizSubmissionJpaRepository.findByQuizId(quizId).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     private QuizSubmission toDomain(QuizSubmissionJpaEntity entity) {
         var answers = entity.getAnswers().stream()
                 .map(a -> QuizSubmissionAnswer.restore(
