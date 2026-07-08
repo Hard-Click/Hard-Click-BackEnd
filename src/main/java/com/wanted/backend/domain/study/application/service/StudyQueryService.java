@@ -3,6 +3,8 @@ package com.wanted.backend.domain.study.application.service;
 import com.wanted.backend.domain.study.application.port.ChatRoomQueryPort;
 import com.wanted.backend.domain.study.application.port.MemberNamePort;
 import com.wanted.backend.domain.study.application.result.StudyDetailResult;
+import com.wanted.backend.domain.study.application.result.StudyItemResult;
+import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.domain.model.Study;
 import com.wanted.backend.domain.study.domain.model.StudyStatus;
@@ -13,6 +15,7 @@ import com.wanted.backend.global.exception.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +38,22 @@ public class StudyQueryService implements StudyQueryUseCase {
         this.studyParticipantRepository = studyParticipantRepository;
         this.memberNamePort = memberNamePort;
         this.chatRoomQueryPort = chatRoomQueryPort;
+    }
+
+    @Override
+    public StudyListResult getList(String subject, int page, int size) {
+        List<Study> studies = studyRepository.findAll(subject, page, size);
+        int totalCount = studyRepository.countAll(subject);
+        int totalPages = (int) Math.ceil((double) totalCount / size);
+
+        Set<Long> hostIds = studies.stream().map(Study::getHostId).collect(Collectors.toSet());
+        Map<Long, String> nameMap = resolveNameMap(hostIds);
+
+        List<StudyItemResult> items = studies.stream()
+                .map(study -> toItemResult(study, nameMap))
+                .toList();
+
+        return new StudyListResult(items, totalPages);
     }
 
     @Override
@@ -61,13 +80,20 @@ public class StudyQueryService implements StudyQueryUseCase {
                 study.getStatus() == StudyStatus.CLOSED, members, chatRoomId, study.getCreatedAt());
     }
 
-    private Map<Long, String> resolveNameMap(List<Long> memberIds) {
-        Set<Long> ids = Set.copyOf(memberIds);
+    private Map<Long, String> resolveNameMap(Collection<Long> memberIds) {
         try {
-            return memberNamePort.getNamesByMemberIds(ids);
+            return memberNamePort.getNamesByMemberIds(memberIds);
         } catch (Exception e) {
             return Map.of();
         }
+    }
+
+    private StudyItemResult toItemResult(Study study, Map<Long, String> nameMap) {
+        String name = maskName(nameMap.getOrDefault(study.getHostId(), ""));
+        return new StudyItemResult(
+                study.getId(), study.getTitle(), study.getContent(), name, study.getSubject(),
+                study.getCurrentCount(), study.getMaxCount(),
+                study.getStatus() == StudyStatus.CLOSED, study.getCreatedAt());
     }
 
     private String maskName(String name) {

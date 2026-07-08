@@ -1,6 +1,8 @@
 package com.wanted.backend.domain.study.presentation.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.wanted.backend.domain.study.application.result.StudyItemResult;
+import com.wanted.backend.domain.study.application.result.StudyListResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -13,6 +15,13 @@ public record StudyListResponse(
         @Schema(description = "전체 페이지 수", example = "3")
         int totalPages
 ) {
+    public static StudyListResponse from(StudyListResult result) {
+        return new StudyListResponse(
+                result.items().stream().map(StudyItem::from).toList(),
+                result.totalPages()
+        );
+    }
+
     @Schema(description = "스터디 목록 항목")
     public record StudyItem(
             @Schema(description = "스터디 그룹 ID", example = "101")
@@ -34,5 +43,12 @@ public record StudyListResponse(
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss+09:00")
             @Schema(description = "작성일시", example = "2025-03-15T14:30:00")
             LocalDateTime createdAt
-    ) {}
+    ) {
+        public static StudyItem from(StudyItemResult r) {
+            return new StudyItem(
+                    r.studyId(), r.title(), r.content(), r.authorName(), r.subjectName(),
+                    r.currentCount(), r.maxCount(), r.isClosed(), r.createdAt()
+            );
+        }
+    }
 }
