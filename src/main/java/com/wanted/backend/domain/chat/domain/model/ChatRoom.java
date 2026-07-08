@@ -1,5 +1,8 @@
 package com.wanted.backend.domain.chat.domain.model;
 
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
+
 import java.time.LocalDateTime;
 
 public class ChatRoom {
@@ -29,6 +32,12 @@ public class ChatRoom {
     public static ChatRoom restore(Long id, Long studyId, Long hostId, ChatRoomStatus status,
                                    LocalDateTime createdAt, LocalDateTime updatedAt) {
         return new ChatRoom(id, studyId, hostId, status, createdAt, updatedAt);
+    }
+
+    public void validateActive() {
+        if (status != ChatRoomStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_CLOSED);
+        }
     }
 
     public Long getId() { return id; }

@@ -221,7 +221,15 @@ import org.springframework.http.HttpStatus;
     STUDY_MIN_COUNT_INVALID(HttpStatus.BAD_REQUEST, "SG001", "스터디 정원은 최소 2명 이상이어야 합니다."),
     STUDY_NOT_FOUND(HttpStatus.NOT_FOUND, "SG002", "존재하지 않거나 이미 삭제된 스터디입니다."),
     STUDY_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "SG003", "방장만 스터디를 수정할 수 있습니다."),
-    STUDY_MAX_COUNT_BELOW_CURRENT(HttpStatus.BAD_REQUEST, "SG004", "정원은 현재 참여 인원 이상이어야 합니다.");
+    STUDY_MAX_COUNT_BELOW_CURRENT(HttpStatus.BAD_REQUEST, "SG004", "정원은 현재 참여 인원 이상이어야 합니다."),
+
+    /* =========================================================================
+       채팅 관련 예외 (CH000)
+       ========================================================================= */
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CH001", "존재하지 않는 채팅방입니다."),
+    CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
+    CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
+    CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다.");
 
 
     private final HttpStatus status;
