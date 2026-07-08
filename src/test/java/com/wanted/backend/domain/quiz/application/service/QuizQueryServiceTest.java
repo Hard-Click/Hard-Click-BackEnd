@@ -6,10 +6,12 @@ import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.QuizReport;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.model.QuizSubmission;
+import com.wanted.backend.domain.quiz.domain.model.QuizSubmissionAnswer;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
 import com.wanted.backend.domain.quiz.domain.repository.QuizSubmissionRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -283,5 +285,107 @@ class QuizQueryServiceTest {
         assertThat(result.completedCount()).isEqualTo(2);
         assertThat(result.averageScore()).isEqualTo(85);
         assertThat(result.quizzes()).allSatisfy(item -> assertThat(item.completed()).isTrue());
+    }
+
+    // 2문항 퀴즈: Q1(id10) 정답=id102, Q2(id20) 정답=id201, 해설 보유
+    private Quiz reportQuiz(Long id, Long sectionId, String title) {
+        QuizQuestion q1 = QuizQuestion.restore(10L, 1, "질문1", "해설1", List.of(
+                QuizOption.restore(101L, 1, "보기1", false),
+                QuizOption.restore(102L, 2, "보기2", true),
+                QuizOption.restore(103L, 3, "보기3", false),
+                QuizOption.restore(104L, 4, "보기4", false)));
+        QuizQuestion q2 = QuizQuestion.restore(20L, 2, "질문2", "해설2", List.of(
+                QuizOption.restore(201L, 1, "보기1", true),
+                QuizOption.restore(202L, 2, "보기2", false),
+                QuizOption.restore(203L, 3, "보기3", false),
+                QuizOption.restore(204L, 4, "보기4", false)));
+        return Quiz.restore(id, INSTRUCTOR_ID, COURSE_ID, sectionId, title,
+                List.of(q1, q2), LocalDateTime.of(2026, 5, 10, 15, 30));
+    }
+
+    @Test
+    void quizReportComputesScoreDiffAgainstPreviousWeekAndSeparatesWrongNotes() {
+        Quiz current = reportQuiz(90L, 200L, "2주차 퀴즈");   // week 2
+        Quiz previous = reportQuiz(91L, 100L, "1주차 퀴즈");  // week 1
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current, previous));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                200L, new CourseSectionTitlePort.SectionInfo("섹션 2", 2),
+                100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+        // 현재(quiz90): Q1 정답(102), Q2 오답(202) → score 60 / 정답1 오답1
+        QuizSubmission currentSub = QuizSubmission.restore(55L, 90L, MEMBER_ID, 60, 2, 1,
+                LocalDateTime.of(2026, 5, 12, 0, 0),
+                List.of(
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
+                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false)));
+        // 이전 주차(quiz91): score 75
+        QuizSubmission prevSub = QuizSubmission.restore(56L, 91L, MEMBER_ID, 75, 2, 2,
+                LocalDateTime.of(2026, 5, 5, 0, 0), List.of());
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(currentSub, prevSub));
+
+        QuizReport report = service.getMyQuizReport(MEMBER_ID, 90L);
+
+        assertThat(report.quizId()).isEqualTo(90L);
+        assertThat(report.week()).isEqualTo(2);
+        assertThat(report.score()).isEqualTo(60);
+        assertThat(report.totalScore()).isEqualTo(100);
+        assertThat(report.correctCount()).isEqualTo(1);
+        assertThat(report.incorrectCount()).isEqualTo(1);
+        // 이전 주차 75점 대비 -15
+        assertThat(report.scoreDiff()).isEqualTo(-15);
+        assertThat(report.questions()).hasSize(2);
+        // 오답노트는 틀린 문항(Q2)만
+        assertThat(report.wrongNotes()).hasSize(1);
+        QuizReport.QuestionResult wrong = report.wrongNotes().get(0);
+        assertThat(wrong.questionId()).isEqualTo(20L);
+        assertThat(wrong.correct()).isFalse();
+        assertThat(wrong.correctOptionId()).isEqualTo(201L);
+        assertThat(wrong.selectedOptionId()).isEqualTo(202L);
+        assertThat(wrong.explanation()).isEqualTo("해설2");
+    }
+
+    @Test
+    void quizReportScoreDiffIsZeroWhenNoPreviousWeekSubmission() {
+        Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");   // week 1, 이전 없음
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+        QuizSubmission currentSub = QuizSubmission.restore(55L, 90L, MEMBER_ID, 60, 2, 1,
+                LocalDateTime.of(2026, 5, 12, 0, 0),
+                List.of(
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
+                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false)));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(currentSub));
+
+        QuizReport report = service.getMyQuizReport(MEMBER_ID, 90L);
+
+        assertThat(report.scoreDiff()).isZero();
+    }
+
+    @Test
+    void quizReportRejectsWhenQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
+    void quizReportRejectsWhenNotSubmitted() {
+        Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_SUBMISSION_NOT_FOUND);
     }
 }

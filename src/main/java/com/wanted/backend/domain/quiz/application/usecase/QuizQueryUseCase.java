@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.application.usecase;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.QuizReport;
 
 import java.util.List;
 
@@ -13,4 +14,6 @@ public interface QuizQueryUseCase {
     InstructorQuizDetail getInstructorQuizDetail(Long instructorId, Long quizId);
 
     MyQuizList getMyQuizzes(Long memberId, Long courseId);
+
+    QuizReport getMyQuizReport(Long memberId, Long quizId);
 }

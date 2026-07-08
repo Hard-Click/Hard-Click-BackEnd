@@ -71,6 +71,7 @@ import org.springframework.http.HttpStatus;
     QUIZ_NOT_AUTHORIZED(HttpStatus.FORBIDDEN, "QZ002", "본인이 등록한 퀴즈만 수정/삭제할 수 있습니다."),
     QUIZ_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "QZ003", "이미 제출한 퀴즈입니다."),
     QUIZ_ENROLLMENT_REQUIRED(HttpStatus.FORBIDDEN, "QZ004", "수강 중인 강의의 퀴즈만 조회할 수 있습니다."),
+    QUIZ_SUBMISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QZ005", "제출한 퀴즈만 결과를 조회할 수 있습니다."),
 
     /* =========================================================================
        5. 리뷰 도메인 관련 예외 (R000)
