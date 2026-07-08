@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 
-public interface QuizEnrollmentJpaRepository extends JpaRepository<EnrollmentReferenceJpaEntity, Long> {
+public interface QuizEnrollmentJpaRepository extends JpaRepository<QuizEnrollmentReferenceJpaEntity, Long> {
 
     boolean existsByMemberIdAndCourseIdAndStatusInAndExpiredAtIsNull(
             Long memberId, Long courseId, Collection<EnrollmentStatus> statuses);

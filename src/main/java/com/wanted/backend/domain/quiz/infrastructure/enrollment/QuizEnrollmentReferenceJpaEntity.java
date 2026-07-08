@@ -15,13 +15,14 @@ import org.hibernate.annotations.Immutable;
 import java.time.LocalDateTime;
 
 // enrollment 테이블의 읽기 전용 참조 (Port + ReferenceEntity 패턴) — 수강 여부 확인용.
-// learning_activity의 동명 엔티티와 동일 방식으로 도메인별로 격리한다.
+// 클래스명은 도메인별로 고유해야 한다 (Hibernate 엔티티명 충돌 방지 — learning_activity의
+// EnrollmentReferenceJpaEntity와 단순명이 겹치면 DuplicateMappingException 발생).
 @Entity
 @Getter
 @Immutable
 @Table(name = "enrollment")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class EnrollmentReferenceJpaEntity {
+public class QuizEnrollmentReferenceJpaEntity {
 
     @Id
     @Column(name = "enrollment_id")
