@@ -218,7 +218,8 @@ import org.springframework.http.HttpStatus;
     /* =========================================================================
        스터디 모집 관련 예외 (SG000) — ST는 순공시간(study_timer)이 선점하여 SG 사용
        ========================================================================= */
-    STUDY_MIN_COUNT_INVALID(HttpStatus.BAD_REQUEST, "SG001", "스터디 정원은 최소 2명 이상이어야 합니다.");
+    STUDY_MIN_COUNT_INVALID(HttpStatus.BAD_REQUEST, "SG001", "스터디 정원은 최소 2명 이상이어야 합니다."),
+    STUDY_NOT_FOUND(HttpStatus.NOT_FOUND, "SG002", "존재하지 않거나 이미 삭제된 스터디입니다.");
 
 
     private final HttpStatus status;

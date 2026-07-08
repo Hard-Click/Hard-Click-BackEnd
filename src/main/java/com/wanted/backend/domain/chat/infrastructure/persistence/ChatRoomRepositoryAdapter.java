@@ -4,6 +4,8 @@ import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public class ChatRoomRepositoryAdapter implements ChatRoomRepository {
 
@@ -22,5 +24,15 @@ public class ChatRoomRepositoryAdapter implements ChatRoomRepository {
         ChatRoomJpaEntity saved = repository.save(entity);
         return ChatRoom.restore(saved.getId(), saved.getStudyId(), saved.getHostId(),
                 saved.getStatus(), saved.getCreatedAt(), saved.getUpdatedAt());
+    }
+
+    @Override
+    public Optional<ChatRoom> findByStudyId(Long studyId) {
+        return repository.findByStudyId(studyId).map(this::toDomain);
+    }
+
+    private ChatRoom toDomain(ChatRoomJpaEntity entity) {
+        return ChatRoom.restore(entity.getId(), entity.getStudyId(), entity.getHostId(),
+                entity.getStatus(), entity.getCreatedAt(), entity.getUpdatedAt());
     }
 }

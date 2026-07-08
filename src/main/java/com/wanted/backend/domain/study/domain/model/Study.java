@@ -47,6 +47,10 @@ public class Study {
         return new Study(id, hostId, title, subject, content, maxCount, currentCount, status, createdAt, updatedAt);
     }
 
+    public boolean isOwner(Long memberId) {
+        return this.hostId.equals(memberId);
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }

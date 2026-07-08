@@ -4,6 +4,8 @@ import com.wanted.backend.domain.study.domain.model.Study;
 import com.wanted.backend.domain.study.domain.repository.StudyRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public class StudyRepositoryAdapter implements StudyRepository {
 
@@ -21,6 +23,11 @@ public class StudyRepositoryAdapter implements StudyRepository {
                 study.getCreatedAt(), study.getUpdatedAt()
         );
         return toDomain(repository.save(entity));
+    }
+
+    @Override
+    public Optional<Study> findById(Long id) {
+        return repository.findById(id).map(this::toDomain);
     }
 
     private Study toDomain(StudyJpaEntity entity) {

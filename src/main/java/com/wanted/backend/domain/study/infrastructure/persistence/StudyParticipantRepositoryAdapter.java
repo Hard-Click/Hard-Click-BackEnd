@@ -4,6 +4,8 @@ import com.wanted.backend.domain.study.domain.model.StudyParticipant;
 import com.wanted.backend.domain.study.domain.repository.StudyParticipantRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public class StudyParticipantRepositoryAdapter implements StudyParticipantRepository {
 
@@ -20,5 +22,12 @@ public class StudyParticipantRepositoryAdapter implements StudyParticipantReposi
         );
         StudyParticipantJpaEntity saved = repository.save(entity);
         return StudyParticipant.restore(saved.getId(), saved.getStudyId(), saved.getMemberId(), saved.getJoinedAt());
+    }
+
+    @Override
+    public List<Long> findMemberIdsByStudyId(Long studyId) {
+        return repository.findByStudyId(studyId).stream()
+                .map(StudyParticipantJpaEntity::getMemberId)
+                .toList();
     }
 }
