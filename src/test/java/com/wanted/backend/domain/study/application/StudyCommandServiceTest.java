@@ -1,11 +1,13 @@
 package com.wanted.backend.domain.study.application;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.port.ChatRoomCommandPort;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.service.StudyCommandService;
 import com.wanted.backend.domain.study.domain.model.Study;
 import com.wanted.backend.domain.study.domain.model.StudyParticipant;
+import com.wanted.backend.domain.study.domain.model.StudyStatus;
 import com.wanted.backend.domain.study.domain.repository.StudyParticipantRepository;
 import com.wanted.backend.domain.study.domain.repository.StudyRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -17,6 +19,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -105,5 +110,71 @@ class StudyCommandServiceTest {
         assertThatThrownBy(() -> studyCommandService.create(command))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("chat room creation failed");
+    }
+
+    private Study activeStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 3, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("방장이 수정하면 정상적으로 반영된다")
+    void update_success() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when
+        studyCommandService.update(new UpdateStudyCommand(45L, 1L, "수정된 제목", "MATH_2", 6, "수정된 내용"));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getTitle()).isEqualTo("수정된 제목");
+        assertThat(captor.getValue().getSubject()).isEqualTo("MATH_2");
+        assertThat(captor.getValue().getMaxCount()).isEqualTo(6);
+        assertThat(captor.getValue().getContent()).isEqualTo("수정된 내용");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 수정하려 하면 예외가 발생한다")
+    void update_fail_notFound() {
+        // given
+        given(studyRepository.findById(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(999L, 1L, "제목", "MATH_1", 5, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 회원이 수정하려 하면 예외가 발생한다")
+    void update_fail_notOwner() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(45L, 999L, "제목", "MATH_1", 5, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_UPDATE_FORBIDDEN.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("정원을 현재 인원 미만으로 줄이면 예외가 발생한다")
+    void update_fail_maxCountBelowCurrent() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(45L, 1L, "제목", "MATH_1", 2, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT.getMessage());
+
+        verify(studyRepository, never()).save(any());
     }
 }
