@@ -54,6 +54,7 @@ import org.springframework.http.HttpStatus;
     INVALID_CURRENT_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH_009", "현재 비밀번호가 일치하지 않습니다."),
     ALREADY_WITHDRAWN_MEMBER(HttpStatus.BAD_REQUEST, "AUTH_010","이미 탈퇴한 회원입니다."),
     WITHDRAWN_MEMBER(HttpStatus.FORBIDDEN,"AUTH_011", "탈퇴한 회원입니다."),
+    PASSWORD_REUSE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "AUTH_012", "새 비밀번호는 기존 비밀번호와 다르게 설정해야 합니다."),
 
     /* =========================================================================
        4. 강의(Course) 관련 예외 (CR000)

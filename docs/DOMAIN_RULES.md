@@ -10,6 +10,7 @@
 - 인증코드 TTL: **5분** (300000ms) · 인증완료 토큰 TTL 5분
 - 비밀번호 재발급: **하루 3회** 제한 (`password-reset-daily-limit`)
 - 로그인 **5회 실패 시 계정 잠금** (`members.login_fail_count` / `is_locked`) — `Member.MAX_LOGIN_FAIL_COUNT`, 잠금 시 `U004 ACCOUNT_LOCKED`
+- 비밀번호 변경 시 **기존 비밀번호 재사용 금지** — 새 비밀번호가 기존과 동일하면 `AUTH_012 PASSWORD_REUSE_NOT_ALLOWED`(400). 적용 경로: 일반 변경 / 이메일 재설정 / 계정잠금 해제 (3개 전부)
 - JWT: access **30분**(1800000ms) / refresh **14일**(1209600000ms)
 
 ## 파일 업로드
