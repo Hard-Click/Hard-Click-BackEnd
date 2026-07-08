@@ -12,10 +12,11 @@ CREATE TABLE study (
     current_count INT          NOT NULL DEFAULT 1,
     status        VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (study_id),
     KEY idx_study_status_created (status, created_at),
-    KEY idx_study_host_id (host_id)
+    KEY idx_study_host_id (host_id),
+    CHECK (max_count >= 2)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 CREATE TABLE study_participant (
@@ -34,7 +35,7 @@ CREATE TABLE chat_room (
     host_id      BIGINT      NOT NULL,
     status       VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (chat_room_id),
     UNIQUE KEY uk_chat_room_study_id (study_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

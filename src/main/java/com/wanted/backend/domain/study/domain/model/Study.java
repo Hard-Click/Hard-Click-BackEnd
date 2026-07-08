@@ -1,5 +1,8 @@
 package com.wanted.backend.domain.study.domain.model;
 
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
+
 import java.time.LocalDateTime;
 
 public class Study {
@@ -31,6 +34,9 @@ public class Study {
     }
 
     public static Study create(Long hostId, String title, String subject, int maxCount, String content) {
+        if (maxCount < 2) {
+            throw new BusinessException(ErrorCode.STUDY_MIN_COUNT_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         return new Study(null, hostId, title, subject, content, maxCount, 1, StudyStatus.ACTIVE, now, now);
     }
