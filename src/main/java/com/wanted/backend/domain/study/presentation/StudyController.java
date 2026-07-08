@@ -2,18 +2,21 @@ package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
+import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
+import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
+import com.wanted.backend.domain.study.presentation.request.StudyListRequest;
 import com.wanted.backend.domain.study.presentation.response.CreateStudyResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyDetailResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyListResponse;
 import com.wanted.backend.global.common.ApiResponse;
-import com.wanted.backend.global.domain.SubjectType;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -21,27 +24,28 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/study")
+@Validated
 public class StudyController {
 
     private final StudyCommandUseCase studyCommandUseCase;
+    private final StudyQueryUseCase studyQueryUseCase;
 
-    public StudyController(StudyCommandUseCase studyCommandUseCase) {
+    public StudyController(StudyCommandUseCase studyCommandUseCase, StudyQueryUseCase studyQueryUseCase) {
         this.studyCommandUseCase = studyCommandUseCase;
+        this.studyQueryUseCase = studyQueryUseCase;
     }
 
-    // TODO(#438): mock 목록 조회 → 실제 조회로 교체
+    @Operation(summary = "스터디 목록 조회", description = "스터디 목록을 조회합니다. subject로 과목 필터링 가능 (SubjectType enum 값)")
     @GetMapping
     public ResponseEntity<ApiResponse<StudyListResponse>> getStudyList(
-            @RequestParam(required = false) SubjectType subject,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @Valid @ModelAttribute StudyListRequest request) {
 
-        List<StudyListResponse.StudyItem> content = List.of(
-                new StudyListResponse.StudyItem(101L, "주말 React 스터디 모집", "강남 카페에서 진행합니다", "최*진", "React", 3, 6, false, LocalDateTime.of(2026, 5, 17, 14, 30)),
-                new StudyListResponse.StudyItem(102L, "수학1 1등급 목표 스터디", "매주 일요일 밤 10시", "이*연", "수학1", 5, 5, true, LocalDateTime.of(2026, 5, 16, 10, 0))
-        );
+        StudyListResult result = studyQueryUseCase.getList(
+                request.subject() != null ? request.subject().name() : null,
+                request.page(),
+                request.size());
 
-        return ApiResponse.success("스터디 목록 조회 완료", new StudyListResponse(content, 1));
+        return ApiResponse.success("스터디 목록 조회 완료", StudyListResponse.from(result));
     }
 
     // TODO(#439): mock 상세 조회 → 실제 조회로 교체 (chatRoomId 포함 예정)
