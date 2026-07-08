@@ -6,6 +6,7 @@ import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
+import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
@@ -150,5 +151,54 @@ public class QuizQueryService implements QuizQueryUseCase {
                 .orElse(0));
 
         return new MyQuizList(courseId, courseTitle, completedCount, averageScore, items);
+    }
+
+    @Override
+    public StudentQuizDetail getStudentQuizDetail(Long memberId, Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        // 수강 중인 강의의 퀴즈만 응시/조회 가능
+        if (!enrollmentAccessPort.hasActiveEnrollment(memberId, quiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
+
+        String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(quiz.getCourseId()))
+                .getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId());
+        String sectionTitle = courseSectionTitlePort.findTitlesBySectionIds(List.of(quiz.getSectionId()))
+                .getOrDefault(quiz.getSectionId(), "섹션 #" + quiz.getSectionId());
+
+        List<QuizSubmission> submissions = quizSubmissionRepository
+                .findByMemberIdAndQuizIdIn(memberId, List.of(quizId));
+        boolean submitted = !submissions.isEmpty();
+        int answeredCount = submitted
+                ? (int) submissions.get(0).getAnswers().stream()
+                        .filter(a -> a.getSelectedOptionId() != null)
+                        .count()
+                : 0;
+
+        // 정답(correct)/해설(explanation)은 응시 화면에 노출하지 않는다.
+        List<StudentQuizDetail.Question> questions = quiz.getQuestions().stream()
+                .map(question -> new StudentQuizDetail.Question(
+                        question.getId(),
+                        question.getQuestionNumber(),
+                        question.getQuestionText(),
+                        question.getOptions().stream()
+                                .map(option -> new StudentQuizDetail.Option(
+                                        option.getId(),
+                                        option.getOptionNumber(),
+                                        option.getOptionText()))
+                                .toList()))
+                .toList();
+
+        return new StudentQuizDetail(
+                quiz.getId(),
+                quiz.getTitle(),
+                courseTitle,
+                sectionTitle,
+                questions.size(),
+                answeredCount,
+                submitted,
+                questions);
     }
 }
