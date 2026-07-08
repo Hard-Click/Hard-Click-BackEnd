@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -49,6 +50,7 @@ public class QuizJpaEntity {
 
     @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 20)
+    @OrderBy("questionNumber ASC")
     private List<QuizQuestionJpaEntity> questions = new ArrayList<>();
 
     public static QuizJpaEntity create(Long courseId, Long sectionId, Long instructorId, String title,

@@ -9,6 +9,7 @@ import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
+import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
@@ -89,17 +90,28 @@ public class QuizController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId
     ) {
-        List<StudentQuizDetailResponse.Question> questions = studentQuizQuestions();
+        StudentQuizDetail detail = quizQueryUseCase.getStudentQuizDetail(userDetails.getMemberId(), quizId);
 
         StudentQuizDetailResponse response = new StudentQuizDetailResponse(
-                quizId,
-                "React 기초 개념 퀴즈",
-                "React 완벽 가이드",
-                "섹션 1: React 기초",
-                questions.size(),
-                3,
-                false,
-                questions
+                detail.quizId(),
+                detail.quizTitle(),
+                detail.courseTitle(),
+                detail.sectionTitle(),
+                detail.totalQuestionCount(),
+                detail.answeredCount(),
+                detail.submitted(),
+                detail.questions().stream()
+                        .map(question -> new StudentQuizDetailResponse.Question(
+                                question.questionId(),
+                                question.questionNumber(),
+                                question.questionText(),
+                                question.options().stream()
+                                        .map(option -> new StudentQuizDetailResponse.Option(
+                                                option.optionId(),
+                                                option.optionNumber(),
+                                                option.optionText()))
+                                        .toList()))
+                        .toList()
         );
 
         return ApiResponse.success("퀴즈 상세 정보를 조회했습니다.", response);
@@ -353,59 +365,6 @@ public class QuizController {
         int fromIndex = (int) offset;
         int toIndex = Math.min(fromIndex + size, items.size());
         return items.subList(fromIndex, toIndex);
-    }
-
-    private List<StudentQuizDetailResponse.Question> studentQuizQuestions() {
-        return List.of(
-                new StudentQuizDetailResponse.Question(1L, 1, "React의 가상 DOM이란 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(1L, 1, "실제 DOM의 복사본"),
-                        new StudentQuizDetailResponse.Option(2L, 2, "메모리에 존재하는 DOM의 표현"),
-                        new StudentQuizDetailResponse.Option(3L, 3, "HTML 파일"),
-                        new StudentQuizDetailResponse.Option(4L, 4, "CSS 스타일시트")
-                )),
-                new StudentQuizDetailResponse.Question(2L, 2, "JSX는 무엇의 약자인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(5L, 1, "JavaScript XML"),
-                        new StudentQuizDetailResponse.Option(6L, 2, "Java Syntax Extension"),
-                        new StudentQuizDetailResponse.Option(7L, 3, "JSON XML"),
-                        new StudentQuizDetailResponse.Option(8L, 4, "JavaScript Extension")
-                )),
-                new StudentQuizDetailResponse.Question(3L, 3, "useState 훅이 반환하는 값의 조합으로 올바른 것은 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(9L, 1, "현재 상태와 상태 변경 함수"),
-                        new StudentQuizDetailResponse.Option(10L, 2, "렌더링 함수와 DOM 노드"),
-                        new StudentQuizDetailResponse.Option(11L, 3, "이전 props와 현재 props"),
-                        new StudentQuizDetailResponse.Option(12L, 4, "컴포넌트 이름과 이벤트 객체")
-                )),
-                new StudentQuizDetailResponse.Question(4L, 4, "useEffect의 의존성 배열을 빈 배열로 전달하면 언제 실행되나요?", List.of(
-                        new StudentQuizDetailResponse.Option(13L, 1, "컴포넌트가 처음 마운트된 뒤 한 번"),
-                        new StudentQuizDetailResponse.Option(14L, 2, "상태가 바뀔 때마다 항상"),
-                        new StudentQuizDetailResponse.Option(15L, 3, "이벤트가 발생할 때마다"),
-                        new StudentQuizDetailResponse.Option(16L, 4, "브라우저가 종료될 때 한 번")
-                )),
-                new StudentQuizDetailResponse.Question(5L, 5, "리스트 렌더링에서 key prop을 사용하는 주된 이유는 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(17L, 1, "CSS 우선순위를 높이기 위해"),
-                        new StudentQuizDetailResponse.Option(18L, 2, "각 항목의 변경을 안정적으로 식별하기 위해"),
-                        new StudentQuizDetailResponse.Option(19L, 3, "API 호출을 자동으로 캐싱하기 위해"),
-                        new StudentQuizDetailResponse.Option(20L, 4, "컴포넌트를 서버에서만 렌더링하기 위해")
-                )),
-                new StudentQuizDetailResponse.Question(6L, 6, "제어 컴포넌트의 설명으로 가장 알맞은 것은 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(21L, 1, "DOM이 입력값을 직접 관리하는 컴포넌트"),
-                        new StudentQuizDetailResponse.Option(22L, 2, "React 상태가 입력값을 관리하는 컴포넌트"),
-                        new StudentQuizDetailResponse.Option(23L, 3, "서버 상태만 관리하는 컴포넌트"),
-                        new StudentQuizDetailResponse.Option(24L, 4, "렌더링을 하지 않는 컴포넌트")
-                )),
-                new StudentQuizDetailResponse.Question(7L, 7, "props의 일반적인 역할은 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(25L, 1, "부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달한다"),
-                        new StudentQuizDetailResponse.Option(26L, 2, "브라우저 쿠키를 암호화한다"),
-                        new StudentQuizDetailResponse.Option(27L, 3, "데이터베이스 트랜잭션을 관리한다"),
-                        new StudentQuizDetailResponse.Option(28L, 4, "번들 파일을 압축한다")
-                )),
-                new StudentQuizDetailResponse.Question(8L, 8, "Context API를 사용하는 대표적인 목적은 무엇인가요?", List.of(
-                        new StudentQuizDetailResponse.Option(29L, 1, "이미지 파일을 최적화하기 위해"),
-                        new StudentQuizDetailResponse.Option(30L, 2, "깊은 컴포넌트 트리에 공통 상태를 전달하기 위해"),
-                        new StudentQuizDetailResponse.Option(31L, 3, "HTTP 요청을 자동 재시도하기 위해"),
-                        new StudentQuizDetailResponse.Option(32L, 4, "CSS 파일을 JavaScript로 변환하기 위해")
-                ))
-        );
     }
 
     private List<QuizReportResponse.QuestionResult> quizReportQuestions() {
