@@ -10,4 +10,7 @@ public interface QuizSubmissionJpaRepository extends JpaRepository<QuizSubmissio
 
     // 내 퀴즈 목록의 제출 여부/점수 조인용 — 강의 퀴즈 id 묶음으로 IN 조회 (N+1 방지).
     List<QuizSubmissionJpaEntity> findByMemberIdAndQuizIdIn(Long memberId, List<Long> quizIds);
+
+    // 강사 통계용 — 한 퀴즈의 전체 응시(제출) 이력.
+    List<QuizSubmissionJpaEntity> findByQuizId(Long quizId);
 }
