@@ -4,10 +4,13 @@ import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
+import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
+import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
+import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import com.wanted.backend.global.security.CustomUserDetails;
@@ -29,13 +32,15 @@ class QuizControllerTest {
 
     private QuizCommandUseCase quizCommandUseCase;
     private QuizQueryUseCase quizQueryUseCase;
+    private QuizSubmissionUseCase quizSubmissionUseCase;
     private QuizController controller;
 
     @BeforeEach
     void setUp() {
         quizCommandUseCase = mock(QuizCommandUseCase.class);
         quizQueryUseCase = mock(QuizQueryUseCase.class);
-        controller = new QuizController(quizCommandUseCase, quizQueryUseCase);
+        quizSubmissionUseCase = mock(QuizSubmissionUseCase.class);
+        controller = new QuizController(quizCommandUseCase, quizQueryUseCase, quizSubmissionUseCase);
     }
 
     @Test
@@ -118,6 +123,67 @@ class QuizControllerTest {
         assertThatThrownBy(() -> controller.getInstructorQuizDetail(userDetails, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+    }
+
+    @Test
+    void submitQuizMapsTheRequestToACommandAndReturnsGradingResult() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizSubmissionUseCase.submit(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new QuizSubmissionResult(55L, 90L, 75, 8, 6, 2,
+                        java.time.LocalDateTime.of(2026, 5, 10, 15, 30)));
+
+        QuizController.QuizSubmissionRequest request = new QuizController.QuizSubmissionRequest(
+                List.of(new QuizController.QuizSubmissionRequest.Answer(11L, 22L)));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.QuizSubmissionResponse>> result =
+                controller.submitQuiz(userDetails, 90L, request);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        QuizController.QuizSubmissionResponse response = result.getBody().data();
+        assertThat(response.submissionId()).isEqualTo(55L);
+        assertThat(response.score()).isEqualTo(75);
+        assertThat(response.correctCount()).isEqualTo(6);
+        assertThat(response.incorrectCount()).isEqualTo(2);
+
+        ArgumentCaptor<SubmitQuizCommand> captor = ArgumentCaptor.forClass(SubmitQuizCommand.class);
+        verify(quizSubmissionUseCase).submit(captor.capture());
+        SubmitQuizCommand command = captor.getValue();
+        assertThat(command.quizId()).isEqualTo(90L);
+        assertThat(command.memberId()).isEqualTo(1L);
+        assertThat(command.answers()).hasSize(1);
+        assertThat(command.answers().get(0).questionId()).isEqualTo(11L);
+        assertThat(command.answers().get(0).selectedOptionId()).isEqualTo(22L);
+    }
+
+    @Test
+    void submitQuizTreatsANullBodyAsAnEmptyAnswerList() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizSubmissionUseCase.submit(org.mockito.ArgumentMatchers.any())).thenReturn(
+                new QuizSubmissionResult(55L, 90L, 0, 8, 0, 8,
+                        java.time.LocalDateTime.of(2026, 5, 10, 15, 30)));
+
+        controller.submitQuiz(userDetails, 90L, null);
+
+        ArgumentCaptor<SubmitQuizCommand> captor = ArgumentCaptor.forClass(SubmitQuizCommand.class);
+        verify(quizSubmissionUseCase).submit(captor.capture());
+        assertThat(captor.getValue().answers()).isEmpty();
+    }
+
+    @Test
+    void submitQuizPropagatesTheUseCasesBusinessExceptionWhenAlreadySubmitted() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizSubmissionUseCase.submit(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_ALREADY_SUBMITTED));
+
+        QuizController.QuizSubmissionRequest request = new QuizController.QuizSubmissionRequest(
+                List.of(new QuizController.QuizSubmissionRequest.Answer(11L, 22L)));
+
+        assertThatThrownBy(() -> controller.submitQuiz(userDetails, 90L, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ALREADY_SUBMITTED);
     }
 
     @Test

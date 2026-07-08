@@ -35,4 +35,20 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    // 퀴즈 제출 내용을 AI(Python) 서버로 비동기 전송하는 전용 풀.
+    // AI 서버 지연이 알림 등 다른 비동기 작업에 전파되지 않도록 분리한다.
+    @Bean(name = "quizAiExecutor")
+    public Executor quizAiExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("QuizAi-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
 }

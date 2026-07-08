@@ -3,11 +3,14 @@ package com.wanted.backend.domain.quiz.presentation;
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
+import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
+import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
+import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,6 +52,7 @@ public class QuizController {
 
     private final QuizCommandUseCase quizCommandUseCase;
     private final QuizQueryUseCase quizQueryUseCase;
+    private final QuizSubmissionUseCase quizSubmissionUseCase;
 
     @GetMapping("/members/me/quizzes")
     @Operation(summary = "내 퀴즈 목록 조회", description = "현재 로그인한 회원의 퀴즈 목록을 조회합니다.")
@@ -94,20 +98,29 @@ public class QuizController {
     }
 
     @PostMapping("/quizzes/{quizId}/submissions")
-    @Operation(summary = "퀴즈 답안 제줄", description = "학생의 퀴즈 답안을 제출하고 재점 결과를 반환합니다.")
+    @Operation(summary = "퀴즈 답안 제출", description = "학생의 퀴즈 답안을 제출하고 자동 채점 결과를 반환합니다.")
     public ResponseEntity<ApiResponse<QuizSubmissionResponse>> submitQuiz(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long quizId,
             @RequestBody(required = false) QuizSubmissionRequest request
     ) {
+        List<SubmitQuizCommand.AnswerCommand> answers =
+                request == null || request.answers() == null ? List.of()
+                        : request.answers().stream()
+                                .map(a -> new SubmitQuizCommand.AnswerCommand(a.questionId(), a.selectedOptionId()))
+                                .toList();
+
+        QuizSubmissionResult result = quizSubmissionUseCase.submit(
+                new SubmitQuizCommand(quizId, userDetails.getMemberId(), answers));
+
         QuizSubmissionResponse response = new QuizSubmissionResponse(
-                55L,
-                quizId,
-                75,
-                8,
-                6,
-                2,
-                OffsetDateTime.parse("2026-05-10T15:30:00+09:00")
+                result.submissionId(),
+                result.quizId(),
+                result.score(),
+                result.totalQuestionCount(),
+                result.correctCount(),
+                result.incorrectCount(),
+                result.submittedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()
         );
 
         return ApiResponse.success("퀴즈가 제출되었습니다.", response);
