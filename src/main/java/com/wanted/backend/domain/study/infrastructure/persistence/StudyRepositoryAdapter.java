@@ -30,7 +30,7 @@ public class StudyRepositoryAdapter implements StudyRepository {
 
     @Override
     public List<Study> findAll(String subject, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
         List<StudyJpaEntity> entities = subject != null
                 ? repository.findBySubject(subject, pageable)
                 : repository.findAll(pageable).getContent();

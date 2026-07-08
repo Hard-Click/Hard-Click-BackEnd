@@ -153,4 +153,22 @@ class StudyControllerTest {
         mockMvc.perform(get("/api/study").param("page", "-1"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("잘못된 subject enum 값이면 400을 반환한다")
+    void getStudyList_fail_invalidSubject() throws Exception {
+        mockMvc.perform(get("/api/study").param("subject", "INVALID_SUBJECT"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("subject 필터가 전달되면 use case에 반영된다")
+    void getStudyList_success_withSubjectFilter() throws Exception {
+        given(studyQueryUseCase.getList(eq("MATH_1"), eq(0), eq(10)))
+                .willReturn(new StudyListResult(List.of(), 0));
+
+        mockMvc.perform(get("/api/study").param("subject", "MATH_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
 }

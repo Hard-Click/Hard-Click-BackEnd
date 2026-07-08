@@ -41,9 +41,9 @@ public class StudyController {
             @Valid @ModelAttribute StudyListRequest request) {
 
         StudyListResult result = studyQueryUseCase.getList(
-                request.getSubject() != null ? request.getSubject().name() : null,
-                request.getPage(),
-                request.getSize());
+                request.subject() != null ? request.subject().name() : null,
+                request.page(),
+                request.size());
 
         return ApiResponse.success("스터디 목록 조회 완료", StudyListResponse.from(result));
     }

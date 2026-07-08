@@ -34,13 +34,21 @@ public class StudyQueryService implements StudyQueryUseCase {
         int totalPages = (int) Math.ceil((double) totalCount / size);
 
         Set<Long> hostIds = studies.stream().map(Study::getHostId).collect(Collectors.toSet());
-        Map<Long, String> nameMap = memberNamePort.getNamesByMemberIds(hostIds);
+        Map<Long, String> nameMap = resolveNameMap(hostIds);
 
         List<StudyItemResult> items = studies.stream()
                 .map(study -> toItemResult(study, nameMap))
                 .toList();
 
         return new StudyListResult(items, totalPages);
+    }
+
+    private Map<Long, String> resolveNameMap(Set<Long> hostIds) {
+        try {
+            return memberNamePort.getNamesByMemberIds(hostIds);
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 
     private StudyItemResult toItemResult(Study study, Map<Long, String> nameMap) {
