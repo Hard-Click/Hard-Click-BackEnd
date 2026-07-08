@@ -47,11 +47,6 @@ public class AuthCommandService implements AuthCommandUseCase {
             throw new BusinessException(ErrorCode.WITHDRAWN_MEMBER);
         }
 
-        if (member.getStatus() == MemberStatus.SUSPENDED) {
-            recordLoginResult("fail");
-            throw new BusinessException(ErrorCode.SUSPENDED_MEMBER);
-        }
-
         if (member.isLocked()) {
             recordLoginResult("fail");
             throw new BusinessException(ErrorCode.ACCOUNT_ALREADY_LOCKED);

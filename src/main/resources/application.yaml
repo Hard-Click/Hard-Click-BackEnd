@@ -43,6 +43,11 @@ spring:
     # (지금 끄면 아직 baseline 안 된 환경의 마이그레이션이 실패하므로 당장은 유지)
     baseline-on-migrate: true
     baseline-version: 1
+    # out-of-order는 profile별로 분리 (docs/DB_MIGRATION_RULES.md 11번 참고)
+    # - local/dev: true (병렬 개발 편의)
+    # - prod: false (순서 의존성 안정성)
+    # 기본값은 false (안전장치로 운영 우선)
+    out-of-order: false
 
 
   mail:
@@ -93,6 +98,13 @@ toss:
   payments:
     base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
     secret-key: ${TOSS_SECRET_KEY}
+
+quiz:
+  ai:
+    # 퀴즈 제출 내용을 전송할 AI(Python/FastAPI) 서버. 스펙 확정 전까지 기본값은 로컬.
+    base-url: ${QUIZ_AI_BASE_URL:http://localhost:8000}
+    submission-path: ${QUIZ_AI_SUBMISSION_PATH:/quiz/submissions}
+    enabled: ${QUIZ_AI_ENABLED:false}
 
 server:
   port: 8080
