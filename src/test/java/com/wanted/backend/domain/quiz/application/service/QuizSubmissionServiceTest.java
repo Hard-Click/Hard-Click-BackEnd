@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.domain.event.QuizSubmittedEvent;
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
@@ -23,6 +24,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,6 +38,7 @@ class QuizSubmissionServiceTest {
 
     private QuizRepository quizRepository;
     private QuizSubmissionRepository quizSubmissionRepository;
+    private EnrollmentAccessPort enrollmentAccessPort;
     private ApplicationEventPublisher eventPublisher;
     private QuizSubmissionService service;
 
@@ -42,8 +46,10 @@ class QuizSubmissionServiceTest {
     void setUp() {
         quizRepository = mock(QuizRepository.class);
         quizSubmissionRepository = mock(QuizSubmissionRepository.class);
+        enrollmentAccessPort = mock(EnrollmentAccessPort.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        service = new QuizSubmissionService(quizRepository, quizSubmissionRepository, eventPublisher);
+        service = new QuizSubmissionService(quizRepository, quizSubmissionRepository,
+                enrollmentAccessPort, eventPublisher);
     }
 
     private Quiz quiz() {
@@ -82,6 +88,7 @@ class QuizSubmissionServiceTest {
     @Test
     void submitGradesSavesAndPublishesEvent() {
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(quiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(true);
         when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
         stubSavePassthrough();
 
@@ -109,6 +116,7 @@ class QuizSubmissionServiceTest {
     @Test
     void submitGradesUnansweredQuestionsAsIncorrectAndPublishesThemInTheEvent() {
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(twoQuestionQuiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(true);
         when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
         stubSavePassthrough();
 
@@ -147,6 +155,7 @@ class QuizSubmissionServiceTest {
     @Test
     void submitRejectsWhenMemberAlreadySubmitted() {
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(quiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(true);
         when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(true);
 
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
@@ -155,6 +164,21 @@ class QuizSubmissionServiceTest {
         assertThatThrownBy(() -> service.submit(command))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ALREADY_SUBMITTED);
+        verify(quizSubmissionRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void submitRejectsWhenNotEnrolled() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(quiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(false);
+
+        SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+
+        assertThatThrownBy(() -> service.submit(command))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
         verify(quizSubmissionRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }

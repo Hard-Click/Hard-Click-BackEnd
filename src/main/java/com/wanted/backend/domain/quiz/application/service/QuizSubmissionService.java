@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.QuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
 import com.wanted.backend.domain.quiz.domain.event.QuizSubmittedEvent;
@@ -26,12 +27,18 @@ public class QuizSubmissionService implements QuizSubmissionUseCase {
 
     private final QuizRepository quizRepository;
     private final QuizSubmissionRepository quizSubmissionRepository;
+    private final EnrollmentAccessPort enrollmentAccessPort;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public QuizSubmissionResult submit(SubmitQuizCommand command) {
         Quiz quiz = quizRepository.findById(command.quizId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        // 수강 중인 강의의 퀴즈만 응시 가능 (비수강자 제출 차단 → 리포트 열람도 원천 차단)
+        if (!enrollmentAccessPort.hasActiveEnrollment(command.memberId(), quiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
 
         // 1인 1제출 정책 — 재제출 방지
         if (quizSubmissionRepository.existsByQuizIdAndMemberId(command.quizId(), command.memberId())) {
