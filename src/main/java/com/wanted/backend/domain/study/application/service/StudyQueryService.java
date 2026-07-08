@@ -12,6 +12,8 @@ import com.wanted.backend.domain.study.domain.repository.StudyParticipantReposit
 import com.wanted.backend.domain.study.domain.repository.StudyRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class StudyQueryService implements StudyQueryUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(StudyQueryService.class);
 
     private final StudyRepository studyRepository;
     private final StudyParticipantRepository studyParticipantRepository;
@@ -84,6 +88,7 @@ public class StudyQueryService implements StudyQueryUseCase {
         try {
             return memberNamePort.getNamesByMemberIds(memberIds);
         } catch (Exception e) {
+            log.warn("MemberNamePort 호출 실패, 빈 이름 맵으로 fallback. memberIds={}", memberIds, e);
             return Map.of();
         }
     }

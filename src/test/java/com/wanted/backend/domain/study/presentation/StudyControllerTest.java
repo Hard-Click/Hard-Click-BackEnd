@@ -8,6 +8,8 @@ import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
 import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
 import com.wanted.backend.global.domain.SubjectType;
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import com.wanted.backend.global.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,6 +131,17 @@ class StudyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디 조회 시 404를 반환한다")
+    void getStudyDetail_fail_notFound() throws Exception {
+        given(studyQueryUseCase.getDetail(eq(999L), eq(1L)))
+                .willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND));
+
+        mockMvc.perform(get("/api/study/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
     }
 
     @Test

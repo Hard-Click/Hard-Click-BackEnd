@@ -22,8 +22,7 @@ public class ChatRoomRepositoryAdapter implements ChatRoomRepository {
                 chatRoom.getCreatedAt(), chatRoom.getUpdatedAt()
         );
         ChatRoomJpaEntity saved = repository.save(entity);
-        return ChatRoom.restore(saved.getId(), saved.getStudyId(), saved.getHostId(),
-                saved.getStatus(), saved.getCreatedAt(), saved.getUpdatedAt());
+        return toDomain(saved);
     }
 
     @Override
