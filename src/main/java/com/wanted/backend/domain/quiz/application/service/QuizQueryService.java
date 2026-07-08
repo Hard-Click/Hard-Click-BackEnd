@@ -54,7 +54,8 @@ public class QuizQueryService implements QuizQueryUseCase {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 
-        if (!quiz.getInstructorId().equals(instructorId)) {
+        // 인증에서 온 instructorId는 non-null 보장 → equals 좌변에 두어 null-safe 비교
+        if (!instructorId.equals(quiz.getInstructorId())) {
             throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
         }
 

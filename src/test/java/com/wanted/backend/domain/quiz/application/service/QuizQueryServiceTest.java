@@ -131,6 +131,26 @@ class QuizQueryServiceTest {
     }
 
     @Test
+    void instructorQuizDetailFallsBackToPlaceholderTitlesWhenReferencesAreMissing() {
+        Quiz quiz = Quiz.restore(90L, INSTRUCTOR_ID, 999L, 888L, "퀴즈",
+                List.of(QuizQuestion.restore(1L, 1, "질문", null,
+                        List.of(
+                                QuizOption.restore(1L, 1, "보기1", true),
+                                QuizOption.restore(2L, 2, "보기2", false),
+                                QuizOption.restore(3L, 3, "보기3", false),
+                                QuizOption.restore(4L, 4, "보기4", false)))),
+                LocalDateTime.of(2026, 5, 10, 15, 30));
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection())).thenReturn(Map.of());
+
+        InstructorQuizDetail detail = service.getInstructorQuizDetail(INSTRUCTOR_ID, 90L);
+
+        assertThat(detail.courseTitle()).isEqualTo("강의 #999");
+        assertThat(detail.sectionTitle()).isEqualTo("섹션 #888");
+    }
+
+    @Test
     void instructorQuizDetailRejectsWhenTheQuizDoesNotExist() {
         when(quizRepository.findById(90L)).thenReturn(Optional.empty());
 
