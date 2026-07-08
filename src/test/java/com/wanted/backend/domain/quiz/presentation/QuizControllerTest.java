@@ -222,6 +222,34 @@ class QuizControllerTest {
         assertThat(notSubmitted.submittedAt()).isNull();
     }
 
+    @Test
+    void myQuizzesMapAnEmptyResultToZeroSummaryAndEmptyList() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizzes(1L, 10L))
+                .thenReturn(new MyQuizList(10L, "React 완벽 가이드", 0, 0, List.of()));
+
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
+                controller.getMyQuizzes(userDetails, 10L);
+
+        QuizController.MyQuizListResponse response = result.getBody().data();
+        assertThat(response.summary().completedCount()).isZero();
+        assertThat(response.summary().averageScore()).isZero();
+        assertThat(response.quizzes()).isEmpty();
+    }
+
+    @Test
+    void myQuizzesPropagateTheUseCasesBusinessExceptionWhenNotEnrolled() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        when(userDetails.getMemberId()).thenReturn(1L);
+        when(quizQueryUseCase.getMyQuizzes(1L, 10L))
+                .thenThrow(new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED));
+
+        assertThatThrownBy(() -> controller.getMyQuizzes(userDetails, 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+    }
+
     private QuizController.InstructorQuizRequest quizRequest() {
         return new QuizController.InstructorQuizRequest(
                 "React 기초 개념 퀴즈", 10L, 100L,

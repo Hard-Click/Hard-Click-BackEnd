@@ -2,6 +2,7 @@ package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.port.CourseSectionTitlePort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
@@ -40,6 +41,7 @@ class QuizQueryServiceTest {
     private QuizSubmissionRepository quizSubmissionRepository;
     private CourseTitlePort courseTitlePort;
     private CourseSectionTitlePort courseSectionTitlePort;
+    private EnrollmentAccessPort enrollmentAccessPort;
     private QuizQueryService service;
 
     @BeforeEach
@@ -48,8 +50,9 @@ class QuizQueryServiceTest {
         quizSubmissionRepository = mock(QuizSubmissionRepository.class);
         courseTitlePort = mock(CourseTitlePort.class);
         courseSectionTitlePort = mock(CourseSectionTitlePort.class);
+        enrollmentAccessPort = mock(EnrollmentAccessPort.class);
         service = new QuizQueryService(quizRepository, quizSubmissionRepository,
-                courseTitlePort, courseSectionTitlePort);
+                courseTitlePort, courseSectionTitlePort, enrollmentAccessPort);
     }
 
     private Quiz quiz(Long id, Long courseId, Long sectionId, String title, int questionCount) {
@@ -183,6 +186,7 @@ class QuizQueryServiceTest {
         // 강의에 3주차/1주차 퀴즈(정렬 뒤섞임). 1주만 제출(80점), 3주 미제출.
         Quiz week3 = quiz(93L, COURSE_ID, 300L, "State와 Lifecycle", 10);
         Quiz week1 = quiz(90L, COURSE_ID, 100L, "React 기초 개념", 10);
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(week3, week1));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
@@ -213,6 +217,7 @@ class QuizQueryServiceTest {
     @Test
     void myQuizzesReturnZeroSummaryWhenNothingSubmitted() {
         Quiz week1 = quiz(90L, COURSE_ID, 100L, "React 기초 개념", 10);
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(week1));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
@@ -227,5 +232,56 @@ class QuizQueryServiceTest {
         assertThat(result.averageScore()).isZero();
         assertThat(result.quizzes()).hasSize(1);
         assertThat(result.quizzes().get(0).completed()).isFalse();
+    }
+
+    @Test
+    void myQuizzesRejectWhenNotEnrolledInTheCourse() {
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getMyQuizzes(MEMBER_ID, COURSE_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+    }
+
+    @Test
+    void myQuizzesReturnEmptyWhenCourseHasNoQuizzes() {
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of());
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of());
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of());
+
+        MyQuizList result = service.getMyQuizzes(MEMBER_ID, COURSE_ID);
+
+        assertThat(result.completedCount()).isZero();
+        assertThat(result.averageScore()).isZero();
+        assertThat(result.quizzes()).isEmpty();
+    }
+
+    @Test
+    void myQuizzesAverageAllCompleted() {
+        Quiz week1 = quiz(90L, COURSE_ID, 100L, "1주", 10);
+        Quiz week2 = quiz(91L, COURSE_ID, 200L, "2주", 10);
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(week1, week2));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                100L, new CourseSectionTitlePort.SectionInfo("섹션 1", 1),
+                200L, new CourseSectionTitlePort.SectionInfo("섹션 2", 2)));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(
+                        QuizSubmission.restore(55L, 90L, MEMBER_ID, 80, 10, 8,
+                                LocalDateTime.of(2026, 5, 12, 0, 0), List.of()),
+                        QuizSubmission.restore(56L, 91L, MEMBER_ID, 90, 10, 9,
+                                LocalDateTime.of(2026, 5, 15, 0, 0), List.of())));
+
+        MyQuizList result = service.getMyQuizzes(MEMBER_ID, COURSE_ID);
+
+        assertThat(result.completedCount()).isEqualTo(2);
+        assertThat(result.averageScore()).isEqualTo(85);
+        assertThat(result.quizzes()).allSatisfy(item -> assertThat(item.completed()).isTrue());
     }
 }

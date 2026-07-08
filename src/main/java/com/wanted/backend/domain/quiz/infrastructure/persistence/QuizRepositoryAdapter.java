@@ -59,7 +59,8 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional(readOnly = true)
     public List<Quiz> findAllByCourseId(Long courseId) {
-        return quizJpaRepository.findByCourseId(courseId).stream().map(this::toDomain).toList();
+        return quizJpaRepository.findByCourseIdOrderBySectionIdAscIdAsc(courseId).stream()
+                .map(this::toDomain).toList();
     }
 
     @Override

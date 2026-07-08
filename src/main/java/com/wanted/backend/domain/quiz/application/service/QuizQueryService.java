@@ -2,6 +2,7 @@ package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.port.CourseSectionTitlePort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
@@ -32,6 +33,7 @@ public class QuizQueryService implements QuizQueryUseCase {
     private final QuizSubmissionRepository quizSubmissionRepository;
     private final CourseTitlePort courseTitlePort;
     private final CourseSectionTitlePort courseSectionTitlePort;
+    private final EnrollmentAccessPort enrollmentAccessPort;
 
     @Override
     public List<InstructorQuizSummary> getInstructorQuizzes(Long instructorId, Long courseId, Long sectionId) {
@@ -105,6 +107,11 @@ public class QuizQueryService implements QuizQueryUseCase {
 
     @Override
     public MyQuizList getMyQuizzes(Long memberId, Long courseId) {
+        // 수강 중인 강의의 퀴즈만 조회 가능 (미수강 강의의 퀴즈 구성 노출 차단)
+        if (!enrollmentAccessPort.hasActiveEnrollment(memberId, courseId)) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
+
         List<Quiz> quizzes = quizRepository.findAllByCourseId(courseId);
 
         String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(courseId))
@@ -131,7 +138,8 @@ public class QuizQueryService implements QuizQueryUseCase {
                             submission == null ? null : submission.getScore(),
                             submission == null ? null : submission.getSubmittedAt());
                 })
-                .sorted(Comparator.comparingInt(MyQuizList.MyQuizItem::weekNumber))
+                .sorted(Comparator.comparingInt(MyQuizList.MyQuizItem::weekNumber)
+                        .thenComparing(MyQuizList.MyQuizItem::quizId))
                 .toList();
 
         int completedCount = (int) items.stream().filter(MyQuizList.MyQuizItem::completed).count();
