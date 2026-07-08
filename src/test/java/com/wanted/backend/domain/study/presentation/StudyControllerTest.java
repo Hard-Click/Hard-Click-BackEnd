@@ -2,7 +2,9 @@ package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
+import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
+import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
 import com.wanted.backend.global.domain.SubjectType;
 import com.wanted.backend.global.security.CustomUserDetails;
@@ -22,7 +24,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,6 +44,9 @@ class StudyControllerTest {
 
     @MockitoBean
     private StudyCommandUseCase studyCommandUseCase;
+
+    @MockitoBean
+    private StudyQueryUseCase studyQueryUseCase;
 
     @BeforeEach
     void setUpAuthentication() {
@@ -118,6 +126,31 @@ class StudyControllerTest {
         mockMvc.perform(post("/api/study")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("목록 조회 시 조회 결과를 그대로 반환한다")
+    void getStudyList_success() throws Exception {
+        given(studyQueryUseCase.getList(isNull(), eq(0), eq(10)))
+                .willReturn(new StudyListResult(List.of(), 0));
+
+        mockMvc.perform(get("/api/study"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalPages").value(0));
+    }
+
+    @Test
+    @DisplayName("size가 50을 초과하면 400을 반환한다")
+    void getStudyList_fail_sizeTooLarge() throws Exception {
+        mockMvc.perform(get("/api/study").param("size", "51"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("page가 음수면 400을 반환한다")
+    void getStudyList_fail_negativePage() throws Exception {
+        mockMvc.perform(get("/api/study").param("page", "-1"))
                 .andExpect(status().isBadRequest());
     }
 }
