@@ -7,6 +7,7 @@ import com.wanted.backend.domain.chat.infrastructure.websocket.ChatPrincipal;
 import com.wanted.backend.domain.chat.presentation.request.SendMessageRequest;
 import com.wanted.backend.domain.chat.presentation.response.ChatErrorMessage;
 import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -46,6 +47,12 @@ public class ChatMessageController {
     @SendToUser("/queue/errors")
     public ChatErrorMessage handleBusinessException(BusinessException e) {
         return new ChatErrorMessage(e.getErrorCode().getCode(), e.getMessage());
+    }
+
+    @MessageExceptionHandler(Exception.class)
+    @SendToUser("/queue/errors")
+    public ChatErrorMessage handleUnexpectedException(Exception e) {
+        return new ChatErrorMessage(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), ErrorCode.INTERNAL_SERVER_ERROR.getMessage());
     }
 
     private Long extractMemberId(Principal principal) {

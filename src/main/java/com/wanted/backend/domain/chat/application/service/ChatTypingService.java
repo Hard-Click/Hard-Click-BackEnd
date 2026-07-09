@@ -42,7 +42,7 @@ public class ChatTypingService implements ChatTypingUseCase {
     private String resolveName(Long memberId) {
         try {
             return memberNamePort.getNamesByMemberIds(Set.of(memberId)).get(memberId);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }

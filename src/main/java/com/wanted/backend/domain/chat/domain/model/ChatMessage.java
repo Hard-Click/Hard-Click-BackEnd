@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 
 public class ChatMessage {
 
+    private static final int MAX_CONTENT_LENGTH = 1000;
+
     private Long id;
     private Long chatRoomId;
     private Long senderId;
@@ -24,6 +26,9 @@ public class ChatMessage {
     public static ChatMessage create(Long chatRoomId, Long senderId, String content) {
         if (content == null || content.isBlank()) {
             throw new BusinessException(ErrorCode.CHAT_MESSAGE_CONTENT_REQUIRED);
+        }
+        if (content.length() > MAX_CONTENT_LENGTH) {
+            throw new BusinessException(ErrorCode.CHAT_MESSAGE_CONTENT_TOO_LONG);
         }
         return new ChatMessage(null, chatRoomId, senderId, content, LocalDateTime.now());
     }

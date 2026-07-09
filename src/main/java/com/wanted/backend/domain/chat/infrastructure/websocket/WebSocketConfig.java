@@ -6,6 +6,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -15,6 +16,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             "http://localhost:3000",
             "https://hard-click-front-end.vercel.app"
     };
+
+    private static final int MAX_MESSAGE_SIZE_BYTES = 64 * 1024;
 
     private final StompChannelInterceptor stompChannelInterceptor;
 
@@ -37,5 +40,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(stompChannelInterceptor);
+    }
+
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.setMessageSizeLimit(MAX_MESSAGE_SIZE_BYTES);
+        registration.setSendBufferSizeLimit(MAX_MESSAGE_SIZE_BYTES * 4);
     }
 }

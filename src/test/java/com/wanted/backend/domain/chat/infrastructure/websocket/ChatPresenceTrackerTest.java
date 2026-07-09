@@ -100,6 +100,41 @@ class ChatPresenceTrackerTest {
     }
 
     @Test
+    @DisplayName("여러 참여자가 같은 방을 구독하면 모두 온라인으로 표시되고, 한 명이 연결 해제되어도 다른 참여자는 온라인으로 유지된다")
+    void multipleMembers_oneDisconnects_othersStayOnline() {
+        // given
+        given(chatRoomParticipantRepository.findMemberIdsByChatRoomId(45L)).willReturn(List.of(1L, 2L));
+        given(memberNamePort.getNamesByMemberIds(any())).willReturn(Map.of(1L, "이지연", 2L, "김민수"));
+
+        // when: 두 참여자가 각자 다른 세션으로 구독
+        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-1", new ChatPrincipal(1L))));
+        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-2", new ChatPrincipal(2L))));
+
+        // when: 1L만 연결 해제
+        tracker.handleDisconnect(new SessionDisconnectEvent(this, disconnectMessage(), "session-1", CloseStatus.NORMAL, new ChatPrincipal(1L)));
+
+        // then: 구독 2회 + 연결 해제 1회, 총 3번 브로드캐스트되며 순서대로 상태가 반영된다
+        ArgumentCaptor<PresenceUpdateMessage> captor = ArgumentCaptor.forClass(PresenceUpdateMessage.class);
+        verify(messagingTemplate, times(3)).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        List<PresenceUpdateMessage> broadcasts = captor.getAllValues();
+
+        // 1L 구독 시점: 1L만 온라인
+        assertThat(broadcasts.get(0).participants()).containsExactlyInAnyOrder(
+                new ParticipantPresenceMessage(1L, "이*연", true),
+                new ParticipantPresenceMessage(2L, "김*수", false));
+
+        // 2L 구독 시점: 둘 다 온라인
+        assertThat(broadcasts.get(1).participants()).containsExactlyInAnyOrder(
+                new ParticipantPresenceMessage(1L, "이*연", true),
+                new ParticipantPresenceMessage(2L, "김*수", true));
+
+        // 1L 연결 해제 시점: 2L은 여전히 온라인으로 유지된다
+        assertThat(broadcasts.get(2).participants()).containsExactlyInAnyOrder(
+                new ParticipantPresenceMessage(1L, "이*연", false),
+                new ParticipantPresenceMessage(2L, "김*수", true));
+    }
+
+    @Test
     @DisplayName("추적되지 않은 세션의 연결 해제는 무시한다")
     void handleDisconnect_unknownSession_doesNothing() {
         // when

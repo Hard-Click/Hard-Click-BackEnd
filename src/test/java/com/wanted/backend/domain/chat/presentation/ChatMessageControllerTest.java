@@ -73,4 +73,14 @@ class ChatMessageControllerTest {
         assertThat(result.errorCode()).isEqualTo(ErrorCode.CHAT_FORBIDDEN.getCode());
         assertThat(result.message()).isEqualTo(ErrorCode.CHAT_FORBIDDEN.getMessage());
     }
+
+    @Test
+    @DisplayName("BusinessException 외의 예외(예: 인증 정보 없음)도 에러 프레임으로 변환된다")
+    void handleUnexpectedException_convertsToChatErrorMessage() {
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+
+        ChatErrorMessage result = controller.handleUnexpectedException(new IllegalStateException("STOMP 세션에 인증 정보가 없습니다."));
+
+        assertThat(result.errorCode()).isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR.getCode());
+    }
 }

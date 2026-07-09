@@ -1,8 +1,7 @@
 package com.wanted.backend.domain.chat.application;
 
 import com.wanted.backend.domain.chat.application.command.SendMessageCommand;
-import com.wanted.backend.domain.chat.application.event.ChatMessageEvent;
-import com.wanted.backend.domain.chat.application.port.MemberNamePort;
+import com.wanted.backend.domain.chat.application.event.ChatMessagePersistedEvent;
 import com.wanted.backend.domain.chat.application.service.ChatMessageCommandService;
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
@@ -19,10 +18,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,10 +46,7 @@ class ChatMessageCommandServiceTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Mock
-    private MemberNamePort memberNamePort;
-
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ApplicationEventPublisher eventPublisher;
 
     private ChatRoom activeChatRoom() {
         return ChatRoom.restore(45L, 100L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
@@ -62,7 +57,7 @@ class ChatMessageCommandServiceTest {
     }
 
     @Test
-    @DisplayName("참여자가 메시지를 보내면 저장 후 브로드캐스트된다")
+    @DisplayName("참여자가 메시지를 보내면 저장 후 ChatMessagePersistedEvent가 발행된다")
     void send_success() {
         // given
         given(chatRoomRepository.findById(45L)).willReturn(Optional.of(activeChatRoom()));
@@ -71,19 +66,17 @@ class ChatMessageCommandServiceTest {
             ChatMessage arg = invocation.getArgument(0);
             return ChatMessage.restore(500L, arg.getChatRoomId(), arg.getSenderId(), arg.getContent(), arg.getSentAt());
         });
-        given(memberNamePort.getNamesByMemberIds(any())).willReturn(Map.of(1L, "이지연"));
 
         // when
         chatMessageCommandService.send(new SendMessageCommand(45L, 1L, "안녕하세요"));
 
         // then
-        ArgumentCaptor<ChatMessageEvent> captor = ArgumentCaptor.forClass(ChatMessageEvent.class);
-        verify(messagingTemplate).convertAndSend(org.mockito.ArgumentMatchers.eq("/sub/chat-rooms/45"), captor.capture());
-        ChatMessageEvent event = captor.getValue();
-        assertThat(event.type()).isEqualTo("CHAT");
+        ArgumentCaptor<ChatMessagePersistedEvent> captor = ArgumentCaptor.forClass(ChatMessagePersistedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        ChatMessagePersistedEvent event = captor.getValue();
+        assertThat(event.chatRoomId()).isEqualTo(45L);
         assertThat(event.messageId()).isEqualTo(500L);
         assertThat(event.senderId()).isEqualTo(1L);
-        assertThat(event.senderName()).isEqualTo("이*연");
         assertThat(event.content()).isEqualTo("안녕하세요");
     }
 
@@ -99,7 +92,7 @@ class ChatMessageCommandServiceTest {
                 .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
 
         verify(chatMessageRepository, never()).save(any());
-        verify(messagingTemplate, never()).convertAndSend(org.mockito.ArgumentMatchers.anyString(), any(Object.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -115,6 +108,7 @@ class ChatMessageCommandServiceTest {
                 .hasMessage(ErrorCode.CHAT_FORBIDDEN.getMessage());
 
         verify(chatMessageRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -130,6 +124,7 @@ class ChatMessageCommandServiceTest {
                 .hasMessage(ErrorCode.CHAT_ROOM_CLOSED.getMessage());
 
         verify(chatMessageRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -145,6 +140,22 @@ class ChatMessageCommandServiceTest {
                 .hasMessage(ErrorCode.CHAT_MESSAGE_CONTENT_REQUIRED.getMessage());
 
         verify(chatMessageRepository, never()).save(any());
-        verify(messagingTemplate, never()).convertAndSend(org.mockito.ArgumentMatchers.anyString(), any(Object.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("내용이 1000자를 초과하면 예외가 발생한다")
+    void send_fail_contentTooLong() {
+        // given
+        given(chatRoomRepository.findById(45L)).willReturn(Optional.of(activeChatRoom()));
+        given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(45L, 1L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> chatMessageCommandService.send(new SendMessageCommand(45L, 1L, "a".repeat(1001))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_MESSAGE_CONTENT_TOO_LONG.getMessage());
+
+        verify(chatMessageRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }
