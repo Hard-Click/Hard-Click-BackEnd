@@ -7,6 +7,8 @@ import java.util.List;
 public interface SpringDataChatRoomParticipantRepository extends JpaRepository<ChatRoomParticipantJpaEntity, Long> {
     List<ChatRoomParticipantJpaEntity> findByChatRoomId(Long chatRoomId);
 
+    List<ChatRoomParticipantJpaEntity> findByMemberId(Long memberId);
+
     boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 
     void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
@@ -34,6 +35,11 @@ public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
                 ? repository.findByChatRoomIdOrderByIdDesc(chatRoomId, pageable)
                 : repository.findByChatRoomIdAndIdLessThanOrderByIdDesc(chatRoomId, cursorId, pageable);
         return entities.stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Optional<ChatMessage> findLatestByChatRoomId(Long chatRoomId) {
+        return repository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId).map(this::toDomain);
     }
 
     private ChatMessage toDomain(ChatMessageJpaEntity entity) {

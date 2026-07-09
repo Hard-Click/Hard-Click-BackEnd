@@ -2,10 +2,12 @@ package com.wanted.backend.domain.chat.presentation;
 
 import com.wanted.backend.domain.chat.application.result.ChatMessageListResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.result.MyChatRoomDetail;
 import com.wanted.backend.domain.chat.application.usecase.ChatMessageQueryUseCase;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
 import com.wanted.backend.domain.chat.presentation.response.ChatMessageListResponse;
 import com.wanted.backend.domain.chat.presentation.response.ChatRoomResponse;
+import com.wanted.backend.domain.chat.presentation.response.MyChatRoomResponse;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/chat/rooms")
@@ -28,6 +32,24 @@ public class ChatRoomController {
                               ChatMessageQueryUseCase chatMessageQueryUseCase) {
         this.chatRoomQueryUseCase = chatRoomQueryUseCase;
         this.chatMessageQueryUseCase = chatMessageQueryUseCase;
+    }
+
+    @Operation(
+            summary = "내 채팅방 목록 조회",
+            description = """
+                내가 참여 중인 채팅방 목록을 조회합니다.
+                - 마지막 메시지(lastMessage)의 전송 시각(lastMessageAt) 최신순으로 정렬되며, 메시지가 없는 채팅방은 뒤로 밀립니다.
+                - unreadCount는 현재 항상 0으로 반환됩니다 (추후 실계산 예정).
+                """
+    )
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<MyChatRoomResponse>>> getMyRooms(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        List<MyChatRoomDetail> results = chatRoomQueryUseCase.getMyRooms(userDetails.getMemberId());
+
+        return ApiResponse.success("내 채팅방 목록 조회 성공",
+                results.stream().map(MyChatRoomResponse::from).toList());
     }
 
     @Operation(

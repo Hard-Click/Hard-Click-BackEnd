@@ -3,6 +3,7 @@ package com.wanted.backend.domain.chat.presentation;
 import com.wanted.backend.domain.chat.application.result.ChatMessageDetail;
 import com.wanted.backend.domain.chat.application.result.ChatMessageListResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.result.MyChatRoomDetail;
 import com.wanted.backend.domain.chat.application.result.ParticipantDetail;
 import com.wanted.backend.domain.chat.application.usecase.ChatMessageQueryUseCase;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
@@ -57,6 +58,33 @@ class ChatRoomControllerTest {
     @AfterEach
     void tearDownAuthentication() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("내 채팅방 목록을 조회하면 200과 함께 목록을 반환한다")
+    void getMyRooms_success() throws Exception {
+        List<MyChatRoomDetail> result = List.of(
+                new MyChatRoomDetail(88L, "주말 React 스터디", "그럼 일요일 저녁 8시로 정해요!",
+                        LocalDateTime.of(2026, 5, 11, 12, 5, 0), 0));
+        given(chatRoomQueryUseCase.getMyRooms(1L)).willReturn(result);
+
+        mockMvc.perform(get("/api/chat/rooms/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].chatRoomId").value(88))
+                .andExpect(jsonPath("$.data[0].name").value("주말 React 스터디"))
+                .andExpect(jsonPath("$.data[0].lastMessage").value("그럼 일요일 저녁 8시로 정해요!"))
+                .andExpect(jsonPath("$.data[0].unreadCount").value(0));
+    }
+
+    @Test
+    @DisplayName("참여 중인 채팅방이 없으면 빈 배열을 반환한다")
+    void getMyRooms_success_empty() throws Exception {
+        given(chatRoomQueryUseCase.getMyRooms(1L)).willReturn(List.of());
+
+        mockMvc.perform(get("/api/chat/rooms/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test

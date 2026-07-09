@@ -32,6 +32,13 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
     }
 
     @Override
+    public List<Long> findChatRoomIdsByMemberId(Long memberId) {
+        return repository.findByMemberId(memberId).stream()
+                .map(ChatRoomParticipantJpaEntity::getChatRoomId)
+                .toList();
+    }
+
+    @Override
     public boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
         return repository.existsByChatRoomIdAndMemberId(chatRoomId, memberId);
     }
