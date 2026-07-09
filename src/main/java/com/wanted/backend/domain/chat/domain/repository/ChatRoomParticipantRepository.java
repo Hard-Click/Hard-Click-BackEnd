@@ -9,6 +9,8 @@ public interface ChatRoomParticipantRepository {
 
     List<Long> findMemberIdsByChatRoomId(Long chatRoomId);
 
+    List<Long> findChatRoomIdsByMemberId(Long memberId);
+
     boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 
     void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);

@@ -4,6 +4,7 @@ import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -33,6 +34,11 @@ public class ChatRoomRepositoryAdapter implements ChatRoomRepository {
     @Override
     public Optional<ChatRoom> findByStudyId(Long studyId) {
         return repository.findByStudyId(studyId).map(this::toDomain);
+    }
+
+    @Override
+    public List<ChatRoom> findAllByIdIn(List<Long> ids) {
+        return repository.findAllById(ids).stream().map(this::toDomain).toList();
     }
 
     private ChatRoom toDomain(ChatRoomJpaEntity entity) {
