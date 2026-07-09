@@ -47,6 +47,90 @@ public class Study {
         return new Study(id, hostId, title, subject, content, maxCount, currentCount, status, createdAt, updatedAt);
     }
 
+    public boolean isOwner(Long memberId) {
+        return this.hostId.equals(memberId);
+    }
+
+    public void update(Long requesterId, String title, String subject, int maxCount, String content) {
+        validateUpdatable(requesterId);
+        if (maxCount < 2) {
+            throw new BusinessException(ErrorCode.STUDY_MIN_COUNT_INVALID);
+        }
+        if (maxCount < currentCount) {
+            throw new BusinessException(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT);
+        }
+        this.title = title;
+        this.subject = subject;
+        this.maxCount = maxCount;
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    private void validateUpdatable(Long memberId) {
+        if (!isOwner(memberId)) {
+            throw new BusinessException(ErrorCode.STUDY_UPDATE_FORBIDDEN);
+        }
+    }
+
+    public boolean isFull() {
+        return currentCount >= maxCount;
+    }
+
+    public void join() {
+        if (status != StudyStatus.ACTIVE || isFull()) {
+            throw new BusinessException(ErrorCode.STUDY_FULL);
+        }
+        currentCount++;
+        if (isFull()) {
+            status = StudyStatus.CLOSED;
+        }
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void validateDeletable(Long memberId) {
+        if (!isOwner(memberId)) {
+            throw new BusinessException(ErrorCode.STUDY_DELETE_FORBIDDEN);
+        }
+        if (currentCount > 1) {
+            throw new BusinessException(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS);
+        }
+    }
+
+    public void close() {
+        status = StudyStatus.CLOSED;
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void leave(Long memberId) {
+        if (isOwner(memberId) && currentCount > 1) {
+            throw new BusinessException(ErrorCode.STUDY_HOST_CANNOT_LEAVE);
+        }
+        decreaseCount();
+    }
+
+    private void decreaseCount() {
+        currentCount--;
+        if (currentCount <= 0) {
+            status = StudyStatus.CLOSED;
+        } else if (status == StudyStatus.CLOSED) {
+            status = StudyStatus.ACTIVE;
+        }
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void validateKickable(Long hostId, Long targetMemberId) {
+        if (!isOwner(hostId)) {
+            throw new BusinessException(ErrorCode.STUDY_KICK_FORBIDDEN);
+        }
+        if (hostId.equals(targetMemberId)) {
+            throw new BusinessException(ErrorCode.STUDY_CANNOT_KICK_SELF);
+        }
+    }
+
+    public void kick() {
+        decreaseCount();
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }

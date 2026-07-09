@@ -54,6 +54,7 @@ import org.springframework.http.HttpStatus;
     INVALID_CURRENT_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH_009", "현재 비밀번호가 일치하지 않습니다."),
     ALREADY_WITHDRAWN_MEMBER(HttpStatus.BAD_REQUEST, "AUTH_010","이미 탈퇴한 회원입니다."),
     WITHDRAWN_MEMBER(HttpStatus.FORBIDDEN,"AUTH_011", "탈퇴한 회원입니다."),
+    PASSWORD_REUSE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "AUTH_012", "새 비밀번호는 기존 비밀번호와 다르게 설정해야 합니다."),
 
     /* =========================================================================
        4. 강의(Course) 관련 예외 (CR000)
@@ -217,7 +218,29 @@ import org.springframework.http.HttpStatus;
     /* =========================================================================
        스터디 모집 관련 예외 (SG000) — ST는 순공시간(study_timer)이 선점하여 SG 사용
        ========================================================================= */
-    STUDY_MIN_COUNT_INVALID(HttpStatus.BAD_REQUEST, "SG001", "스터디 정원은 최소 2명 이상이어야 합니다.");
+    STUDY_MIN_COUNT_INVALID(HttpStatus.BAD_REQUEST, "SG001", "스터디 정원은 최소 2명 이상이어야 합니다."),
+    STUDY_NOT_FOUND(HttpStatus.NOT_FOUND, "SG002", "존재하지 않거나 이미 삭제된 스터디입니다."),
+    STUDY_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "SG003", "방장만 스터디를 수정할 수 있습니다."),
+    STUDY_MAX_COUNT_BELOW_CURRENT(HttpStatus.BAD_REQUEST, "SG004", "정원은 현재 참여 인원 이상이어야 합니다."),
+    STUDY_ALREADY_JOINED(HttpStatus.BAD_REQUEST, "SG005", "이미 참여 중인 스터디입니다."),
+    STUDY_FULL(HttpStatus.CONFLICT, "SG006", "정원이 가득 차 참여할 수 없습니다."),
+    STUDY_NOT_JOINED(HttpStatus.BAD_REQUEST, "SG007", "참여 중인 스터디가 아닙니다."),
+    STUDY_HOST_CANNOT_LEAVE(HttpStatus.FORBIDDEN, "SG008", "방장은 다른 참여자가 남아있는 동안 나갈 수 없습니다."),
+    STUDY_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "SG009", "방장만 스터디를 삭제할 수 있습니다."),
+    STUDY_HAS_OTHER_PARTICIPANTS(HttpStatus.FORBIDDEN, "SG010", "다른 참여자가 남아있어 해산할 수 없습니다."),
+    STUDY_KICK_FORBIDDEN(HttpStatus.FORBIDDEN, "SG011", "방장만 참여자를 강퇴할 수 있습니다."),
+    STUDY_CANNOT_KICK_SELF(HttpStatus.FORBIDDEN, "SG012", "자기 자신은 강퇴할 수 없습니다."),
+    STUDY_TARGET_NOT_JOINED(HttpStatus.NOT_FOUND, "SG013", "강퇴할 대상이 스터디 참여자가 아닙니다."),
+    STUDY_KICKED(HttpStatus.FORBIDDEN, "SG014", "강퇴된 스터디에는 다시 참여할 수 없습니다."),
+
+    /* =========================================================================
+       채팅 관련 예외 (CH000)
+       ========================================================================= */
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CH001", "존재하지 않는 채팅방입니다."),
+    CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
+    CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
+    CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다."),
+    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다.");
 
 
     private final HttpStatus status;

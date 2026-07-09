@@ -46,6 +46,10 @@ public class PasswordCommandService implements PasswordCommandUseCase {
             throw new BusinessException(ErrorCode.PASSWORD_CONFIRM_MISMATCH);
         }
 
+        if (passwordEncoder.matches(command.newPassword(), member.getPassword())) {
+            throw new BusinessException(ErrorCode.PASSWORD_REUSE_NOT_ALLOWED);
+        }
+
         member.changePassword(passwordEncoder.encode(command.newPassword()));
         Member saved = memberRepository.save(member);
         return PasswordChangeResult.from(saved);
@@ -60,6 +64,10 @@ public class PasswordCommandService implements PasswordCommandUseCase {
 
         Member member = memberRepository.findByEmail(command.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (passwordEncoder.matches(command.newPassword(), member.getPassword())) {
+            throw new BusinessException(ErrorCode.PASSWORD_REUSE_NOT_ALLOWED);
+        }
 
         verificationTokenCoordinator.reserveForCurrentTransaction(
                 command.email(),
@@ -117,6 +125,10 @@ public class PasswordCommandService implements PasswordCommandUseCase {
 
         if (!member.isLocked()) {
             throw new BusinessException(ErrorCode.ACCOUNT_NOT_LOCKED);
+        }
+
+        if (passwordEncoder.matches(command.newPassword(), member.getPassword())) {
+            throw new BusinessException(ErrorCode.PASSWORD_REUSE_NOT_ALLOWED);
         }
 
         verificationTokenCoordinator.reserveForCurrentTransaction(

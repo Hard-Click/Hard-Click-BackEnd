@@ -1,9 +1,12 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.port.CourseSectionTitlePort;
+import com.wanted.backend.domain.quiz.application.port.CourseStudentPort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
+import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
@@ -41,6 +44,7 @@ public class QuizQueryService implements QuizQueryUseCase {
     private final CourseTitlePort courseTitlePort;
     private final CourseSectionTitlePort courseSectionTitlePort;
     private final EnrollmentAccessPort enrollmentAccessPort;
+    private final CourseStudentPort courseStudentPort;
 
     @Override
     public List<InstructorQuizSummary> getInstructorQuizzes(Long instructorId, Long courseId, Long sectionId) {
@@ -279,6 +283,121 @@ public class QuizQueryService implements QuizQueryUseCase {
                 scoreDiff,
                 wrongNotes,
                 questions);
+    }
+
+    @Override
+    public InstructorQuizStatistics getInstructorQuizStatistics(QuizStatisticsQuery query) {
+        Quiz quiz = quizRepository.findById(query.quizId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        // 본인이 등록한 퀴즈만 통계 조회 가능
+        if (!query.instructorId().equals(quiz.getInstructorId())) {
+            throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
+        }
+
+        String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(quiz.getCourseId()))
+                .getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId());
+        String sectionTitle = courseSectionTitlePort.findTitlesBySectionIds(List.of(quiz.getSectionId()))
+                .getOrDefault(quiz.getSectionId(), "섹션 #" + quiz.getSectionId());
+
+        // 전체 수강생 + 각 수강생의 응시(제출) 현황을 조합
+        Map<Long, QuizSubmission> submissionByMemberId = quizSubmissionRepository.findByQuizId(query.quizId()).stream()
+                .collect(Collectors.toMap(QuizSubmission::getMemberId, Function.identity()));
+
+        List<InstructorQuizStatistics.StudentScore> allStudents = courseStudentPort
+                .findActiveStudents(quiz.getCourseId()).stream()
+                .map(student -> {
+                    QuizSubmission submission = submissionByMemberId.get(student.memberId());
+                    return new InstructorQuizStatistics.StudentScore(
+                            student.username(),
+                            student.name(),
+                            submission != null,
+                            submission == null ? null : submission.getScore(),
+                            submission == null ? null : submission.getSubmittedAt());
+                })
+                .toList();
+
+        int totalCount = allStudents.size();
+        int submittedCount = (int) allStudents.stream()
+                .filter(InstructorQuizStatistics.StudentScore::submitted).count();
+        int averageScore = (int) Math.round(allStudents.stream()
+                .filter(InstructorQuizStatistics.StudentScore::submitted)
+                .mapToInt(InstructorQuizStatistics.StudentScore::score)
+                .average()
+                .orElse(0));
+
+        InstructorQuizStatistics.Summary summary = new InstructorQuizStatistics.Summary(
+                totalCount, submittedCount, totalCount - submittedCount, averageScore);
+
+        List<InstructorQuizStatistics.ScoreDistribution> distribution =
+                scoreDistribution(allStudents, submittedCount);
+
+        // 수강생 목록: 검색 → 필터 → 정렬 → 페이지네이션
+        List<InstructorQuizStatistics.StudentScore> students = allStudents.stream()
+                .filter(s -> matchesKeyword(s, query.keyword()))
+                .filter(s -> matchesFilter(s, query.filter()))
+                .sorted(studentComparator(query.sort()))
+                .toList();
+        students = paginate(students, query.page(), query.size());
+
+        return new InstructorQuizStatistics(courseTitle, sectionTitle, quiz.getTitle(),
+                summary, distribution, students);
+    }
+
+    private List<InstructorQuizStatistics.ScoreDistribution> scoreDistribution(
+            List<InstructorQuizStatistics.StudentScore> students, int submittedCount) {
+        int[][] bounds = {{90, 100}, {70, 89}, {50, 69}, {0, 49}};
+        String[] labels = {"90~100", "70~89", "50~69", "0~49"};
+
+        List<InstructorQuizStatistics.ScoreDistribution> distribution = new java.util.ArrayList<>();
+        for (int i = 0; i < bounds.length; i++) {
+            int low = bounds[i][0];
+            int high = bounds[i][1];
+            int count = (int) students.stream()
+                    .filter(InstructorQuizStatistics.StudentScore::submitted)
+                    .filter(s -> s.score() >= low && s.score() <= high)
+                    .count();
+            int percentage = submittedCount == 0 ? 0 : Math.round((float) count * 100 / submittedCount);
+            distribution.add(new InstructorQuizStatistics.ScoreDistribution(labels[i], count, percentage));
+        }
+        return distribution;
+    }
+
+    private boolean matchesKeyword(InstructorQuizStatistics.StudentScore s, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        String kw = keyword.strip();
+        return s.name().contains(kw) || s.userId().contains(kw);
+    }
+
+    private boolean matchesFilter(InstructorQuizStatistics.StudentScore s, QuizStatisticsQuery.FilterType filter) {
+        return switch (filter) {
+            case ALL -> true;
+            case SUBMITTED -> s.submitted();
+            case NOT_SUBMITTED -> !s.submitted();
+        };
+    }
+
+    private Comparator<InstructorQuizStatistics.StudentScore> studentComparator(QuizStatisticsQuery.SortType sort) {
+        // 동점자/동명 순서 결정성을 위해 userId를 2차 정렬 키로 사용 (페이지네이션 안정성 보장).
+        Comparator<InstructorQuizStatistics.StudentScore> primary = switch (sort) {
+            // 미응시(score null)는 항상 뒤로
+            case SCORE_DESC -> Comparator.comparing(InstructorQuizStatistics.StudentScore::score,
+                    Comparator.nullsLast(Comparator.reverseOrder()));
+            case SCORE_ASC -> Comparator.comparing(InstructorQuizStatistics.StudentScore::score,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case NAME -> Comparator.comparing(InstructorQuizStatistics.StudentScore::name);
+        };
+        return primary.thenComparing(InstructorQuizStatistics.StudentScore::userId);
+    }
+
+    private <T> List<T> paginate(List<T> items, int page, int size) {
+        int fromIndex = page * size;
+        if (fromIndex >= items.size()) {
+            return List.of();
+        }
+        return items.subList(fromIndex, Math.min(fromIndex + size, items.size()));
     }
 
     private int weekOf(Map<Long, CourseSectionTitlePort.SectionInfo> sections, Long sectionId) {

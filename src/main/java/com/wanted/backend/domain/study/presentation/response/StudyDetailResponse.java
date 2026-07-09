@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.presentation.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -30,7 +31,17 @@ public record StudyDetailResponse(
         boolean isClosed,
         @Schema(description = "참여 중인 회원 이름 목록 (참여자에게만 노출)")
         List<String> members,
+        @Schema(description = "연결된 채팅방 ID", example = "12")
+        Long chatRoomId,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss+09:00")
         @Schema(description = "작성일시", example = "2025-03-15T14:30:00")
         LocalDateTime createdAt
-) {}
+) {
+    public static StudyDetailResponse from(StudyDetailResult r) {
+        return new StudyDetailResponse(
+                r.groupId(), r.title(), r.content(), r.subjectName(), r.authorName(),
+                r.currentCount(), r.maxCount(), r.isMine(), r.isJoined(), r.isClosed(),
+                r.members(), r.chatRoomId(), r.createdAt()
+        );
+    }
+}

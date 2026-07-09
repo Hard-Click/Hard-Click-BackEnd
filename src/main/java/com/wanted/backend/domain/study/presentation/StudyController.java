@@ -1,19 +1,30 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
+import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.KickStudyMemberCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
+import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
+import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
+import com.wanted.backend.domain.study.application.result.StudyDetailResult;
+import com.wanted.backend.domain.study.application.result.StudyListResult;
 import com.wanted.backend.domain.study.application.usecase.StudyCommandUseCase;
+import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
+import com.wanted.backend.domain.study.presentation.request.StudyListRequest;
 import com.wanted.backend.domain.study.presentation.response.CreateStudyResponse;
+import com.wanted.backend.domain.study.presentation.response.JoinStudyResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyDetailResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyListResponse;
 import com.wanted.backend.global.common.ApiResponse;
-import com.wanted.backend.global.domain.SubjectType;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -21,48 +32,45 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/study")
+@Validated
 public class StudyController {
 
     private final StudyCommandUseCase studyCommandUseCase;
+    private final StudyQueryUseCase studyQueryUseCase;
 
-    public StudyController(StudyCommandUseCase studyCommandUseCase) {
+    public StudyController(StudyCommandUseCase studyCommandUseCase, StudyQueryUseCase studyQueryUseCase) {
         this.studyCommandUseCase = studyCommandUseCase;
+        this.studyQueryUseCase = studyQueryUseCase;
     }
 
-    // TODO(#438): mock 목록 조회 → 실제 조회로 교체
+    @Operation(summary = "스터디 목록 조회", description = "스터디 목록을 조회합니다. subject로 과목 필터링 가능 (SubjectType enum 값)")
     @GetMapping
     public ResponseEntity<ApiResponse<StudyListResponse>> getStudyList(
-            @RequestParam(required = false) SubjectType subject,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @Valid @ModelAttribute StudyListRequest request) {
 
-        List<StudyListResponse.StudyItem> content = List.of(
-                new StudyListResponse.StudyItem(101L, "주말 React 스터디 모집", "강남 카페에서 진행합니다", "최*진", "React", 3, 6, false, LocalDateTime.of(2026, 5, 17, 14, 30)),
-                new StudyListResponse.StudyItem(102L, "수학1 1등급 목표 스터디", "매주 일요일 밤 10시", "이*연", "수학1", 5, 5, true, LocalDateTime.of(2026, 5, 16, 10, 0))
-        );
+        StudyListResult result = studyQueryUseCase.getList(
+                request.subject() != null ? request.subject().name() : null,
+                request.page(),
+                request.size());
 
-        return ApiResponse.success("스터디 목록 조회 완료", new StudyListResponse(content, 1));
+        return ApiResponse.success("스터디 목록 조회 완료", StudyListResponse.from(result));
     }
 
-    // TODO(#439): mock 상세 조회 → 실제 조회로 교체 (chatRoomId 포함 예정)
-    @Operation(summary = "스터디 상세 조회", description = "스터디 상세 정보를 조회합니다.")
+    @Operation(
+            summary = "스터디 상세 조회",
+            description = """
+                스터디 상세 정보를 조회합니다.
+                - 연결된 채팅방 ID(chatRoomId)가 함께 반환됩니다.
+                - 참여자 이름 목록(members)은 본인이 참여 중인 경우에만 노출됩니다.
+                """
+    )
     @GetMapping("/{groupId}")
     public ResponseEntity<ApiResponse<StudyDetailResponse>> getStudyDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId) {
 
-        boolean isJoined = true;
-
-        StudyDetailResponse response = new StudyDetailResponse(
-                groupId,
-                "수학 1등급 목표 스터디",
-                "매주 일요일 밤 10시에 모여서 질문 받습니다.",
-                "수학1", "이*연", 2, 5, false, isJoined, false,
-                isJoined ? List.of("이*연", "김*민") : null,
-                LocalDateTime.of(2026, 5, 18, 17, 0)
-        );
-
-        return ApiResponse.success("스터디 상세 조회 완료", response);
+        StudyDetailResult result = studyQueryUseCase.getDetail(groupId, userDetails.getMemberId());
+        return ApiResponse.success("스터디 상세 조회 완료", StudyDetailResponse.from(result));
     }
 
     @Operation(
@@ -91,22 +99,103 @@ public class StudyController {
                 new CreateStudyResponse(result.studyId(), result.chatRoomId()));
     }
 
-    // TODO(#440): mock 수정 → 실제 로직으로 교체
+    @Operation(
+            summary = "스터디 모집글 수정",
+            description = """
+                스터디 모집글을 수정합니다.
+                - 방장만 수정할 수 있습니다.
+                - 정원(maxCount)은 현재 참여 인원 이상이어야 합니다.
+                """
+    )
     @PatchMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> updateStudy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId,
             @Valid @RequestBody CreateStudyRequest request) {
 
+        studyCommandUseCase.update(new UpdateStudyCommand(
+                groupId,
+                userDetails.getMemberId(),
+                request.title(),
+                request.subject().name(),
+                request.maxCount(),
+                request.content()
+        ));
+
         return ApiResponse.success("스터디가 수정되었습니다.", null);
     }
 
-    // TODO(#441): mock 삭제(해산) → 실제 로직으로 교체 (다른 참여자 존재 시 403, 채팅방 함께 CLOSED)
+    @Operation(
+            summary = "스터디 참여",
+            description = """
+                스터디에 즉시 참여합니다.
+                - 승인 절차 없이 즉시 참여 처리되며, 참여와 동시에 채팅방 참여자로도 등록됩니다.
+                - 정원이 가득 차면 스터디가 자동으로 마감됩니다.
+                """
+    )
+    @PostMapping("/{groupId}/join")
+    public ResponseEntity<ApiResponse<JoinStudyResponse>> joinStudy(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId) {
+
+        JoinStudyResult result = studyCommandUseCase.join(new JoinStudyCommand(groupId, userDetails.getMemberId()));
+
+        return ApiResponse.success("스터디에 참여했습니다.", JoinStudyResponse.from(result));
+    }
+
+    @Operation(
+            summary = "스터디 퇴장",
+            description = """
+                참여 중인 스터디에서 나갑니다.
+                - 퇴장과 동시에 채팅방 참여자 목록에서도 제거됩니다.
+                - 방장은 다른 참여자가 남아있는 동안 나갈 수 없습니다.
+                """
+    )
+    @PostMapping("/{groupId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveStudy(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId) {
+
+        studyCommandUseCase.leave(new LeaveStudyCommand(groupId, userDetails.getMemberId()));
+
+        return ApiResponse.success("스터디에서 퇴장했습니다", null);
+    }
+
+    @Operation(
+            summary = "스터디 모집글 삭제(해산)",
+            description = """
+                스터디 모집글을 삭제(해산)합니다.
+                - 방장만 삭제할 수 있습니다.
+                - 다른 참여자가 한 명이라도 남아있으면 해산할 수 없습니다 (본인 혼자 남았을 때만 가능).
+                - 연결된 채팅방도 함께 비활성화(CLOSED)됩니다.
+                """
+    )
     @DeleteMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> deleteStudy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId) {
 
+        studyCommandUseCase.delete(new DeleteStudyCommand(groupId, userDetails.getMemberId()));
+
         return ApiResponse.successNoContent("스터디가 삭제되었습니다.");
+    }
+
+    @Operation(
+            summary = "스터디 참여자 강퇴",
+            description = """
+                방장이 참여자를 강퇴합니다.
+                - 방장만 강퇴할 수 있으며, 자기 자신은 강퇴할 수 없습니다.
+                - 강퇴된 회원은 스터디/채팅방 참여자 목록에서 제거되며, 같은 스터디에 다시 참여할 수 없습니다.
+                """
+    )
+    @DeleteMapping("/{groupId}/members/{memberId}")
+    public ResponseEntity<ApiResponse<Void>> kickMember(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId,
+            @PathVariable Long memberId) {
+
+        studyCommandUseCase.kick(new KickStudyMemberCommand(groupId, userDetails.getMemberId(), memberId));
+
+        return ApiResponse.successNoContent("해당 회원을 강퇴했습니다.");
     }
 }

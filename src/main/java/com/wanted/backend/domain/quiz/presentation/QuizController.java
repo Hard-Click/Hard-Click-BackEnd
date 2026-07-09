@@ -5,7 +5,9 @@ import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
+import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
+import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
@@ -330,22 +332,69 @@ public class QuizController {
             @PathVariable Long quizId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String filter,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
     ) {
-        int normalizedPage = normalizePage(page);
-        int normalizedSize = normalizeSize(size);
-        InstructorQuizStatisticsResponse statistics = instructorQuizStatistics();
+        QuizStatisticsQuery query = new QuizStatisticsQuery(
+                userDetails.getMemberId(),
+                quizId,
+                keyword,
+                parseSort(sort),
+                parseFilter(filter),
+                normalizePage(page),
+                normalizeSize(size)
+        );
+
+        InstructorQuizStatistics statistics = quizQueryUseCase.getInstructorQuizStatistics(query);
+
         InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 statistics.courseTitle(),
                 statistics.sectionTitle(),
                 statistics.quizTitle(),
-                statistics.summary(),
-                statistics.scoreDistribution(),
-                paginate(statistics.students(), normalizedPage, normalizedSize)
+                new InstructorQuizStatisticsResponse.Summary(
+                        statistics.summary().totalCount(),
+                        statistics.summary().submittedCount(),
+                        statistics.summary().notSubmittedCount(),
+                        statistics.summary().averageScore()),
+                statistics.scoreDistribution().stream()
+                        .map(d -> new InstructorQuizStatisticsResponse.ScoreDistribution(
+                                d.range(), d.count(), d.percentage()))
+                        .toList(),
+                statistics.students().stream()
+                        .map(s -> new InstructorQuizStatisticsResponse.StudentScore(
+                                s.userId(),
+                                s.name(),
+                                s.submitted(),
+                                s.score(),
+                                s.submittedAt() == null ? null
+                                        : s.submittedAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
+                        .toList()
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
+    }
+
+    private QuizStatisticsQuery.SortType parseSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return QuizStatisticsQuery.SortType.SCORE_DESC;
+        }
+        try {
+            return QuizStatisticsQuery.SortType.valueOf(sort.strip().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return QuizStatisticsQuery.SortType.SCORE_DESC;
+        }
+    }
+
+    private QuizStatisticsQuery.FilterType parseFilter(String filter) {
+        if (filter == null || filter.isBlank()) {
+            return QuizStatisticsQuery.FilterType.ALL;
+        }
+        try {
+            return QuizStatisticsQuery.FilterType.valueOf(filter.strip().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return QuizStatisticsQuery.FilterType.ALL;
+        }
     }
 
     private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
@@ -382,45 +431,6 @@ public class QuizController {
         int fromIndex = (int) offset;
         int toIndex = Math.min(fromIndex + size, items.size());
         return items.subList(fromIndex, toIndex);
-    }
-
-    private InstructorQuizStatisticsResponse instructorQuizStatistics() {
-        return new InstructorQuizStatisticsResponse(
-                "React 완벽 가이드",
-                "섹션 1: React 기초",
-                "React 기초 개념 퀴즈",
-                new InstructorQuizStatisticsResponse.Summary(18, 4, 76),
-                List.of(
-                        new InstructorQuizStatisticsResponse.ScoreDistribution("90~100", 5, 28),
-                        new InstructorQuizStatisticsResponse.ScoreDistribution("70~89", 7, 39),
-                        new InstructorQuizStatisticsResponse.ScoreDistribution("50~69", 4, 22),
-                        new InstructorQuizStatisticsResponse.ScoreDistribution("0~49", 2, 11)
-                ),
-                List.of(
-                        new InstructorQuizStatisticsResponse.StudentScore("@choiaa2026", "최*아", true, 100, "2026-05-10"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@kimminsu92", "김*수", true, 95, "2026-05-10"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@leesj01", "이*진", true, 92, "2026-05-11"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@parkjh7", "박*현", true, 90, "2026-05-11"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@janghw44", "장*원", true, 96, "2026-05-12"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@jungym5", "정*민", true, 88, "2026-05-12"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@ohseul9", "오*슬", true, 85, "2026-05-12"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@moonhk2", "문*경", true, 83, "2026-05-13"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@limdo11", "임*윤", true, 82, "2026-05-13"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@baekhj3", "백*준", true, 78, "2026-05-14"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@seoha20", "서*아", true, 75, "2026-05-14"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@kangms8", "강*서", true, 72, "2026-05-14"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@hanjy31", "한*윤", true, 68, "2026-05-15"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@yuji77", "유*호", true, 64, "2026-05-15"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@shinra4", "신*라", true, 60, "2026-05-16"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@kwonbi6", "권*빈", true, 55, "2026-05-16"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@namjw13", "남*우", true, 48, "2026-05-17"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@choimh21", "조*현", true, 40, "2026-05-17"),
-                        new InstructorQuizStatisticsResponse.StudentScore("@hanyeong3", "한*영", false, null, null),
-                        new InstructorQuizStatisticsResponse.StudentScore("@songar12", "송*린", false, null, null),
-                        new InstructorQuizStatisticsResponse.StudentScore("@yoonseo2", "윤*서", false, null, null),
-                        new InstructorQuizStatisticsResponse.StudentScore("@minjun0", "민*준", false, null, null)
-                )
-        );
     }
 
     public record MyQuizListResponse(
@@ -590,7 +600,7 @@ public class QuizController {
             List<ScoreDistribution> scoreDistribution,
             List<StudentScore> students
     ) {
-        public record Summary(int submittedCount, int notSubmittedCount, int averageScore) {
+        public record Summary(int totalCount, int submittedCount, int notSubmittedCount, int averageScore) {
         }
 
         public record ScoreDistribution(String range, int count, int percentage) {
@@ -601,7 +611,7 @@ public class QuizController {
                 String name,
                 boolean submitted,
                 Integer score,
-                String submittedAt
+                OffsetDateTime submittedAt
         ) {
         }
     }

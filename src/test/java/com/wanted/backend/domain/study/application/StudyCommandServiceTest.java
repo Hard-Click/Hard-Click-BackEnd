@@ -1,11 +1,25 @@
 package com.wanted.backend.domain.study.application;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
+import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.KickStudyMemberCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
+import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
+import com.wanted.backend.domain.study.application.event.StudyClosedEvent;
+import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
+import com.wanted.backend.domain.study.application.event.StudyKickedEvent;
+import com.wanted.backend.domain.study.application.event.StudyLeftEvent;
 import com.wanted.backend.domain.study.application.port.ChatRoomCommandPort;
+import com.wanted.backend.domain.study.application.port.ChatRoomQueryPort;
+import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.service.StudyCommandService;
 import com.wanted.backend.domain.study.domain.model.Study;
+import com.wanted.backend.domain.study.domain.model.StudyBannedMember;
 import com.wanted.backend.domain.study.domain.model.StudyParticipant;
+import com.wanted.backend.domain.study.domain.model.StudyStatus;
+import com.wanted.backend.domain.study.domain.repository.StudyBannedMemberRepository;
 import com.wanted.backend.domain.study.domain.repository.StudyParticipantRepository;
 import com.wanted.backend.domain.study.domain.repository.StudyRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -17,6 +31,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +56,16 @@ class StudyCommandServiceTest {
     private StudyParticipantRepository studyParticipantRepository;
 
     @Mock
+    private StudyBannedMemberRepository studyBannedMemberRepository;
+
+    @Mock
     private ChatRoomCommandPort chatRoomCommandPort;
+
+    @Mock
+    private ChatRoomQueryPort chatRoomQueryPort;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Test
     @DisplayName("스터디 생성 시 방장이 참여자로 등록되고 채팅방이 함께 생성된다")
@@ -105,5 +132,551 @@ class StudyCommandServiceTest {
         assertThatThrownBy(() -> studyCommandService.create(command))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("chat room creation failed");
+    }
+
+    private Study activeStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 3, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("방장이 수정하면 정상적으로 반영된다")
+    void update_success() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when
+        studyCommandService.update(new UpdateStudyCommand(45L, 1L, "수정된 제목", "MATH_2", 6, "수정된 내용"));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getTitle()).isEqualTo("수정된 제목");
+        assertThat(captor.getValue().getSubject()).isEqualTo("MATH_2");
+        assertThat(captor.getValue().getMaxCount()).isEqualTo(6);
+        assertThat(captor.getValue().getContent()).isEqualTo("수정된 내용");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 수정하려 하면 예외가 발생한다")
+    void update_fail_notFound() {
+        // given
+        given(studyRepository.findById(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(999L, 1L, "제목", "MATH_1", 5, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 회원이 수정하려 하면 예외가 발생한다")
+    void update_fail_notOwner() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(45L, 999L, "제목", "MATH_1", 5, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_UPDATE_FORBIDDEN.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("정원을 현재 인원 미만으로 줄이면 예외가 발생한다")
+    void update_fail_maxCountBelowCurrent() {
+        // given
+        given(studyRepository.findById(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.update(new UpdateStudyCommand(45L, 1L, "제목", "MATH_1", 2, "내용")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_MAX_COUNT_BELOW_CURRENT.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    private Study almostFullStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 4, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    private Study fullStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 5, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("참여 시 정원이 남아있으면 인원이 증가하고 채팅방에도 등록되며 이벤트가 발행된다")
+    void join_success() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(false);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        JoinStudyResult result = studyCommandService.join(new JoinStudyCommand(45L, 2L));
+
+        // then
+        assertThat(result.groupId()).isEqualTo(45L);
+        assertThat(result.chatRoomId()).isEqualTo(12L);
+        assertThat(result.currentCount()).isEqualTo(4);
+
+        ArgumentCaptor<StudyParticipant> participantCaptor = ArgumentCaptor.forClass(StudyParticipant.class);
+        verify(studyParticipantRepository).save(participantCaptor.capture());
+        assertThat(participantCaptor.getValue().getStudyId()).isEqualTo(45L);
+        assertThat(participantCaptor.getValue().getMemberId()).isEqualTo(2L);
+
+        verify(chatRoomCommandPort).addParticipant(12L, 2L);
+
+        ArgumentCaptor<StudyJoinedEvent> eventCaptor = ArgumentCaptor.forClass(StudyJoinedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(45L);
+        assertThat(eventCaptor.getValue().memberId()).isEqualTo(2L);
+        assertThat(eventCaptor.getValue().currentCount()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("마지막 자리에 참여하면 정원이 가득 차 스터디가 자동으로 마감된다")
+    void join_success_fillsLastSlot_closesStudy() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(almostFullStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(false);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.join(new JoinStudyCommand(45L, 2L));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentCount()).isEqualTo(5);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에 참여하려 하면 예외가 발생한다")
+    void join_fail_notFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.join(new JoinStudyCommand(999L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("이미 참여 중이면 예외가 발생한다")
+    void join_fail_alreadyJoined() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.join(new JoinStudyCommand(45L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_ALREADY_JOINED.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(studyParticipantRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("강퇴된 회원이 재참여를 시도하면 예외가 발생한다")
+    void join_fail_kicked() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyBannedMemberRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.join(new JoinStudyCommand(45L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_KICKED.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(studyParticipantRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("정원이 가득 찬 스터디에 참여하려 하면 예외가 발생한다")
+    void join_fail_studyFull() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(fullStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.join(new JoinStudyCommand(45L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_FULL.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(studyParticipantRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결된 채팅방을 찾을 수 없으면 예외가 발생한다")
+    void join_fail_chatRoomNotFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(false);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.join(new JoinStudyCommand(45L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
+
+        verify(chatRoomCommandPort, never()).addParticipant(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    private Study soloHostStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 1, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    private Study closedFullStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 5, StudyStatus.CLOSED,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("혼자 남은 방장이 삭제(해산)하면 스터디와 채팅방이 모두 CLOSED되고 이벤트가 발행된다")
+    void delete_success() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.delete(new DeleteStudyCommand(45L, 1L));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+
+        verify(chatRoomCommandPort).closeRoom(12L);
+
+        ArgumentCaptor<StudyClosedEvent> eventCaptor = ArgumentCaptor.forClass(StudyClosedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(45L);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 회원이 삭제를 시도하면 예외가 발생한다")
+    void delete_fail_notOwner() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 999L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_DELETE_FORBIDDEN.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(chatRoomCommandPort, never()).closeRoom(any());
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장의 삭제 시도는 예외가 발생한다")
+    void delete_fail_hasOtherParticipants() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(chatRoomCommandPort, never()).closeRoom(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 삭제하려 하면 예외가 발생한다")
+    void delete_fail_notFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(999L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결된 채팅방을 찾을 수 없으면 예외가 발생한다")
+    void delete_fail_chatRoomNotFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
+
+        verify(chatRoomCommandPort, never()).closeRoom(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("참여자가 퇴장하면 인원이 감소하고 채팅방에서도 제거되며 이벤트가 발행된다")
+    void leave_success() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.leave(new LeaveStudyCommand(45L, 2L));
+
+        // then
+        ArgumentCaptor<Study> studyCaptor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(studyCaptor.capture());
+        assertThat(studyCaptor.getValue().getCurrentCount()).isEqualTo(2);
+
+        verify(studyParticipantRepository).deleteByStudyIdAndMemberId(45L, 2L);
+        verify(chatRoomCommandPort).removeParticipant(12L, 2L);
+
+        ArgumentCaptor<StudyLeftEvent> eventCaptor = ArgumentCaptor.forClass(StudyLeftEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(45L);
+        assertThat(eventCaptor.getValue().memberId()).isEqualTo(2L);
+        assertThat(eventCaptor.getValue().currentCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("정원이 가득 차 마감된 스터디에서 누군가 나가면 다시 모집 상태로 전환된다")
+    void leave_success_reopensClosedStudy() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(closedFullStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.leave(new LeaveStudyCommand(45L, 2L));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentCount()).isEqualTo(4);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("혼자 남은 방장은 퇴장할 수 있다")
+    void leave_success_soloHostLeaves() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 1L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.leave(new LeaveStudyCommand(45L, 1L));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCurrentCount()).isEqualTo(0);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장은 퇴장할 수 없다")
+    void leave_fail_hostCannotLeave() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 1L)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.leave(new LeaveStudyCommand(45L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_HOST_CANNOT_LEAVE.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(studyParticipantRepository, never()).deleteByStudyIdAndMemberId(any(), any());
+    }
+
+    @Test
+    @DisplayName("참여 중이 아니면 퇴장할 수 없다")
+    void leave_fail_notJoined() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 999L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.leave(new LeaveStudyCommand(45L, 999L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_JOINED.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에서 나가려 하면 예외가 발생한다")
+    void leave_fail_notFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.leave(new LeaveStudyCommand(999L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결된 채팅방을 찾을 수 없으면 예외가 발생한다")
+    void leave_fail_chatRoomNotFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.leave(new LeaveStudyCommand(45L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
+
+        verify(chatRoomCommandPort, never()).removeParticipant(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("방장이 참여자를 강퇴하면 인원이 감소하고 채팅방에서도 제거되며 밴 목록에 등록되고 이벤트가 발행된다")
+    void kick_success() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.kick(new KickStudyMemberCommand(45L, 1L, 2L));
+
+        // then
+        ArgumentCaptor<Study> studyCaptor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(studyCaptor.capture());
+        assertThat(studyCaptor.getValue().getCurrentCount()).isEqualTo(2);
+
+        verify(studyParticipantRepository).deleteByStudyIdAndMemberId(45L, 2L);
+
+        ArgumentCaptor<StudyBannedMember> bannedCaptor = ArgumentCaptor.forClass(StudyBannedMember.class);
+        verify(studyBannedMemberRepository).save(bannedCaptor.capture());
+        assertThat(bannedCaptor.getValue().getStudyId()).isEqualTo(45L);
+        assertThat(bannedCaptor.getValue().getMemberId()).isEqualTo(2L);
+
+        verify(chatRoomCommandPort).removeParticipant(12L, 2L);
+
+        ArgumentCaptor<StudyKickedEvent> eventCaptor = ArgumentCaptor.forClass(StudyKickedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(45L);
+        assertThat(eventCaptor.getValue().kickedMemberId()).isEqualTo(2L);
+        assertThat(eventCaptor.getValue().currentCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 회원이 강퇴를 시도하면 예외가 발생한다")
+    void kick_fail_notOwner() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.kick(new KickStudyMemberCommand(45L, 999L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_KICK_FORBIDDEN.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(chatRoomCommandPort, never()).removeParticipant(any(), any());
+    }
+
+    @Test
+    @DisplayName("방장이 자기 자신을 강퇴하려 하면 예외가 발생한다")
+    void kick_fail_self() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.kick(new KickStudyMemberCommand(45L, 1L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_CANNOT_KICK_SELF.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("대상이 참여자가 아니면 예외가 발생한다")
+    void kick_fail_targetNotJoined() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 999L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.kick(new KickStudyMemberCommand(45L, 1L, 999L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_TARGET_NOT_JOINED.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에서 강퇴를 시도하면 예외가 발생한다")
+    void kick_fail_notFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.kick(new KickStudyMemberCommand(999L, 1L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결된 채팅방을 찾을 수 없으면 예외가 발생한다")
+    void kick_fail_chatRoomNotFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+        given(studyParticipantRepository.existsByStudyIdAndMemberId(45L, 2L)).willReturn(true);
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.kick(new KickStudyMemberCommand(45L, 1L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
+
+        verify(chatRoomCommandPort, never()).removeParticipant(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }

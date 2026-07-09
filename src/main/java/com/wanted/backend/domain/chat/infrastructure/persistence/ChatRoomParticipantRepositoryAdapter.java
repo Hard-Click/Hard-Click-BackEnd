@@ -4,6 +4,8 @@ import com.wanted.backend.domain.chat.domain.model.ChatRoomParticipant;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipantRepository {
 
@@ -20,5 +22,22 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
         );
         ChatRoomParticipantJpaEntity saved = repository.save(entity);
         return ChatRoomParticipant.restore(saved.getId(), saved.getChatRoomId(), saved.getMemberId(), saved.getJoinedAt());
+    }
+
+    @Override
+    public List<Long> findMemberIdsByChatRoomId(Long chatRoomId) {
+        return repository.findByChatRoomId(chatRoomId).stream()
+                .map(ChatRoomParticipantJpaEntity::getMemberId)
+                .toList();
+    }
+
+    @Override
+    public boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
+        return repository.existsByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
+
+    @Override
+    public void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
+        repository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
     }
 }

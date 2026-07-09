@@ -5,6 +5,8 @@ import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.model.ChatRoomParticipant;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,5 +31,24 @@ public class ChatRoomCommandService implements ChatRoomCommandUseCase {
         chatRoomParticipantRepository.save(ChatRoomParticipant.create(saved.getId(), hostId));
 
         return saved.getId();
+    }
+
+    @Override
+    public void addParticipant(Long chatRoomId, Long memberId) {
+        chatRoomParticipantRepository.save(ChatRoomParticipant.create(chatRoomId, memberId));
+    }
+
+    @Override
+    public void closeRoom(Long chatRoomId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        chatRoom.close();
+        chatRoomRepository.save(chatRoom);
+    }
+
+    @Override
+    public void removeParticipant(Long chatRoomId, Long memberId) {
+        chatRoomParticipantRepository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
     }
 }
