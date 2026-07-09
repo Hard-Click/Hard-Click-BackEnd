@@ -2,6 +2,7 @@ package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
@@ -258,6 +259,51 @@ class StudyControllerTest {
         mockMvc.perform(post("/api/study/45/join"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_FULL.getCode()));
+    }
+
+    @Test
+    @DisplayName("퇴장 성공 시 200을 반환하고 use case에 올바른 값이 전달된다")
+    void leaveStudy_success() throws Exception {
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<LeaveStudyCommand> captor = ArgumentCaptor.forClass(LeaveStudyCommand.class);
+        verify(studyCommandUseCase).leave(captor.capture());
+        assertThat(captor.getValue().groupId()).isEqualTo(45L);
+        assertThat(captor.getValue().memberId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에서 나가려 하면 404를 반환한다")
+    void leaveStudy_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/999/leave"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("참여 중이 아니면 400을 반환한다")
+    void leaveStudy_fail_notJoined() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_JOINED))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_JOINED.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장의 퇴장 시도는 403을 반환한다")
+    void leaveStudy_fail_hostCannotLeave() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_HOST_CANNOT_LEAVE))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_HOST_CANNOT_LEAVE.getCode()));
     }
 
     @Test

@@ -2,8 +2,10 @@ package com.wanted.backend.domain.study.application.service;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
+import com.wanted.backend.domain.study.application.event.StudyLeftEvent;
 import com.wanted.backend.domain.study.application.port.ChatRoomCommandPort;
 import com.wanted.backend.domain.study.application.port.ChatRoomQueryPort;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
@@ -87,5 +89,26 @@ public class StudyCommandService implements StudyCommandUseCase {
         eventPublisher.publishEvent(new StudyJoinedEvent(chatRoomId, saved.getId(), command.memberId(), saved.getCurrentCount()));
 
         return new JoinStudyResult(saved.getId(), chatRoomId, saved.getCurrentCount());
+    }
+
+    @Override
+    public void leave(LeaveStudyCommand command) {
+        Study study = studyRepository.findByIdForUpdate(command.groupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.STUDY_NOT_FOUND));
+
+        if (!studyParticipantRepository.existsByStudyIdAndMemberId(command.groupId(), command.memberId())) {
+            throw new BusinessException(ErrorCode.STUDY_NOT_JOINED);
+        }
+
+        study.leave(command.memberId());
+        Study saved = studyRepository.save(study);
+
+        studyParticipantRepository.deleteByStudyIdAndMemberId(command.groupId(), command.memberId());
+
+        Long chatRoomId = chatRoomQueryPort.findChatRoomIdByStudyId(command.groupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        chatRoomCommandPort.removeParticipant(chatRoomId, command.memberId());
+
+        eventPublisher.publishEvent(new StudyLeftEvent(chatRoomId, saved.getId(), command.memberId(), saved.getCurrentCount()));
     }
 }

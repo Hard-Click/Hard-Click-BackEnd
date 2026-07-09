@@ -35,4 +35,9 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
     public boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
         return repository.existsByChatRoomIdAndMemberId(chatRoomId, memberId);
     }
+
+    @Override
+    public void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
+        repository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
 }
