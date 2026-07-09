@@ -228,6 +228,10 @@ import org.springframework.http.HttpStatus;
     STUDY_HOST_CANNOT_LEAVE(HttpStatus.FORBIDDEN, "SG008", "방장은 다른 참여자가 남아있는 동안 나갈 수 없습니다."),
     STUDY_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "SG009", "방장만 스터디를 삭제할 수 있습니다."),
     STUDY_HAS_OTHER_PARTICIPANTS(HttpStatus.FORBIDDEN, "SG010", "다른 참여자가 남아있어 해산할 수 없습니다."),
+    STUDY_KICK_FORBIDDEN(HttpStatus.FORBIDDEN, "SG011", "방장만 참여자를 강퇴할 수 있습니다."),
+    STUDY_CANNOT_KICK_SELF(HttpStatus.FORBIDDEN, "SG012", "자기 자신은 강퇴할 수 없습니다."),
+    STUDY_TARGET_NOT_JOINED(HttpStatus.NOT_FOUND, "SG013", "강퇴할 대상이 스터디 참여자가 아닙니다."),
+    STUDY_KICKED(HttpStatus.FORBIDDEN, "SG014", "강퇴된 스터디에는 다시 참여할 수 없습니다."),
 
     /* =========================================================================
        채팅 관련 예외 (CH000)
