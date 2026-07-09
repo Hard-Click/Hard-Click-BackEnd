@@ -159,16 +159,24 @@ public class AuthCommandService implements AuthCommandUseCase {
     }
 
     private void recordLoginResult(String result) {
-        Counter.builder("auth.login.count")
-                .tag("result", result)
-                .register(meterRegistry)
-                .increment();
+        try {
+            Counter.builder("auth.login.count")
+                    .tag("result", result)
+                    .register(meterRegistry)
+                    .increment();
+        } catch (Exception e) {
+            log.warn("로그인 metric 기록 실패. result={}", result, e);
+        }
     }
 
     private void recordReissueResult(String result) {
-        Counter.builder("auth.token.reissue.count")
-                .tag("result", result)
-                .register(meterRegistry)
-                .increment();
+        try {
+            Counter.builder("auth.token.reissue.count")
+                    .tag("result", result)
+                    .register(meterRegistry)
+                    .increment();
+        } catch (Exception e) {
+            log.warn("토큰 재발급 metric 기록 실패. result={}", result, e);
+        }
     }
 }

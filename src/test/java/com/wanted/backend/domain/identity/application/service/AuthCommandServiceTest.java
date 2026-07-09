@@ -101,5 +101,7 @@ class AuthCommandServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.ACCOUNT_LOCKED);
+
+        verify(emailVerificationUseCase).sendAccountLockCode(anyString());
     }
 }
