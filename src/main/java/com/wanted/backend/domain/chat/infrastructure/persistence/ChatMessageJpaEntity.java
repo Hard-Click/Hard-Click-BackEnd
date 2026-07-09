@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.infrastructure.persistence;
 
+import com.wanted.backend.domain.chat.domain.model.ChatMessageType;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -18,8 +19,12 @@ public class ChatMessageJpaEntity {
     @Column(name = "chat_room_id", nullable = false)
     private Long chatRoomId;
 
-    @Column(name = "sender_id", nullable = false)
+    @Column(name = "sender_id")
     private Long senderId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private ChatMessageType type;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
@@ -29,9 +34,10 @@ public class ChatMessageJpaEntity {
 
     protected ChatMessageJpaEntity() {}
 
-    public ChatMessageJpaEntity(Long chatRoomId, Long senderId, String content, LocalDateTime sentAt) {
+    public ChatMessageJpaEntity(Long chatRoomId, Long senderId, ChatMessageType type, String content, LocalDateTime sentAt) {
         this.chatRoomId = chatRoomId;
         this.senderId = senderId;
+        this.type = type;
         this.content = content;
         this.sentAt = sentAt;
     }
