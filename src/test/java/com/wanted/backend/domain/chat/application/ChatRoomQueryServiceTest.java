@@ -256,4 +256,42 @@ class ChatRoomQueryServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).name()).isEqualTo("알 수 없음");
     }
+
+    @Test
+    @DisplayName("studyInfoQueryPort가 예외를 던져도 해당 방만 알 수 없음으로 대체되고 나머지 목록은 정상 반환된다")
+    void getMyRooms_success_studyInfoPortThrows() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willThrow(new RuntimeException("db down"));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("알 수 없음");
+    }
+
+    @Test
+    @DisplayName("chatMessageRepository가 예외를 던져도 마지막 메시지 없음으로 대체되고 목록은 정상 반환된다")
+    void getMyRooms_success_chatMessageRepositoryThrows() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willThrow(new RuntimeException("db down"));
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("수학 스터디");
+        assertThat(result.get(0).lastMessage()).isNull();
+        assertThat(result.get(0).lastMessageAt()).isNull();
+    }
 }

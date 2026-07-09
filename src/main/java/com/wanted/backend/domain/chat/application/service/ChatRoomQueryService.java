@@ -96,17 +96,34 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
     }
 
     private MyChatRoomDetail toMyChatRoomDetail(ChatRoom chatRoom) {
-        String name = studyInfoQueryPort.getStudyInfo(chatRoom.getStudyId())
-                .map(StudyInfoResult::title)
-                .orElse("알 수 없음");
-
-        Optional<ChatMessage> latest = chatMessageRepository.findLatestByChatRoomId(chatRoom.getId());
+        String name = resolveStudyTitle(chatRoom.getStudyId());
+        Optional<ChatMessage> latest = resolveLatestMessage(chatRoom.getId());
 
         return new MyChatRoomDetail(
                 chatRoom.getId(), name,
                 latest.map(ChatMessage::getContent).orElse(null),
                 latest.map(ChatMessage::getSentAt).orElse(null),
                 0);
+    }
+
+    private String resolveStudyTitle(Long studyId) {
+        try {
+            return studyInfoQueryPort.getStudyInfo(studyId)
+                    .map(StudyInfoResult::title)
+                    .orElse("알 수 없음");
+        } catch (Exception e) {
+            log.warn("StudyInfoQueryPort 호출 실패, 알 수 없음으로 fallback. studyId={}", studyId, e);
+            return "알 수 없음";
+        }
+    }
+
+    private Optional<ChatMessage> resolveLatestMessage(Long chatRoomId) {
+        try {
+            return chatMessageRepository.findLatestByChatRoomId(chatRoomId);
+        } catch (Exception e) {
+            log.warn("ChatMessageRepository 호출 실패, 마지막 메시지 없음으로 fallback. chatRoomId={}", chatRoomId, e);
+            return Optional.empty();
+        }
     }
 
     private Map<Long, String> resolveNameMap(Collection<Long> memberIds) {
