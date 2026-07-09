@@ -3,6 +3,7 @@ package com.wanted.backend.domain.study.presentation;
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
 import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.KickStudyMemberCommand;
 import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
@@ -177,5 +178,24 @@ public class StudyController {
         studyCommandUseCase.delete(new DeleteStudyCommand(groupId, userDetails.getMemberId()));
 
         return ApiResponse.successNoContent("스터디가 삭제되었습니다.");
+    }
+
+    @Operation(
+            summary = "스터디 참여자 강퇴",
+            description = """
+                방장이 참여자를 강퇴합니다.
+                - 방장만 강퇴할 수 있으며, 자기 자신은 강퇴할 수 없습니다.
+                - 강퇴된 회원은 스터디/채팅방 참여자 목록에서 제거되며, 같은 스터디에 다시 참여할 수 없습니다.
+                """
+    )
+    @DeleteMapping("/{groupId}/members/{memberId}")
+    public ResponseEntity<ApiResponse<Void>> kickMember(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId,
+            @PathVariable Long memberId) {
+
+        studyCommandUseCase.kick(new KickStudyMemberCommand(groupId, userDetails.getMemberId(), memberId));
+
+        return ApiResponse.successNoContent("해당 회원을 강퇴했습니다.");
     }
 }

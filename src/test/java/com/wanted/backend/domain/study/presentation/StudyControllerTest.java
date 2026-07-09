@@ -3,6 +3,7 @@ package com.wanted.backend.domain.study.presentation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.KickStudyMemberCommand;
 import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
@@ -351,6 +352,63 @@ class StudyControllerTest {
         mockMvc.perform(delete("/api/study/45"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS.getCode()));
+    }
+
+    @Test
+    @DisplayName("강퇴 성공 시 200을 반환하고 use case에 올바른 값이 전달된다")
+    void kickMember_success() throws Exception {
+        mockMvc.perform(delete("/api/study/45/members/2"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<KickStudyMemberCommand> captor = ArgumentCaptor.forClass(KickStudyMemberCommand.class);
+        verify(studyCommandUseCase).kick(captor.capture());
+        assertThat(captor.getValue().groupId()).isEqualTo(45L);
+        assertThat(captor.getValue().hostId()).isEqualTo(1L);
+        assertThat(captor.getValue().targetMemberId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 사용자의 강퇴 시도는 403을 반환한다")
+    void kickMember_fail_notOwner() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_KICK_FORBIDDEN))
+                .given(studyCommandUseCase).kick(any());
+
+        mockMvc.perform(delete("/api/study/45/members/2"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_KICK_FORBIDDEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("자기 자신을 강퇴하려 하면 403을 반환한다")
+    void kickMember_fail_self() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_CANNOT_KICK_SELF))
+                .given(studyCommandUseCase).kick(any());
+
+        mockMvc.perform(delete("/api/study/45/members/1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_CANNOT_KICK_SELF.getCode()));
+    }
+
+    @Test
+    @DisplayName("대상이 참여자가 아니면 404를 반환한다")
+    void kickMember_fail_targetNotJoined() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_TARGET_NOT_JOINED))
+                .given(studyCommandUseCase).kick(any());
+
+        mockMvc.perform(delete("/api/study/45/members/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_TARGET_NOT_JOINED.getCode()));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에서 강퇴를 시도하면 404를 반환한다")
+    void kickMember_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).kick(any());
+
+        mockMvc.perform(delete("/api/study/999/members/2"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
     }
 
     @Test
