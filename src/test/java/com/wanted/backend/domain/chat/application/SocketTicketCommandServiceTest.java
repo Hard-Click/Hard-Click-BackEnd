@@ -13,10 +13,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 
@@ -63,5 +66,32 @@ class SocketTicketCommandServiceTest {
 
         // then
         assertThat(first.ticket()).isNotEqualTo(second.ticket());
+    }
+
+    @Test
+    @DisplayName("유효한 티켓을 소비하면 memberId를 반환하고 Redis 값은 삭제(GETDEL)된다")
+    void consume_success() {
+        // given
+        given(valueOperations.getAndDelete(anyString())).willReturn("1");
+
+        // when
+        Optional<Long> result = service.consume("some-ticket");
+
+        // then
+        assertThat(result).contains(1L);
+        verify(valueOperations).getAndDelete("chat:{socket-ticket}:some-ticket");
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 이미 소비된 티켓이면 빈 값을 반환한다")
+    void consume_fail_notFoundOrAlreadyConsumed() {
+        // given
+        given(valueOperations.getAndDelete(anyString())).willReturn(null);
+
+        // when
+        Optional<Long> result = service.consume("unknown-ticket");
+
+        // then
+        assertThat(result).isEmpty();
     }
 }

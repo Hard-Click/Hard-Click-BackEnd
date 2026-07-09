@@ -70,7 +70,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/actuator/health"
+                                "/actuator/health",
+                                "/ws-chat/**"
                         ).permitAll()
                         // Prometheus는 같은 Docker 네트워크(브리지 대역) 또는 localhost에서만 스크랩하므로
                         // 외부 인터넷으로 메트릭이 그대로 노출되지 않도록 발신 IP를 제한한다.

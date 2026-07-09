@@ -26,6 +26,11 @@ public class ChatRoomRepositoryAdapter implements ChatRoomRepository {
     }
 
     @Override
+    public Optional<ChatRoom> findById(Long id) {
+        return repository.findById(id).map(this::toDomain);
+    }
+
+    @Override
     public Optional<ChatRoom> findByStudyId(Long studyId) {
         return repository.findByStudyId(studyId).map(this::toDomain);
     }
