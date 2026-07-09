@@ -67,7 +67,11 @@ class ChatRoomControllerTest {
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.participantCount").value(2))
                 .andExpect(jsonPath("$.data.participants[0].memberId").value(1))
-                .andExpect(jsonPath("$.data.participants[0].online").value(true));
+                .andExpect(jsonPath("$.data.participants[0].name").value("이*연"))
+                .andExpect(jsonPath("$.data.participants[0].online").value(true))
+                .andExpect(jsonPath("$.data.participants[1].memberId").value(2))
+                .andExpect(jsonPath("$.data.participants[1].name").value("김*수"))
+                .andExpect(jsonPath("$.data.participants[1].online").value(false));
     }
 
     @Test

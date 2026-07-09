@@ -140,4 +140,23 @@ class ChatRoomQueryServiceTest {
         assertThat(result.participants()).hasSize(1);
         assertThat(result.participants().get(0).name()).isEqualTo("알 수 없음");
     }
+
+    @Test
+    @DisplayName("presence 포트가 예외를 던지면 모든 참여자가 오프라인으로 처리된다")
+    void getRoom_success_presencePortFails() {
+        // given
+        given(chatRoomRepository.findById(12L)).willReturn(Optional.of(activeRoom()));
+        given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(12L, 1L)).willReturn(true);
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 1등급 목표 스터디", "MATH_1")));
+        given(chatRoomParticipantRepository.findMemberIdsByChatRoomId(12L)).willReturn(List.of(1L, 2L));
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(1L, "이지연", 2L, "김민수"));
+        given(chatPresencePort.getOnlineMemberIds(12L)).willThrow(new RuntimeException("presence down"));
+
+        // when
+        ChatRoomDetailResult result = chatRoomQueryService.getRoom(12L, 1L);
+
+        // then
+        assertThat(result.participants()).extracting("online")
+                .containsExactly(false, false);
+    }
 }

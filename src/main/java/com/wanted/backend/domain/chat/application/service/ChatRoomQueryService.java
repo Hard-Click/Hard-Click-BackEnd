@@ -60,7 +60,7 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
 
         List<Long> participantIds = chatRoomParticipantRepository.findMemberIdsByChatRoomId(chatRoomId);
         Map<Long, String> nameMap = resolveNameMap(participantIds);
-        Set<Long> onlineMemberIds = chatPresencePort.getOnlineMemberIds(chatRoomId);
+        Set<Long> onlineMemberIds = resolveOnlineMemberIds(chatRoomId);
 
         List<ParticipantDetail> participants = participantIds.stream()
                 .map(id -> new ParticipantDetail(id, maskName(nameMap.get(id)), onlineMemberIds.contains(id)))
@@ -77,6 +77,15 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
         } catch (Exception e) {
             log.warn("MemberNamePort 호출 실패, 빈 이름 맵으로 fallback. memberIds={}", memberIds, e);
             return Map.of();
+        }
+    }
+
+    private Set<Long> resolveOnlineMemberIds(Long chatRoomId) {
+        try {
+            return chatPresencePort.getOnlineMemberIds(chatRoomId);
+        } catch (Exception e) {
+            log.warn("ChatPresencePort 호출 실패, 빈 Set으로 fallback. chatRoomId={}", chatRoomId, e);
+            return Set.of();
         }
     }
 
