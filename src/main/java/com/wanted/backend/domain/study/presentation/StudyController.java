@@ -1,7 +1,9 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
+import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
@@ -10,6 +12,7 @@ import com.wanted.backend.domain.study.application.usecase.StudyQueryUseCase;
 import com.wanted.backend.domain.study.presentation.request.CreateStudyRequest;
 import com.wanted.backend.domain.study.presentation.request.StudyListRequest;
 import com.wanted.backend.domain.study.presentation.response.CreateStudyResponse;
+import com.wanted.backend.domain.study.presentation.response.JoinStudyResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyDetailResponse;
 import com.wanted.backend.domain.study.presentation.response.StudyListResponse;
 import com.wanted.backend.global.common.ApiResponse;
@@ -117,6 +120,24 @@ public class StudyController {
         ));
 
         return ApiResponse.success("스터디가 수정되었습니다.", null);
+    }
+
+    @Operation(
+            summary = "스터디 참여",
+            description = """
+                스터디에 즉시 참여합니다.
+                - 승인 절차 없이 즉시 참여 처리되며, 참여와 동시에 채팅방 참여자로도 등록됩니다.
+                - 정원이 가득 차면 스터디가 자동으로 마감됩니다.
+                """
+    )
+    @PostMapping("/{groupId}/join")
+    public ResponseEntity<ApiResponse<JoinStudyResponse>> joinStudy(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId) {
+
+        JoinStudyResult result = studyCommandUseCase.join(new JoinStudyCommand(groupId, userDetails.getMemberId()));
+
+        return ApiResponse.success("스터디에 참여했습니다.", JoinStudyResponse.from(result));
     }
 
     // TODO(#441): mock 삭제(해산) → 실제 로직으로 교체 (다른 참여자 존재 시 403, 채팅방 함께 CLOSED)

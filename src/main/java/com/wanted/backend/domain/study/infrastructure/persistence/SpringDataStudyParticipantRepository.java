@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface SpringDataStudyParticipantRepository extends JpaRepository<StudyParticipantJpaEntity, Long> {
     List<StudyParticipantJpaEntity> findByStudyId(Long studyId);
+
+    boolean existsByStudyIdAndMemberId(Long studyId, Long memberId);
 }

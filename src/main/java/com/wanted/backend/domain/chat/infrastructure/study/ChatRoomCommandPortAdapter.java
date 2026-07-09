@@ -21,4 +21,9 @@ public class ChatRoomCommandPortAdapter implements ChatRoomCommandPort {
     public Long createRoom(Long studyId, Long hostId) {
         return chatRoomCommandUseCase.createRoom(studyId, hostId);
     }
+
+    @Override
+    public void addParticipant(Long chatRoomId, Long memberId) {
+        chatRoomCommandUseCase.addParticipant(chatRoomId, memberId);
+    }
 }

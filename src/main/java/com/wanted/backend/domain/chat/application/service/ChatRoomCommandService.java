@@ -30,4 +30,9 @@ public class ChatRoomCommandService implements ChatRoomCommandUseCase {
 
         return saved.getId();
     }
+
+    @Override
+    public void addParticipant(Long chatRoomId, Long memberId) {
+        chatRoomParticipantRepository.save(ChatRoomParticipant.create(chatRoomId, memberId));
+    }
 }

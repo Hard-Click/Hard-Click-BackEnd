@@ -35,6 +35,11 @@ public class StudyRepositoryAdapter implements StudyRepository {
     }
 
     @Override
+    public Optional<Study> findByIdForUpdate(Long id) {
+        return repository.findByIdForUpdate(id).map(this::toDomain);
+    }
+
+    @Override
     public List<Study> findAll(String subject, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
         List<StudyJpaEntity> entities = subject != null

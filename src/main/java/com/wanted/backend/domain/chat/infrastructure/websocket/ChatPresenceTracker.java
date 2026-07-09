@@ -77,6 +77,10 @@ public class ChatPresenceTracker {
         broadcastPresence(chatRoomId);
     }
 
+    public Set<Long> getOnlineMemberIds(Long chatRoomId) {
+        return Set.copyOf(onlineMembersByChatRoomId.getOrDefault(chatRoomId, Set.of()));
+    }
+
     private void broadcastPresence(Long chatRoomId) {
         List<Long> participantIds = chatRoomParticipantRepository.findMemberIdsByChatRoomId(chatRoomId);
         Set<Long> onlineMembers = onlineMembersByChatRoomId.getOrDefault(chatRoomId, Set.of());
