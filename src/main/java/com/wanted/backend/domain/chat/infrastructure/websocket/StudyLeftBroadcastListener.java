@@ -4,6 +4,7 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.SystemLeaveMessage;
 import com.wanted.backend.domain.study.application.event.StudyLeftEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -12,6 +13,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Component
 public class StudyLeftBroadcastListener {
 
@@ -29,13 +31,17 @@ public class StudyLeftBroadcastListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(StudyLeftEvent event) {
-        List<ParticipantPresenceMessage> participants = presenceResolver.resolve(event.chatRoomId());
-        String leaverName = maskName(resolveName(event.memberId()));
-        String message = leaverName + "님이 퇴장했습니다";
+        try {
+            List<ParticipantPresenceMessage> participants = presenceResolver.resolve(event.chatRoomId());
+            String leaverName = maskName(resolveName(event.memberId()));
+            String message = leaverName + "님이 퇴장했습니다";
 
-        messagingTemplate.convertAndSend(
-                "/sub/chat-rooms/" + event.chatRoomId(),
-                SystemLeaveMessage.of(message, participants));
+            messagingTemplate.convertAndSend(
+                    "/sub/chat-rooms/" + event.chatRoomId(),
+                    SystemLeaveMessage.of(message, participants));
+        } catch (Exception e) {
+            log.error("SYSTEM_LEAVE 브로드캐스트 실패 - chatRoomId={}, memberId={}", event.chatRoomId(), event.memberId(), e);
+        }
     }
 
     private String resolveName(Long memberId) {

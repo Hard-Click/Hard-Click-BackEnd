@@ -94,7 +94,7 @@ public class Study {
         decreaseCount();
     }
 
-    public void decreaseCount() {
+    private void decreaseCount() {
         currentCount--;
         if (currentCount <= 0) {
             status = StudyStatus.CLOSED;
