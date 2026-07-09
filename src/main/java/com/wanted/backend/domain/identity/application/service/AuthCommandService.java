@@ -14,6 +14,7 @@ import com.wanted.backend.global.security.jwt.JwtProvider;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthCommandService implements AuthCommandUseCase {
 
@@ -61,7 +63,11 @@ public class AuthCommandService implements AuthCommandUseCase {
             recordLoginResult("fail");
 
             if (member.isLocked()) {
-                emailVerificationUseCase.sendAccountLockCode(member.getEmail());
+                try {
+                    emailVerificationUseCase.sendAccountLockCode(member.getEmail());
+                } catch (Exception e) {
+                    log.warn("계정 잠금 인증코드 발송 실패. email={}", member.getEmail(), e);
+                }
                 throw new BusinessException(ErrorCode.ACCOUNT_LOCKED);
             }
 
