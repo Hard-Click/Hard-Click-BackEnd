@@ -118,6 +118,19 @@ public class Study {
         updatedAt = LocalDateTime.now();
     }
 
+    public void validateKickable(Long hostId, Long targetMemberId) {
+        if (!isOwner(hostId)) {
+            throw new BusinessException(ErrorCode.STUDY_KICK_FORBIDDEN);
+        }
+        if (hostId.equals(targetMemberId)) {
+            throw new BusinessException(ErrorCode.STUDY_CANNOT_KICK_SELF);
+        }
+    }
+
+    public void kick() {
+        decreaseCount();
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }
