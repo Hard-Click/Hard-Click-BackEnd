@@ -1,8 +1,10 @@
 package com.wanted.backend.domain.study.application;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
+import com.wanted.backend.domain.study.application.event.StudyClosedEvent;
 import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
 import com.wanted.backend.domain.study.application.port.ChatRoomCommandPort;
 import com.wanted.backend.domain.study.application.port.ChatRoomQueryPort;
@@ -314,6 +316,97 @@ class StudyCommandServiceTest {
                 .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
 
         verify(chatRoomCommandPort, never()).addParticipant(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    private Study soloHostStudy() {
+        return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 1, StudyStatus.ACTIVE,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("혼자 남은 방장이 삭제(해산)하면 스터디와 채팅방이 모두 CLOSED되고 이벤트가 발행된다")
+    void delete_success() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.of(12L));
+
+        // when
+        studyCommandService.delete(new DeleteStudyCommand(45L, 1L));
+
+        // then
+        ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
+        verify(studyRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+
+        verify(chatRoomCommandPort).closeRoom(12L);
+
+        ArgumentCaptor<StudyClosedEvent> eventCaptor = ArgumentCaptor.forClass(StudyClosedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(45L);
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 회원이 삭제를 시도하면 예외가 발생한다")
+    void delete_fail_notOwner() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 999L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_DELETE_FORBIDDEN.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(chatRoomCommandPort, never()).closeRoom(any());
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장의 삭제 시도는 예외가 발생한다")
+    void delete_fail_hasOtherParticipants() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(activeStudy()));
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS.getMessage());
+
+        verify(studyRepository, never()).save(any());
+        verify(chatRoomCommandPort, never()).closeRoom(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 삭제하려 하면 예외가 발생한다")
+    void delete_fail_notFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(999L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(999L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.STUDY_NOT_FOUND.getMessage());
+
+        verify(studyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결된 채팅방을 찾을 수 없으면 예외가 발생한다")
+    void delete_fail_chatRoomNotFound() {
+        // given
+        given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
+        given(studyRepository.save(any(Study.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(chatRoomQueryPort.findChatRoomIdByStudyId(45L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyCommandService.delete(new DeleteStudyCommand(45L, 1L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_ROOM_NOT_FOUND.getMessage());
+
+        verify(chatRoomCommandPort, never()).closeRoom(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
 }

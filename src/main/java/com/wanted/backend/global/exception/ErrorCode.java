@@ -224,6 +224,8 @@ import org.springframework.http.HttpStatus;
     STUDY_MAX_COUNT_BELOW_CURRENT(HttpStatus.BAD_REQUEST, "SG004", "정원은 현재 참여 인원 이상이어야 합니다."),
     STUDY_ALREADY_JOINED(HttpStatus.BAD_REQUEST, "SG005", "이미 참여 중인 스터디입니다."),
     STUDY_FULL(HttpStatus.CONFLICT, "SG006", "정원이 가득 차 참여할 수 없습니다."),
+    STUDY_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "SG007", "방장만 스터디를 삭제할 수 있습니다."),
+    STUDY_HAS_OTHER_PARTICIPANTS(HttpStatus.FORBIDDEN, "SG008", "다른 참여자가 남아있어 해산할 수 없습니다."),
 
     /* =========================================================================
        채팅 관련 예외 (CH000)

@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.application.usecase;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
@@ -12,4 +13,6 @@ public interface StudyCommandUseCase {
     void update(UpdateStudyCommand command);
 
     JoinStudyResult join(JoinStudyCommand command);
+
+    void delete(DeleteStudyCommand command);
 }
