@@ -3,6 +3,7 @@ package com.wanted.backend.domain.study.presentation;
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
 import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
@@ -139,6 +140,24 @@ public class StudyController {
         JoinStudyResult result = studyCommandUseCase.join(new JoinStudyCommand(groupId, userDetails.getMemberId()));
 
         return ApiResponse.success("스터디에 참여했습니다.", JoinStudyResponse.from(result));
+    }
+
+    @Operation(
+            summary = "스터디 퇴장",
+            description = """
+                참여 중인 스터디에서 나갑니다.
+                - 퇴장과 동시에 채팅방 참여자 목록에서도 제거됩니다.
+                - 방장은 다른 참여자가 남아있는 동안 나갈 수 없습니다.
+                """
+    )
+    @PostMapping("/{groupId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveStudy(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId) {
+
+        studyCommandUseCase.leave(new LeaveStudyCommand(groupId, userDetails.getMemberId()));
+
+        return ApiResponse.success("스터디에서 퇴장했습니다", null);
     }
 
     @Operation(

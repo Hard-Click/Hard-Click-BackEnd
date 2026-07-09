@@ -136,4 +136,14 @@ class ChatRoomCommandServiceTest {
 
         verify(chatRoomRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("참여자를 제거하면 채팅방 참여자 목록에서 삭제된다")
+    void removeParticipant_success() {
+        // when
+        chatRoomCommandService.removeParticipant(200L, 3L);
+
+        // then
+        verify(chatRoomParticipantRepository).deleteByChatRoomIdAndMemberId(200L, 3L);
+    }
 }

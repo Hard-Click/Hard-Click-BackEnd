@@ -6,4 +6,6 @@ public interface ChatRoomCommandPort {
     void addParticipant(Long chatRoomId, Long memberId);
 
     void closeRoom(Long chatRoomId);
+
+    void removeParticipant(Long chatRoomId, Long memberId);
 }

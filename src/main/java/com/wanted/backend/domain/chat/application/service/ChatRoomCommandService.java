@@ -46,4 +46,9 @@ public class ChatRoomCommandService implements ChatRoomCommandUseCase {
         chatRoom.close();
         chatRoomRepository.save(chatRoom);
     }
+
+    @Override
+    public void removeParticipant(Long chatRoomId, Long memberId) {
+        chatRoomParticipantRepository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
 }
