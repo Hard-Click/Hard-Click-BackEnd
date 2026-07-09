@@ -64,7 +64,7 @@ class ChatMessageCommandServiceTest {
         given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(45L, 1L)).willReturn(true);
         given(chatMessageRepository.save(any(ChatMessage.class))).willAnswer(invocation -> {
             ChatMessage arg = invocation.getArgument(0);
-            return ChatMessage.restore(500L, arg.getChatRoomId(), arg.getSenderId(), arg.getContent(), arg.getSentAt());
+            return ChatMessage.restore(500L, arg.getChatRoomId(), arg.getSenderId(), arg.getType(), arg.getContent(), arg.getSentAt());
         });
 
         // when

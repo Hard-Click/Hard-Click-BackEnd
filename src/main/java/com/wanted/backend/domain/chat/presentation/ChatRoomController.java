@@ -1,7 +1,10 @@
 package com.wanted.backend.domain.chat.presentation;
 
+import com.wanted.backend.domain.chat.application.result.ChatMessageListResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.usecase.ChatMessageQueryUseCase;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
+import com.wanted.backend.domain.chat.presentation.response.ChatMessageListResponse;
 import com.wanted.backend.domain.chat.presentation.response.ChatRoomResponse;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
@@ -11,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,9 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatRoomController {
 
     private final ChatRoomQueryUseCase chatRoomQueryUseCase;
+    private final ChatMessageQueryUseCase chatMessageQueryUseCase;
 
-    public ChatRoomController(ChatRoomQueryUseCase chatRoomQueryUseCase) {
+    public ChatRoomController(ChatRoomQueryUseCase chatRoomQueryUseCase,
+                              ChatMessageQueryUseCase chatMessageQueryUseCase) {
         this.chatRoomQueryUseCase = chatRoomQueryUseCase;
+        this.chatMessageQueryUseCase = chatMessageQueryUseCase;
     }
 
     @Operation(
@@ -39,5 +46,27 @@ public class ChatRoomController {
         ChatRoomDetailResult result = chatRoomQueryUseCase.getRoom(chatRoomId, userDetails.getMemberId());
 
         return ApiResponse.success("채팅방 조회 성공", ChatRoomResponse.from(result));
+    }
+
+    @Operation(
+            summary = "채팅 메시지 히스토리 조회",
+            description = """
+                채팅방의 과거 메시지를 커서 기반 페이지네이션으로 조회합니다.
+                - 채팅방 참여자만 조회할 수 있습니다.
+                - 입장/퇴장 시스템 메시지(SYSTEM_JOIN/SYSTEM_LEAVE)도 함께 반환됩니다.
+                - cursorId를 생략하면 최신 메시지부터 조회하며, 응답의 nextCursorId를 다음 요청의 cursorId로 사용하면 이전 메시지를 이어서 조회할 수 있습니다.
+                """
+    )
+    @GetMapping("/{chatRoomId}/messages")
+    public ResponseEntity<ApiResponse<ChatMessageListResponse>> getMessages(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int size) {
+
+        ChatMessageListResult result = chatMessageQueryUseCase.getMessages(
+                chatRoomId, cursorId, size, userDetails.getMemberId());
+
+        return ApiResponse.success("채팅 메시지 조회 성공", ChatMessageListResponse.from(result));
     }
 }
