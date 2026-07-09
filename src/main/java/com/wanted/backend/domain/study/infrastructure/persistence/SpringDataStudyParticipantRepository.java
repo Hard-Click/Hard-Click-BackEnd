@@ -8,4 +8,6 @@ public interface SpringDataStudyParticipantRepository extends JpaRepository<Stud
     List<StudyParticipantJpaEntity> findByStudyId(Long studyId);
 
     boolean existsByStudyIdAndMemberId(Long studyId, Long memberId);
+
+    void deleteByStudyIdAndMemberId(Long studyId, Long memberId);
 }

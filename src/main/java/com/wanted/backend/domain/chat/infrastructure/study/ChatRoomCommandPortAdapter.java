@@ -26,4 +26,14 @@ public class ChatRoomCommandPortAdapter implements ChatRoomCommandPort {
     public void addParticipant(Long chatRoomId, Long memberId) {
         chatRoomCommandUseCase.addParticipant(chatRoomId, memberId);
     }
+
+    @Override
+    public void closeRoom(Long chatRoomId) {
+        chatRoomCommandUseCase.closeRoom(chatRoomId);
+    }
+
+    @Override
+    public void removeParticipant(Long chatRoomId, Long memberId) {
+        chatRoomCommandUseCase.removeParticipant(chatRoomId, memberId);
+    }
 }

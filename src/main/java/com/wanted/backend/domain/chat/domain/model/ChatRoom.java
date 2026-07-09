@@ -40,6 +40,11 @@ public class ChatRoom {
         }
     }
 
+    public void close() {
+        status = ChatRoomStatus.CLOSED;
+        updatedAt = LocalDateTime.now();
+    }
+
     public Long getId() { return id; }
     public Long getStudyId() { return studyId; }
     public Long getHostId() { return hostId; }

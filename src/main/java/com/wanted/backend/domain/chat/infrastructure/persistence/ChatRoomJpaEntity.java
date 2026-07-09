@@ -34,8 +34,9 @@ public class ChatRoomJpaEntity {
 
     protected ChatRoomJpaEntity() {}
 
-    public ChatRoomJpaEntity(Long studyId, Long hostId, ChatRoomStatus status,
+    public ChatRoomJpaEntity(Long id, Long studyId, Long hostId, ChatRoomStatus status,
                              LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
         this.studyId = studyId;
         this.hostId = hostId;
         this.status = status;

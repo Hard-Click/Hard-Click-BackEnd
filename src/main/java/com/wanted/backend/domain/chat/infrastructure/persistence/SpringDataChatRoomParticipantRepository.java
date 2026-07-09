@@ -8,4 +8,6 @@ public interface SpringDataChatRoomParticipantRepository extends JpaRepository<C
     List<ChatRoomParticipantJpaEntity> findByChatRoomId(Long chatRoomId);
 
     boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
+
+    void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 }

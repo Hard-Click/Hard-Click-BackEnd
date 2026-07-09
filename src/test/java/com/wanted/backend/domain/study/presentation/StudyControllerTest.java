@@ -1,7 +1,9 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -258,6 +261,96 @@ class StudyControllerTest {
         mockMvc.perform(post("/api/study/45/join"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_FULL.getCode()));
+    }
+
+    @Test
+    @DisplayName("퇴장 성공 시 200을 반환하고 use case에 올바른 값이 전달된다")
+    void leaveStudy_success() throws Exception {
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<LeaveStudyCommand> captor = ArgumentCaptor.forClass(LeaveStudyCommand.class);
+        verify(studyCommandUseCase).leave(captor.capture());
+        assertThat(captor.getValue().groupId()).isEqualTo(45L);
+        assertThat(captor.getValue().memberId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에서 나가려 하면 404를 반환한다")
+    void leaveStudy_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/999/leave"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("참여 중이 아니면 400을 반환한다")
+    void leaveStudy_fail_notJoined() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_JOINED))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_JOINED.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장의 퇴장 시도는 403을 반환한다")
+    void leaveStudy_fail_hostCannotLeave() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_HOST_CANNOT_LEAVE))
+                .given(studyCommandUseCase).leave(any());
+
+        mockMvc.perform(post("/api/study/45/leave"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_HOST_CANNOT_LEAVE.getCode()));
+    }
+
+    @Test
+    @DisplayName("삭제(해산) 성공 시 200을 반환하고 use case에 올바른 값이 전달된다")
+    void deleteStudy_success() throws Exception {
+        mockMvc.perform(delete("/api/study/45"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<DeleteStudyCommand> captor = ArgumentCaptor.forClass(DeleteStudyCommand.class);
+        verify(studyCommandUseCase).delete(captor.capture());
+        assertThat(captor.getValue().groupId()).isEqualTo(45L);
+        assertThat(captor.getValue().memberId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디를 삭제하려 하면 404를 반환한다")
+    void deleteStudy_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).delete(any());
+
+        mockMvc.perform(delete("/api/study/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("방장이 아닌 사용자의 삭제 시도는 403을 반환한다")
+    void deleteStudy_fail_notOwner() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_DELETE_FORBIDDEN))
+                .given(studyCommandUseCase).delete(any());
+
+        mockMvc.perform(delete("/api/study/45"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_DELETE_FORBIDDEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("다른 참여자가 남아있으면 방장의 삭제 시도는 403을 반환한다")
+    void deleteStudy_fail_hasOtherParticipants() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS))
+                .given(studyCommandUseCase).delete(any());
+
+        mockMvc.perform(delete("/api/study/45"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS.getCode()));
     }
 
     @Test

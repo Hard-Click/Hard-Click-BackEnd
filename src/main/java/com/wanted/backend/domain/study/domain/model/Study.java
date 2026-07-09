@@ -87,6 +87,37 @@ public class Study {
         updatedAt = LocalDateTime.now();
     }
 
+    public void validateDeletable(Long memberId) {
+        if (!isOwner(memberId)) {
+            throw new BusinessException(ErrorCode.STUDY_DELETE_FORBIDDEN);
+        }
+        if (currentCount > 1) {
+            throw new BusinessException(ErrorCode.STUDY_HAS_OTHER_PARTICIPANTS);
+        }
+    }
+
+    public void close() {
+        status = StudyStatus.CLOSED;
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void leave(Long memberId) {
+        if (isOwner(memberId) && currentCount > 1) {
+            throw new BusinessException(ErrorCode.STUDY_HOST_CANNOT_LEAVE);
+        }
+        decreaseCount();
+    }
+
+    private void decreaseCount() {
+        currentCount--;
+        if (currentCount <= 0) {
+            status = StudyStatus.CLOSED;
+        } else if (status == StudyStatus.CLOSED) {
+            status = StudyStatus.ACTIVE;
+        }
+        updatedAt = LocalDateTime.now();
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }

@@ -1,7 +1,9 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.wanted.backend.domain.study.application.command.CreateStudyCommand;
+import com.wanted.backend.domain.study.application.command.DeleteStudyCommand;
 import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
+import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
@@ -140,11 +142,39 @@ public class StudyController {
         return ApiResponse.success("스터디에 참여했습니다.", JoinStudyResponse.from(result));
     }
 
-    // TODO(#441): mock 삭제(해산) → 실제 로직으로 교체 (다른 참여자 존재 시 403, 채팅방 함께 CLOSED)
+    @Operation(
+            summary = "스터디 퇴장",
+            description = """
+                참여 중인 스터디에서 나갑니다.
+                - 퇴장과 동시에 채팅방 참여자 목록에서도 제거됩니다.
+                - 방장은 다른 참여자가 남아있는 동안 나갈 수 없습니다.
+                """
+    )
+    @PostMapping("/{groupId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveStudy(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long groupId) {
+
+        studyCommandUseCase.leave(new LeaveStudyCommand(groupId, userDetails.getMemberId()));
+
+        return ApiResponse.success("스터디에서 퇴장했습니다", null);
+    }
+
+    @Operation(
+            summary = "스터디 모집글 삭제(해산)",
+            description = """
+                스터디 모집글을 삭제(해산)합니다.
+                - 방장만 삭제할 수 있습니다.
+                - 다른 참여자가 한 명이라도 남아있으면 해산할 수 없습니다 (본인 혼자 남았을 때만 가능).
+                - 연결된 채팅방도 함께 비활성화(CLOSED)됩니다.
+                """
+    )
     @DeleteMapping("/{groupId}")
     public ResponseEntity<ApiResponse<Void>> deleteStudy(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long groupId) {
+
+        studyCommandUseCase.delete(new DeleteStudyCommand(groupId, userDetails.getMemberId()));
 
         return ApiResponse.successNoContent("스터디가 삭제되었습니다.");
     }

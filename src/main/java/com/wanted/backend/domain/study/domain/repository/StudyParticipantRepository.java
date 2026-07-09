@@ -10,4 +10,6 @@ public interface StudyParticipantRepository {
     List<Long> findMemberIdsByStudyId(Long studyId);
 
     boolean existsByStudyIdAndMemberId(Long studyId, Long memberId);
+
+    void deleteByStudyIdAndMemberId(Long studyId, Long memberId);
 }

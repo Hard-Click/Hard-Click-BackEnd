@@ -35,4 +35,9 @@ public class StudyParticipantRepositoryAdapter implements StudyParticipantReposi
     public boolean existsByStudyIdAndMemberId(Long studyId, Long memberId) {
         return repository.existsByStudyIdAndMemberId(studyId, memberId);
     }
+
+    @Override
+    public void deleteByStudyIdAndMemberId(Long studyId, Long memberId) {
+        repository.deleteByStudyIdAndMemberId(studyId, memberId);
+    }
 }
