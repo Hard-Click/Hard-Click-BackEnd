@@ -86,4 +86,17 @@ class ChatRoomCommandServiceTest {
         assertThatThrownBy(() -> chatRoomCommandService.createRoom(100L, 1L))
                 .isInstanceOf(RuntimeException.class);
     }
+
+    @Test
+    @DisplayName("참여자를 추가하면 채팅방 참여자로 저장된다")
+    void addParticipant_success() {
+        // when
+        chatRoomCommandService.addParticipant(200L, 3L);
+
+        // then
+        ArgumentCaptor<ChatRoomParticipant> captor = ArgumentCaptor.forClass(ChatRoomParticipant.class);
+        verify(chatRoomParticipantRepository).save(captor.capture());
+        assertThat(captor.getValue().getChatRoomId()).isEqualTo(200L);
+        assertThat(captor.getValue().getMemberId()).isEqualTo(3L);
+    }
 }

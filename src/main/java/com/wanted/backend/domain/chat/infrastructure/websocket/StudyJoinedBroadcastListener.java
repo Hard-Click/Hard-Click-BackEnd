@@ -1,0 +1,55 @@
+package com.wanted.backend.domain.chat.infrastructure.websocket;
+
+import com.wanted.backend.domain.chat.application.port.MemberNamePort;
+import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
+import com.wanted.backend.domain.chat.infrastructure.websocket.message.SystemJoinMessage;
+import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.util.List;
+import java.util.Set;
+
+@Component
+public class StudyJoinedBroadcastListener {
+
+    private final MemberNamePort memberNamePort;
+    private final ChatParticipantPresenceResolver presenceResolver;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    public StudyJoinedBroadcastListener(MemberNamePort memberNamePort,
+                                        ChatParticipantPresenceResolver presenceResolver,
+                                        SimpMessagingTemplate messagingTemplate) {
+        this.memberNamePort = memberNamePort;
+        this.presenceResolver = presenceResolver;
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handle(StudyJoinedEvent event) {
+        List<ParticipantPresenceMessage> participants = presenceResolver.resolve(event.chatRoomId());
+        String joinerName = maskName(resolveName(event.memberId()));
+        String message = joinerName + "님이 입장했습니다";
+
+        messagingTemplate.convertAndSend(
+                "/sub/chat-rooms/" + event.chatRoomId(),
+                SystemJoinMessage.of(message, participants));
+    }
+
+    private String resolveName(Long memberId) {
+        try {
+            return memberNamePort.getNamesByMemberIds(Set.of(memberId)).get(memberId);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private String maskName(String name) {
+        if (name == null || name.isEmpty()) return "알 수 없음";
+        if (name.length() == 1) return name;
+        if (name.length() == 2) return name.charAt(0) + "*";
+        return name.charAt(0) + "*" + name.charAt(name.length() - 1);
+    }
+}

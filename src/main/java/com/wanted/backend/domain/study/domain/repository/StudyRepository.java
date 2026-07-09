@@ -10,6 +10,8 @@ public interface StudyRepository {
 
     Optional<Study> findById(Long id);
 
+    Optional<Study> findByIdForUpdate(Long id);
+
     List<Study> findAll(String subject, int page, int size);
 
     int countAll(String subject);

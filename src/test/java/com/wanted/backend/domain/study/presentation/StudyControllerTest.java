@@ -1,7 +1,9 @@
 package com.wanted.backend.domain.study.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wanted.backend.domain.study.application.command.JoinStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
+import com.wanted.backend.domain.study.application.result.JoinStudyResult;
 import com.wanted.backend.domain.study.application.result.StudyCreationResult;
 import com.wanted.backend.domain.study.application.result.StudyDetailResult;
 import com.wanted.backend.domain.study.application.result.StudyListResult;
@@ -210,6 +212,52 @@ class StudyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("참여 성공 시 200과 함께 참여 결과를 반환한다")
+    void joinStudy_success() throws Exception {
+        given(studyCommandUseCase.join(new JoinStudyCommand(45L, 1L)))
+                .willReturn(new JoinStudyResult(45L, 12L, 4));
+
+        mockMvc.perform(post("/api/study/45/join"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupId").value(45))
+                .andExpect(jsonPath("$.data.chatRoomId").value(12))
+                .andExpect(jsonPath("$.data.currentCount").value(4));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스터디에 참여하려 하면 404를 반환한다")
+    void joinStudy_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_NOT_FOUND))
+                .given(studyCommandUseCase).join(any());
+
+        mockMvc.perform(post("/api/study/999/join"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("이미 참여 중이면 400을 반환한다")
+    void joinStudy_fail_alreadyJoined() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_ALREADY_JOINED))
+                .given(studyCommandUseCase).join(any());
+
+        mockMvc.perform(post("/api/study/45/join"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_ALREADY_JOINED.getCode()));
+    }
+
+    @Test
+    @DisplayName("정원이 가득 차면 409를 반환한다")
+    void joinStudy_fail_full() throws Exception {
+        willThrow(new BusinessException(ErrorCode.STUDY_FULL))
+                .given(studyCommandUseCase).join(any());
+
+        mockMvc.perform(post("/api/study/45/join"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.STUDY_FULL.getCode()));
     }
 
     @Test

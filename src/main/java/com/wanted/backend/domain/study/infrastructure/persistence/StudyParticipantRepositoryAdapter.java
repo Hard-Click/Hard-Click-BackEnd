@@ -30,4 +30,9 @@ public class StudyParticipantRepositoryAdapter implements StudyParticipantReposi
                 .map(StudyParticipantJpaEntity::getMemberId)
                 .toList();
     }
+
+    @Override
+    public boolean existsByStudyIdAndMemberId(Long studyId, Long memberId) {
+        return repository.existsByStudyIdAndMemberId(studyId, memberId);
+    }
 }

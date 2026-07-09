@@ -72,6 +72,21 @@ public class Study {
         }
     }
 
+    public boolean isFull() {
+        return currentCount >= maxCount;
+    }
+
+    public void join() {
+        if (status != StudyStatus.ACTIVE || isFull()) {
+            throw new BusinessException(ErrorCode.STUDY_FULL);
+        }
+        currentCount++;
+        if (isFull()) {
+            status = StudyStatus.CLOSED;
+        }
+        updatedAt = LocalDateTime.now();
+    }
+
     public Long getId() { return id; }
     public Long getHostId() { return hostId; }
     public String getTitle() { return title; }
