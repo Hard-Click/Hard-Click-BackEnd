@@ -11,6 +11,7 @@ import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -98,7 +99,7 @@ public class EmailVerificationService implements EmailVerificationUseCase {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendAccountLockCode(String email) {
         sendVerificationCode(email, EmailPurpose.ACCOUNT_LOCK);
     }
