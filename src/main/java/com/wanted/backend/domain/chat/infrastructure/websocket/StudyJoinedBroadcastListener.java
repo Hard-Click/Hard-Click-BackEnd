@@ -1,41 +1,57 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
+import com.wanted.backend.domain.chat.domain.model.ChatMessage;
+import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.SystemJoinMessage;
 import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Component
 public class StudyJoinedBroadcastListener {
 
     private final MemberNamePort memberNamePort;
     private final ChatParticipantPresenceResolver presenceResolver;
+    private final ChatMessageRepository chatMessageRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     public StudyJoinedBroadcastListener(MemberNamePort memberNamePort,
                                         ChatParticipantPresenceResolver presenceResolver,
+                                        ChatMessageRepository chatMessageRepository,
                                         SimpMessagingTemplate messagingTemplate) {
         this.memberNamePort = memberNamePort;
         this.presenceResolver = presenceResolver;
+        this.chatMessageRepository = chatMessageRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(StudyJoinedEvent event) {
-        List<ParticipantPresenceMessage> participants = presenceResolver.resolve(event.chatRoomId());
-        String joinerName = maskName(resolveName(event.memberId()));
-        String message = joinerName + "님이 입장했습니다";
+        try {
+            List<ParticipantPresenceMessage> participants = presenceResolver.resolve(event.chatRoomId());
+            String joinerName = maskName(resolveName(event.memberId()));
+            String message = joinerName + "님이 입장했습니다";
 
-        messagingTemplate.convertAndSend(
-                "/sub/chat-rooms/" + event.chatRoomId(),
-                SystemJoinMessage.of(message, participants));
+            chatMessageRepository.save(ChatMessage.createSystemJoin(event.chatRoomId(), message));
+
+            messagingTemplate.convertAndSend(
+                    "/sub/chat-rooms/" + event.chatRoomId(),
+                    SystemJoinMessage.of(message, participants));
+        } catch (Exception e) {
+            log.error("SYSTEM_JOIN 브로드캐스트 실패 - chatRoomId={}, memberId={}", event.chatRoomId(), event.memberId(), e);
+        }
     }
 
     private String resolveName(Long memberId) {
