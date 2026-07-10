@@ -85,9 +85,12 @@ class AccountLockTransactionTest {
                 "SELECT is_locked FROM members WHERE member_id = ?", Boolean.class, MEMBER_ID);
         Integer failCount = jdbcTemplate.queryForObject(
                 "SELECT login_fail_count FROM members WHERE member_id = ?", Integer.class, MEMBER_ID);
+        LocalDateTime lockedAt = jdbcTemplate.queryForObject(
+                "SELECT locked_at FROM members WHERE member_id = ?", LocalDateTime.class, MEMBER_ID);
 
         assertThat(isLocked).isTrue();
         assertThat(failCount).isEqualTo(5);
+        assertThat(lockedAt).isNotNull();
     }
 
     @Test
