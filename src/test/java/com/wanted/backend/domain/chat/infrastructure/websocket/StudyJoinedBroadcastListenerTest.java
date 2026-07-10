@@ -1,6 +1,9 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
+import com.wanted.backend.domain.chat.domain.model.ChatMessage;
+import com.wanted.backend.domain.chat.domain.model.ChatMessageType;
+import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.SystemJoinMessage;
 import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
@@ -35,6 +38,9 @@ class StudyJoinedBroadcastListenerTest {
     private ChatParticipantPresenceResolver presenceResolver;
 
     @Mock
+    private ChatMessageRepository chatMessageRepository;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     @Test
@@ -59,6 +65,13 @@ class StudyJoinedBroadcastListenerTest {
         assertThat(message.message()).isEqualTo("김*수님이 입장했습니다");
         assertThat(message.participantCount()).isEqualTo(2);
         assertThat(message.participants()).isEqualTo(participants);
+
+        ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(chatMessageRepository).save(messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getChatRoomId()).isEqualTo(12L);
+        assertThat(messageCaptor.getValue().getSenderId()).isNull();
+        assertThat(messageCaptor.getValue().getType()).isEqualTo(ChatMessageType.SYSTEM_JOIN);
+        assertThat(messageCaptor.getValue().getContent()).isEqualTo("김*수님이 입장했습니다");
     }
 
     @Test

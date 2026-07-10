@@ -5,9 +5,12 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.application.port.StudyInfoQueryPort;
 import com.wanted.backend.domain.chat.application.port.StudyInfoResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.result.MyChatRoomDetail;
 import com.wanted.backend.domain.chat.application.result.ParticipantDetail;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
+import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
+import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -18,8 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -30,17 +35,20 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomParticipantRepository chatRoomParticipantRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final MemberNamePort memberNamePort;
     private final ChatPresencePort chatPresencePort;
     private final StudyInfoQueryPort studyInfoQueryPort;
 
     public ChatRoomQueryService(ChatRoomRepository chatRoomRepository,
                                 ChatRoomParticipantRepository chatRoomParticipantRepository,
+                                ChatMessageRepository chatMessageRepository,
                                 MemberNamePort memberNamePort,
                                 ChatPresencePort chatPresencePort,
                                 StudyInfoQueryPort studyInfoQueryPort) {
         this.chatRoomRepository = chatRoomRepository;
         this.chatRoomParticipantRepository = chatRoomParticipantRepository;
+        this.chatMessageRepository = chatMessageRepository;
         this.memberNamePort = memberNamePort;
         this.chatPresencePort = chatPresencePort;
         this.studyInfoQueryPort = studyInfoQueryPort;
@@ -69,6 +77,53 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
         return new ChatRoomDetailResult(
                 chatRoom.getId(), chatRoom.getStudyId(), studyInfo.title(), studyInfo.subject(),
                 chatRoom.getHostId(), chatRoom.getStatus().name(), participants, participants.size());
+    }
+
+    @Override
+    public List<MyChatRoomDetail> getMyRooms(Long memberId) {
+        List<Long> chatRoomIds = chatRoomParticipantRepository.findChatRoomIdsByMemberId(memberId);
+        if (chatRoomIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<ChatRoom> chatRooms = chatRoomRepository.findAllByIdIn(chatRoomIds);
+
+        return chatRooms.stream()
+                .map(this::toMyChatRoomDetail)
+                .sorted(Comparator.comparing(MyChatRoomDetail::lastMessageAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private MyChatRoomDetail toMyChatRoomDetail(ChatRoom chatRoom) {
+        String name = resolveStudyTitle(chatRoom.getStudyId());
+        Optional<ChatMessage> latest = resolveLatestMessage(chatRoom.getId());
+
+        return new MyChatRoomDetail(
+                chatRoom.getId(), name,
+                latest.map(ChatMessage::getContent).orElse(null),
+                latest.map(ChatMessage::getSentAt).orElse(null),
+                0);
+    }
+
+    private String resolveStudyTitle(Long studyId) {
+        try {
+            return studyInfoQueryPort.getStudyInfo(studyId)
+                    .map(StudyInfoResult::title)
+                    .orElse("알 수 없음");
+        } catch (Exception e) {
+            log.warn("StudyInfoQueryPort 호출 실패, 알 수 없음으로 fallback. studyId={}", studyId, e);
+            return "알 수 없음";
+        }
+    }
+
+    private Optional<ChatMessage> resolveLatestMessage(Long chatRoomId) {
+        try {
+            return chatMessageRepository.findLatestByChatRoomId(chatRoomId);
+        } catch (Exception e) {
+            log.warn("ChatMessageRepository 호출 실패, 마지막 메시지 없음으로 fallback. chatRoomId={}", chatRoomId, e);
+            return Optional.empty();
+        }
     }
 
     private Map<Long, String> resolveNameMap(Collection<Long> memberIds) {

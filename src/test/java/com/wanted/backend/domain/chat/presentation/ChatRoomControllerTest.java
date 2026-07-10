@@ -1,7 +1,11 @@
 package com.wanted.backend.domain.chat.presentation;
 
+import com.wanted.backend.domain.chat.application.result.ChatMessageDetail;
+import com.wanted.backend.domain.chat.application.result.ChatMessageListResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.result.MyChatRoomDetail;
 import com.wanted.backend.domain.chat.application.result.ParticipantDetail;
+import com.wanted.backend.domain.chat.application.usecase.ChatMessageQueryUseCase;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
@@ -18,9 +22,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +45,9 @@ class ChatRoomControllerTest {
     @MockitoBean
     private ChatRoomQueryUseCase chatRoomQueryUseCase;
 
+    @MockitoBean
+    private ChatMessageQueryUseCase chatMessageQueryUseCase;
+
     @BeforeEach
     void setUpAuthentication() {
         CustomUserDetails userDetails = new CustomUserDetails(1L, "tester", "password", false, true, "USER", List.of());
@@ -47,6 +58,33 @@ class ChatRoomControllerTest {
     @AfterEach
     void tearDownAuthentication() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("내 채팅방 목록을 조회하면 200과 함께 목록을 반환한다")
+    void getMyRooms_success() throws Exception {
+        List<MyChatRoomDetail> result = List.of(
+                new MyChatRoomDetail(88L, "주말 React 스터디", "그럼 일요일 저녁 8시로 정해요!",
+                        LocalDateTime.of(2026, 5, 11, 12, 5, 0), 0));
+        given(chatRoomQueryUseCase.getMyRooms(1L)).willReturn(result);
+
+        mockMvc.perform(get("/api/chat/rooms/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].chatRoomId").value(88))
+                .andExpect(jsonPath("$.data[0].name").value("주말 React 스터디"))
+                .andExpect(jsonPath("$.data[0].lastMessage").value("그럼 일요일 저녁 8시로 정해요!"))
+                .andExpect(jsonPath("$.data[0].unreadCount").value(0));
+    }
+
+    @Test
+    @DisplayName("참여 중인 채팅방이 없으면 빈 배열을 반환한다")
+    void getMyRooms_success_empty() throws Exception {
+        given(chatRoomQueryUseCase.getMyRooms(1L)).willReturn(List.of());
+
+        mockMvc.perform(get("/api/chat/rooms/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test
@@ -92,6 +130,64 @@ class ChatRoomControllerTest {
                 .given(chatRoomQueryUseCase).getRoom(eq(12L), eq(1L));
 
         mockMvc.perform(get("/api/chat/rooms/12"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.CHAT_FORBIDDEN.getCode()));
+    }
+
+    @Test
+    @DisplayName("참여자가 조회하면 200과 함께 메시지 목록을 반환한다")
+    void getMessages_success() throws Exception {
+        ChatMessageListResult result = new ChatMessageListResult(
+                List.of(
+                        new ChatMessageDetail("SYSTEM_JOIN", 300L, null, null, "김*민님이 입장했습니다",
+                                LocalDateTime.of(2026, 7, 7, 20, 59, 0)),
+                        new ChatMessageDetail("CHAT", 301L, 2L, "김*민", "안녕하세요!",
+                                LocalDateTime.of(2026, 7, 7, 21, 0, 0))),
+                true, 300L);
+        given(chatMessageQueryUseCase.getMessages(eq(12L), isNull(), eq(20), eq(1L))).willReturn(result);
+
+        mockMvc.perform(get("/api/chat/rooms/12/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messages[0].type").value("SYSTEM_JOIN"))
+                .andExpect(jsonPath("$.data.messages[0].messageId").value(300))
+                .andExpect(jsonPath("$.data.messages[0].senderId").doesNotExist())
+                .andExpect(jsonPath("$.data.messages[1].type").value("CHAT"))
+                .andExpect(jsonPath("$.data.messages[1].senderId").value(2))
+                .andExpect(jsonPath("$.data.messages[1].senderName").value("김*민"))
+                .andExpect(jsonPath("$.data.messages[1].content").value("안녕하세요!"))
+                .andExpect(jsonPath("$.data.hasNext").value(true))
+                .andExpect(jsonPath("$.data.nextCursorId").value(300));
+    }
+
+    @Test
+    @DisplayName("cursorId와 size 쿼리 파라미터가 use case에 그대로 전달된다")
+    void getMessages_success_withCursorAndSize() throws Exception {
+        given(chatMessageQueryUseCase.getMessages(eq(12L), eq(300L), eq(10), eq(1L)))
+                .willReturn(new ChatMessageListResult(List.of(), false, null));
+
+        mockMvc.perform(get("/api/chat/rooms/12/messages").param("cursorId", "300").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 채팅방의 메시지를 조회하면 404를 반환한다")
+    void getMessages_fail_notFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                .given(chatMessageQueryUseCase).getMessages(eq(999L), any(), anyInt(), eq(1L));
+
+        mockMvc.perform(get("/api/chat/rooms/999/messages"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.CHAT_ROOM_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("참여자가 아닌 회원이 메시지를 조회하면 403을 반환한다")
+    void getMessages_fail_forbidden() throws Exception {
+        willThrow(new BusinessException(ErrorCode.CHAT_FORBIDDEN))
+                .given(chatMessageQueryUseCase).getMessages(eq(12L), any(), anyInt(), eq(1L));
+
+        mockMvc.perform(get("/api/chat/rooms/12/messages"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(ErrorCode.CHAT_FORBIDDEN.getCode()));
     }

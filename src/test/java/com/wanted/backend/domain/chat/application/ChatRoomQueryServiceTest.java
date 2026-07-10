@@ -5,9 +5,13 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.application.port.StudyInfoQueryPort;
 import com.wanted.backend.domain.chat.application.port.StudyInfoResult;
 import com.wanted.backend.domain.chat.application.result.ChatRoomDetailResult;
+import com.wanted.backend.domain.chat.application.result.MyChatRoomDetail;
 import com.wanted.backend.domain.chat.application.service.ChatRoomQueryService;
+import com.wanted.backend.domain.chat.domain.model.ChatMessage;
+import com.wanted.backend.domain.chat.domain.model.ChatMessageType;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.model.ChatRoomStatus;
+import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
 import com.wanted.backend.global.exception.BusinessException;
@@ -41,6 +45,9 @@ class ChatRoomQueryServiceTest {
 
     @Mock
     private ChatRoomParticipantRepository chatRoomParticipantRepository;
+
+    @Mock
+    private ChatMessageRepository chatMessageRepository;
 
     @Mock
     private MemberNamePort memberNamePort;
@@ -158,5 +165,133 @@ class ChatRoomQueryServiceTest {
         // then
         assertThat(result.participants()).extracting("online")
                 .containsExactly(false, false);
+    }
+
+    @Test
+    @DisplayName("참여 중인 채팅방이 없으면 빈 목록을 반환한다")
+    void getMyRooms_success_empty() {
+        // given
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of());
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("마지막 메시지 전송 시각 최신순으로 정렬되어 반환된다")
+    void getMyRooms_success_sortedByLastMessageAt() {
+        // given
+        ChatRoom room1 = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        ChatRoom room2 = ChatRoom.restore(13L, 46L, 2L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L, 13L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L, 13L))).willReturn(List.of(room1, room2));
+
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(studyInfoQueryPort.getStudyInfo(46L)).willReturn(Optional.of(new StudyInfoResult("영어 스터디", "ENG_1")));
+
+        ChatMessage olderMessage = ChatMessage.restore(1L, 12L, 1L, ChatMessageType.CHAT,
+                "오래된 메시지", LocalDateTime.of(2026, 5, 10, 12, 0));
+        ChatMessage newerMessage = ChatMessage.restore(2L, 13L, 2L, ChatMessageType.CHAT,
+                "최근 메시지", LocalDateTime.of(2026, 5, 11, 12, 5));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.of(olderMessage));
+        given(chatMessageRepository.findLatestByChatRoomId(13L)).willReturn(Optional.of(newerMessage));
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).chatRoomId()).isEqualTo(13L);
+        assertThat(result.get(0).name()).isEqualTo("영어 스터디");
+        assertThat(result.get(0).lastMessage()).isEqualTo("최근 메시지");
+        assertThat(result.get(0).unreadCount()).isEqualTo(0);
+        assertThat(result.get(1).chatRoomId()).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("메시지가 없는 채팅방은 목록 뒤로 밀린다")
+    void getMyRooms_success_noMessageRoomsLast() {
+        // given
+        ChatRoom roomWithMessage = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        ChatRoom roomWithoutMessage = ChatRoom.restore(13L, 46L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L, 13L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L, 13L))).willReturn(List.of(roomWithoutMessage, roomWithMessage));
+
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(studyInfoQueryPort.getStudyInfo(46L)).willReturn(Optional.of(new StudyInfoResult("영어 스터디", "ENG_1")));
+
+        ChatMessage message = ChatMessage.restore(1L, 12L, 1L, ChatMessageType.CHAT,
+                "메시지", LocalDateTime.now());
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.of(message));
+        given(chatMessageRepository.findLatestByChatRoomId(13L)).willReturn(Optional.empty());
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).chatRoomId()).isEqualTo(12L);
+        assertThat(result.get(1).chatRoomId()).isEqualTo(13L);
+        assertThat(result.get(1).lastMessage()).isNull();
+        assertThat(result.get(1).lastMessageAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("연결된 스터디 정보를 찾을 수 없으면 이름을 알 수 없음으로 대체한다")
+    void getMyRooms_success_studyInfoMissing() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.empty());
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("알 수 없음");
+    }
+
+    @Test
+    @DisplayName("studyInfoQueryPort가 예외를 던져도 해당 방만 알 수 없음으로 대체되고 나머지 목록은 정상 반환된다")
+    void getMyRooms_success_studyInfoPortThrows() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willThrow(new RuntimeException("db down"));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("알 수 없음");
+    }
+
+    @Test
+    @DisplayName("chatMessageRepository가 예외를 던져도 마지막 메시지 없음으로 대체되고 목록은 정상 반환된다")
+    void getMyRooms_success_chatMessageRepositoryThrows() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willThrow(new RuntimeException("db down"));
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("수학 스터디");
+        assertThat(result.get(0).lastMessage()).isNull();
+        assertThat(result.get(0).lastMessageAt()).isNull();
     }
 }
