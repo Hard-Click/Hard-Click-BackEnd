@@ -3,16 +3,21 @@ package com.wanted.backend.domain.quiz.presentation;
 import com.wanted.backend.domain.quiz.application.command.CreateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.AdminQuizCourse;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
+import com.wanted.backend.domain.quiz.application.usecase.AdminQuizCourseQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.response.AdminQuizCourseListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizMutationResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatisticsResponse;
 import com.wanted.backend.global.common.ApiResponse;
+
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,13 +36,15 @@ class AdminQuizControllerTest {
 
     private QuizQueryUseCase quizQueryUseCase;
     private QuizCommandUseCase quizCommandUseCase;
+    private AdminQuizCourseQueryUseCase adminQuizCourseQueryUseCase;
     private AdminQuizController controller;
 
     @BeforeEach
     void setUp() {
         quizQueryUseCase = mock(QuizQueryUseCase.class);
         quizCommandUseCase = mock(QuizCommandUseCase.class);
-        controller = new AdminQuizController(quizQueryUseCase, quizCommandUseCase);
+        adminQuizCourseQueryUseCase = mock(AdminQuizCourseQueryUseCase.class);
+        controller = new AdminQuizController(quizQueryUseCase, quizCommandUseCase, adminQuizCourseQueryUseCase);
     }
 
     @Test
@@ -159,5 +166,55 @@ class AdminQuizControllerTest {
         verify(quizQueryUseCase).getStatisticsByAdmin(captor.capture());
         assertThat(captor.getValue().instructorId()).isNull();
         assertThat(captor.getValue().quizId()).isEqualTo(90L);
+    }
+
+    @Test
+    void getQuizCoursesMapsTheResultAndPassesFilters() {
+        when(adminQuizCourseQueryUseCase.getCourses("수학1", 5L, null, "React")).thenReturn(List.of(
+                new AdminQuizCourse(1L, "React 완벽 가이드", true, 89, "안현",
+                        Instant.parse("2026-05-10T00:00:00Z"))));
+
+        ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> result =
+                controller.getQuizCourses("수학1", 5L, null, "React");
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        AdminQuizCourseListResponse response = result.getBody().data();
+        assertThat(response.courses()).hasSize(1);
+        AdminQuizCourseListResponse.AdminQuizCourseItem item = response.courses().get(0);
+        assertThat(item.courseId()).isEqualTo(1L);
+        assertThat(item.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(item.visible()).isTrue();
+        assertThat(item.studentCount()).isEqualTo(89);
+        assertThat(item.instructorName()).isEqualTo("안현");
+        assertThat(item.registeredAt()).isNotNull();
+        verify(adminQuizCourseQueryUseCase).getCourses("수학1", 5L, null, "React");
+    }
+
+    @Test
+    void getQuizCoursesReturnsEmptyListWhenNoMatch() {
+        when(adminQuizCourseQueryUseCase.getCourses(null, null, null, null)).thenReturn(List.of());
+
+        ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> result =
+                controller.getQuizCourses(null, null, null, null);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        assertThat(result.getBody().data().courses()).isEmpty();
+        verify(adminQuizCourseQueryUseCase).getCourses(null, null, null, null);
+    }
+
+    @Test
+    void getQuizCoursesMapsMultipleItemsIncludingFallbacks() {
+        when(adminQuizCourseQueryUseCase.getCourses(null, null, null, null)).thenReturn(List.of(
+                new AdminQuizCourse(1L, "React 기초", true, 10, "김강사", Instant.parse("2026-05-10T00:00:00Z")),
+                new AdminQuizCourse(2L, "Vue 기초", false, 0, "알 수 없음", Instant.parse("2026-05-11T00:00:00Z"))));
+
+        ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> result =
+                controller.getQuizCourses(null, null, null, null);
+
+        assertThat(result.getBody().data().courses()).hasSize(2);
+        AdminQuizCourseListResponse.AdminQuizCourseItem second = result.getBody().data().courses().get(1);
+        assertThat(second.visible()).isFalse();
+        assertThat(second.studentCount()).isZero();
+        assertThat(second.instructorName()).isEqualTo("알 수 없음");
     }
 }

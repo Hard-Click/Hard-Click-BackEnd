@@ -3,11 +3,14 @@ package com.wanted.backend.domain.quiz.presentation;
 import com.wanted.backend.domain.quiz.application.command.CreateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.AdminQuizCourse;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
+import com.wanted.backend.domain.quiz.application.usecase.AdminQuizCourseQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.response.AdminQuizCourseListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizMutationResponse;
@@ -44,6 +47,7 @@ public class AdminQuizController {
 
     private final QuizQueryUseCase quizQueryUseCase;
     private final QuizCommandUseCase quizCommandUseCase;
+    private final AdminQuizCourseQueryUseCase adminQuizCourseQueryUseCase;
 
     @GetMapping("/{quizId}")
     @Operation(summary = "퀴즈 상세 조회", description = "수정 모달에서 기존 문항/정답/해설을 로드하기 위한 퀴즈 상세를 조회합니다. ADMIN 권한 필요.")
@@ -83,22 +87,25 @@ public class AdminQuizController {
     }
 
     @GetMapping("/courses")
-    @Operation(summary = "퀴즈 관리 강의 목록 조회", description = "과목/강사/강의/검색어로 필터링하여 퀴즈를 관리할 강의 목록을 조회합니다. ADMIN 권한 필요. (Mock)")
+    @Operation(summary = "퀴즈 관리 강의 목록 조회", description = "과목/강사/강의/검색어로 필터링하여 퀴즈를 관리할 강의 목록을 조회합니다. ADMIN 권한 필요.")
     public ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> getQuizCourses(
             @Parameter(description = "과목명", example = "수학1") @RequestParam(required = false) String subject,
             @Parameter(description = "강사 ID", example = "1") @RequestParam(required = false) Long instructorId,
             @Parameter(description = "강의 ID", example = "1") @RequestParam(required = false) Long courseId,
             @Parameter(description = "강의 검색어", example = "React") @RequestParam(required = false) String keyword
     ) {
+        List<AdminQuizCourse> courses = adminQuizCourseQueryUseCase.getCourses(subject, instructorId, courseId, keyword);
+
         AdminQuizCourseListResponse response = new AdminQuizCourseListResponse(
-                List.of(
-                        new AdminQuizCourseListResponse.AdminQuizCourseItem(
-                                1L, "React 완벽 가이드", true, 89, "안현", OffsetDateTime.parse("2026-05-10T00:00:00+09:00")
-                        ),
-                        new AdminQuizCourseListResponse.AdminQuizCourseItem(
-                                2L, "수1 정복하기", false, 124, "김종호", OffsetDateTime.parse("2026-04-22T00:00:00+09:00")
-                        )
-                )
+                courses.stream()
+                        .map(c -> new AdminQuizCourseListResponse.AdminQuizCourseItem(
+                                c.courseId(),
+                                c.courseTitle(),
+                                c.visible(),
+                                c.studentCount(),
+                                c.instructorName(),
+                                c.registeredAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
+                        .toList()
         );
 
         return ApiResponse.success("관리자 퀴즈 관리 강의 목록을 조회했습니다.", response);
@@ -227,20 +234,6 @@ public class AdminQuizController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
-    }
-
-    @Schema(description = "퀴즈 관리 강의 목록")
-    public record AdminQuizCourseListResponse(List<AdminQuizCourseItem> courses) {
-        @Schema(description = "퀴즈 관리 강의 항목")
-        public record AdminQuizCourseItem(
-                @Schema(description = "강의 ID", example = "1") Long courseId,
-                @Schema(description = "강의명", example = "React 완벽 가이드") String courseTitle,
-                @Schema(description = "공개 여부", example = "true") boolean visible,
-                @Schema(description = "수강생 수", example = "89") int studentCount,
-                @Schema(description = "강사명", example = "안현") String instructorName,
-                @Schema(description = "강의 등록일시") OffsetDateTime registeredAt
-        ) {
-        }
     }
 
     @Schema(description = "강의별 주차 퀴즈 목록")
