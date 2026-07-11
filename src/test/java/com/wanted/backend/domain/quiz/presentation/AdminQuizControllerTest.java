@@ -42,7 +42,7 @@ class AdminQuizControllerTest {
 
     @Test
     void getQuizMapsTheDetailFromUseCaseIncludingCorrectOptionAndExplanation() {
-        when(quizQueryUseCase.getQuizDetail(90L)).thenReturn(new InstructorQuizDetail(
+        when(quizQueryUseCase.getDetailByAdmin(90L)).thenReturn(new InstructorQuizDetail(
                 90L, "React 기초 개념 퀴즈", 10L, "React 완벽 가이드", 100L, "섹션 1: React 기초", 1,
                 LocalDateTime.of(2026, 5, 10, 15, 30),
                 List.of(new InstructorQuizDetail.QuestionDetail(
@@ -65,7 +65,7 @@ class AdminQuizControllerTest {
         assertThat(question.explanation()).isEqualTo("가상 DOM 설명");
         assertThat(question.options()).hasSize(2);
         assertThat(question.options().get(1).correct()).isTrue();
-        verify(quizQueryUseCase).getQuizDetail(90L);
+        verify(quizQueryUseCase).getDetailByAdmin(90L);
     }
 
     @Test
@@ -76,7 +76,7 @@ class AdminQuizControllerTest {
         InstructorQuizDeleteResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.status()).isEqualTo("DELETED");
-        verify(quizCommandUseCase).deleteQuiz(90L);
+        verify(quizCommandUseCase).deleteByAdmin(90L);
     }
 
     @Test
@@ -137,7 +137,7 @@ class AdminQuizControllerTest {
 
     @Test
     void getQuizStatisticsMapsResultAndBuildsQueryWithoutInstructor() {
-        when(quizQueryUseCase.getQuizStatistics(any(QuizStatisticsQuery.class))).thenReturn(
+        when(quizQueryUseCase.getStatisticsByAdmin(any(QuizStatisticsQuery.class))).thenReturn(
                 new InstructorQuizStatistics("React 완벽 가이드", "1주차", 1, "React 기초 개념 퀴즈",
                         new InstructorQuizStatistics.Summary(3, 2, 1, 75),
                         List.of(new InstructorQuizStatistics.ScoreDistribution("90~100", 1, 50)),
@@ -156,7 +156,7 @@ class AdminQuizControllerTest {
 
         // 관리자 조회는 소유권 무관 → instructorId=null 로 쿼리를 만든다
         ArgumentCaptor<QuizStatisticsQuery> captor = ArgumentCaptor.forClass(QuizStatisticsQuery.class);
-        verify(quizQueryUseCase).getQuizStatistics(captor.capture());
+        verify(quizQueryUseCase).getStatisticsByAdmin(captor.capture());
         assertThat(captor.getValue().instructorId()).isNull();
         assertThat(captor.getValue().quizId()).isEqualTo(90L);
     }

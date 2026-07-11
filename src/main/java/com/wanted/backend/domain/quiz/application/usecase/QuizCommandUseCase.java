@@ -23,7 +23,7 @@ public interface QuizCommandUseCase {
     void delete(DeleteQuizCommand command);
 
     // 관리자(ADMIN)용 — 소유권 검증 없이 삭제 (인가는 컨트롤러 @PreAuthorize가 보장).
-    void deleteQuiz(Long quizId);
+    void deleteByAdmin(Long quizId);
 
     // 섹션 삭제 cascade: 강의 수정으로 삭제된 섹션들의 퀴즈를 정리한다(SectionDeletedEvent 처리).
     void deleteBySectionIds(List<Long> sectionIds);

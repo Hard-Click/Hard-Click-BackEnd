@@ -1,7 +1,6 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateAdminQuizCommand;
-import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
@@ -52,7 +51,7 @@ public class AdminQuizController {
             @Parameter(description = "퀴즈 ID", example = "90") @PathVariable Long quizId
     ) {
         // 관리자는 소유권 검증 없이 조회 (인가는 @PreAuthorize("hasRole('ADMIN')")가 보장).
-        InstructorQuizDetail detail = quizQueryUseCase.getQuizDetail(quizId);
+        InstructorQuizDetail detail = quizQueryUseCase.getDetailByAdmin(quizId);
 
         InstructorQuizDetailResponse response = new InstructorQuizDetailResponse(
                 detail.quizId(),
@@ -135,7 +134,7 @@ public class AdminQuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         ));
 
         InstructorQuizMutationResponse response = new InstructorQuizMutationResponse(
@@ -148,15 +147,6 @@ public class AdminQuizController {
         return ApiResponse.created("퀴즈가 등록되었습니다.", response);
     }
 
-    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
-        return questions.stream()
-                .map(q -> new QuizQuestionCommand(
-                        q.questionText(),
-                        q.explanation(),
-                        q.correctOptionNumber(),
-                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()))
-                .toList();
-    }
 
     @PutMapping("/{quizId}")
     @Operation(summary = "퀴즈 수정", description = "등록된 퀴즈의 제목/문항을 수정합니다. ADMIN 권한 필요.")
@@ -170,7 +160,7 @@ public class AdminQuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         ));
 
         InstructorQuizMutationResponse response = new InstructorQuizMutationResponse(
@@ -189,7 +179,7 @@ public class AdminQuizController {
             @Parameter(description = "퀴즈 ID", example = "90") @PathVariable Long quizId
     ) {
         // 관리자는 소유권 검증 없이 삭제 (인가는 @PreAuthorize("hasRole('ADMIN')")가 보장).
-        quizCommandUseCase.deleteQuiz(quizId);
+        quizCommandUseCase.deleteByAdmin(quizId);
 
         InstructorQuizDeleteResponse response = new InstructorQuizDeleteResponse(
                 quizId, "DELETED", OffsetDateTime.now());
@@ -209,7 +199,7 @@ public class AdminQuizController {
     ) {
         // 관리자는 소유권 검증 없이 조회 (instructorId=null). 인가는 @PreAuthorize("hasRole('ADMIN')")가 보장.
         QuizStatisticsQuery query = QuizStatisticsQuery.of(null, quizId, keyword, sort, filter, page, size);
-        InstructorQuizStatistics statistics = quizQueryUseCase.getQuizStatistics(query);
+        InstructorQuizStatistics statistics = quizQueryUseCase.getStatisticsByAdmin(query);
 
         InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 statistics.courseTitle(),

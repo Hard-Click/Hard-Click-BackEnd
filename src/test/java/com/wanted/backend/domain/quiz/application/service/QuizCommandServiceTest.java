@@ -288,8 +288,9 @@ class QuizCommandServiceTest {
     }
 
     @Test
-    void updateByAdminUpdatesWithoutOwnershipCheck() {
-        // 다른 강사(INSTRUCTOR_ID) 소유 퀴즈 + 강의 주인이 555L여도, 관리자는 소유권 검증 없이 수정한다.
+    void updateByAdminUpdatesWithoutOwnershipCheckAndReattributesToCourseOwner() {
+        // 기존 퀴즈는 INSTRUCTOR_ID(1L) 소유. 대상 강의 주인이 555L이면, 관리자 수정은 소유권 검증 없이
+        // 진행하되 퀴즈 소유자를 대상 강의 주인(555L)으로 재귀속한다.
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(existingQuiz()));
         when(courseOwnershipPort.findOwnership(COURSE_ID, SECTION_ID))
                 .thenReturn(Optional.of(new CourseOwnershipPort.CourseSectionOwnership(555L, true)));
@@ -301,6 +302,7 @@ class QuizCommandServiceTest {
         assertThat(quizId).isEqualTo(QUIZ_ID);
         ArgumentCaptor<Quiz> captor = ArgumentCaptor.forClass(Quiz.class);
         verify(quizRepository).update(captor.capture());
+        assertThat(captor.getValue().getInstructorId()).isEqualTo(555L); // 대상 강의 주인으로 재귀속
         assertThat(captor.getValue().getTitle()).isEqualTo("수정된 제목");
         assertThat(captor.getValue().getQuestions()).hasSize(2);
     }
@@ -334,7 +336,7 @@ class QuizCommandServiceTest {
         // 관리자(ADMIN) core — 다른 강사 소유 퀴즈여도 소유권을 따지지 않고 삭제한다.
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(existingQuiz()));
 
-        service.deleteQuiz(QUIZ_ID);
+        service.deleteByAdmin(QUIZ_ID);
 
         verify(quizRepository).deleteById(QUIZ_ID);
     }
@@ -343,7 +345,7 @@ class QuizCommandServiceTest {
     void deleteQuizRejectsWhenTheQuizDoesNotExist() {
         when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.deleteQuiz(QUIZ_ID))
+        assertThatThrownBy(() -> service.deleteByAdmin(QUIZ_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
         verify(quizRepository, never()).deleteById(any());

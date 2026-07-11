@@ -2,7 +2,6 @@ package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
-import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
@@ -268,7 +267,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         Long quizId = quizCommandUseCase.create(command);
@@ -296,7 +295,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         quizCommandUseCase.update(command);
@@ -370,17 +369,6 @@ public class QuizController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
-    }
-
-    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
-        return questions.stream()
-                .map(q -> new QuizQuestionCommand(
-                        q.questionText(),
-                        q.explanation(),
-                        q.correctOptionNumber(),
-                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
-                ))
-                .toList();
     }
 
 }

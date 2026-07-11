@@ -87,7 +87,7 @@ public class QuizQueryService implements QuizQueryUseCase {
 
     // 관리자(ADMIN)용 — 소유권 검증 없이 상세 조회. 인가는 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")가 보장한다.
     @Override
-    public InstructorQuizDetail getQuizDetail(Long quizId) {
+    public InstructorQuizDetail getDetailByAdmin(Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 
@@ -320,7 +320,7 @@ public class QuizQueryService implements QuizQueryUseCase {
 
     // 관리자(ADMIN)용 — 소유권 검증 없이 통계 조회. 인가는 컨트롤러 @PreAuthorize("hasRole('ADMIN')")가 보장한다.
     @Override
-    public InstructorQuizStatistics getQuizStatistics(QuizStatisticsQuery query) {
+    public InstructorQuizStatistics getStatisticsByAdmin(QuizStatisticsQuery query) {
         Quiz quiz = quizRepository.findById(query.quizId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 

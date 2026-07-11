@@ -212,7 +212,7 @@ class QuizQueryServiceTest {
         when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
                 .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초"));
 
-        InstructorQuizDetail detail = service.getQuizDetail(90L);
+        InstructorQuizDetail detail = service.getDetailByAdmin(90L);
 
         assertThat(detail.quizId()).isEqualTo(90L);
         assertThat(detail.courseTitle()).isEqualTo("React 완벽 가이드");
@@ -224,7 +224,7 @@ class QuizQueryServiceTest {
     void getQuizDetailRejectsWhenTheQuizDoesNotExist() {
         when(quizRepository.findById(90L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getQuizDetail(90L))
+        assertThatThrownBy(() -> service.getDetailByAdmin(90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
     }
@@ -603,7 +603,7 @@ class QuizQueryServiceTest {
         stubStatsCommon(); // 퀴즈는 INSTRUCTOR_ID(1L) 소유
 
         // 관리자(ADMIN) core — instructorId=null(소유권 무시)로도 통계가 반환된다
-        InstructorQuizStatistics stats = service.getQuizStatistics(
+        InstructorQuizStatistics stats = service.getStatisticsByAdmin(
                 new QuizStatisticsQuery(null, 90L, null,
                         QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10));
 
@@ -617,7 +617,7 @@ class QuizQueryServiceTest {
     void getQuizStatisticsRejectsWhenTheQuizDoesNotExist() {
         when(quizRepository.findById(90L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getQuizStatistics(
+        assertThatThrownBy(() -> service.getStatisticsByAdmin(
                 new QuizStatisticsQuery(null, 90L, null,
                         QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10)))
                 .isInstanceOf(BusinessException.class)

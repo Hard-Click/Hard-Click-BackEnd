@@ -31,7 +31,8 @@ public class QuizCommandService implements QuizCommandUseCase {
     @Override
     public Long create(CreateQuizCommand command) {
         CourseOwnershipPort.CourseSectionOwnership ownership = requireSection(command.courseId(), command.sectionId());
-        if (!ownership.instructorId().equals(command.instructorId())) {
+        // 인증에서 온 instructorId는 non-null 보장 → equals 좌변에 두어 null-safe 비교
+        if (!command.instructorId().equals(ownership.instructorId())) {
             throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
         }
 
@@ -58,12 +59,14 @@ public class QuizCommandService implements QuizCommandUseCase {
     public Long update(UpdateQuizCommand command) {
         Quiz quiz = loadQuiz(command.quizId());
 
-        if (!quiz.getInstructorId().equals(command.instructorId())) {
+        // 인증에서 온 instructorId는 non-null 보장 → equals 좌변에 두어 null-safe 비교
+        if (!command.instructorId().equals(quiz.getInstructorId())) {
             throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
         }
         validateCourseOwnership(command.courseId(), command.sectionId(), command.instructorId());
 
-        return applyUpdate(quiz, command.courseId(), command.sectionId(),
+        // 강사는 자기 소유 강의로만 이동 가능하므로 소유자(instructorId)는 그대로 유지된다.
+        return applyUpdate(quiz, command.instructorId(), command.courseId(), command.sectionId(),
                 command.quizTitle(), command.questions());
     }
 
@@ -71,9 +74,11 @@ public class QuizCommandService implements QuizCommandUseCase {
     @Override
     public Long updateByAdmin(UpdateAdminQuizCommand command) {
         Quiz quiz = loadQuiz(command.quizId());
-        requireSection(command.courseId(), command.sectionId());
+        CourseOwnershipPort.CourseSectionOwnership ownership =
+                requireSection(command.courseId(), command.sectionId());
 
-        return applyUpdate(quiz, command.courseId(), command.sectionId(),
+        // 다른 강의로 이동 시 퀴즈 소유자를 대상 강의의 주인으로 재귀속해 정합성을 유지한다.
+        return applyUpdate(quiz, ownership.instructorId(), command.courseId(), command.sectionId(),
                 command.quizTitle(), command.questions());
     }
 
@@ -82,9 +87,9 @@ public class QuizCommandService implements QuizCommandUseCase {
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
     }
 
-    private Long applyUpdate(Quiz quiz, Long courseId, Long sectionId,
+    private Long applyUpdate(Quiz quiz, Long instructorId, Long courseId, Long sectionId,
                             String quizTitle, List<QuizQuestionCommand> questions) {
-        quiz.update(courseId, sectionId, quizTitle, toQuestions(questions));
+        quiz.update(instructorId, courseId, sectionId, quizTitle, toQuestions(questions));
         return quizRepository.update(quiz).getId();
     }
 
@@ -93,7 +98,8 @@ public class QuizCommandService implements QuizCommandUseCase {
         Quiz quiz = quizRepository.findById(command.quizId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 
-        if (!quiz.getInstructorId().equals(command.instructorId())) {
+        // 인증에서 온 instructorId는 non-null 보장 → equals 좌변에 두어 null-safe 비교
+        if (!command.instructorId().equals(quiz.getInstructorId())) {
             throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
         }
 
@@ -102,7 +108,7 @@ public class QuizCommandService implements QuizCommandUseCase {
 
     // 관리자(ADMIN)용 — 소유권 검증 없이 삭제. 인가는 컨트롤러 @PreAuthorize("hasRole('ADMIN')")가 보장한다.
     @Override
-    public void deleteQuiz(Long quizId) {
+    public void deleteByAdmin(Long quizId) {
         if (quizRepository.findById(quizId).isEmpty()) {
             throw new BusinessException(ErrorCode.QUIZ_NOT_FOUND);
         }
@@ -119,7 +125,8 @@ public class QuizCommandService implements QuizCommandUseCase {
 
     private void validateCourseOwnership(Long courseId, Long sectionId, Long instructorId) {
         CourseOwnershipPort.CourseSectionOwnership ownership = requireSection(courseId, sectionId);
-        if (!ownership.instructorId().equals(instructorId)) {
+        // 인증에서 온 instructorId는 non-null 보장 → equals 좌변에 두어 null-safe 비교
+        if (!instructorId.equals(ownership.instructorId())) {
             throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
         }
     }
