@@ -168,6 +168,7 @@ public class QuizController {
                 report.correctCount(),
                 report.incorrectCount(),
                 report.scoreDiff(),
+                report.previousScore(),
                 report.wrongNotes().stream().map(QuizController::toQuestionResultResponse).toList(),
                 report.questions().stream().map(QuizController::toQuestionResultResponse).toList()
         );
@@ -207,6 +208,8 @@ public class QuizController {
                                 summary.quizId(),
                                 summary.quizTitle(),
                                 summary.courseTitle(),
+                                summary.sectionId(),
+                                summary.weekNumber(),
                                 summary.sectionTitle(),
                                 summary.questionCount(),
                                 summary.createdAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
@@ -351,6 +354,7 @@ public class QuizController {
         InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 statistics.courseTitle(),
                 statistics.sectionTitle(),
+                statistics.week(),
                 statistics.quizTitle(),
                 new InstructorQuizStatisticsResponse.Summary(
                         statistics.summary().totalCount(),
@@ -497,6 +501,7 @@ public class QuizController {
             int correctCount,
             int incorrectCount,
             int scoreDiff,
+            Integer previousScore,
             List<QuestionResult> wrongNotes,
             List<QuestionResult> questions
     ) {
@@ -525,6 +530,8 @@ public class QuizController {
                 Long quizId,
                 String quizTitle,
                 String courseTitle,
+                Long sectionId,
+                int weekNumber,
                 String sectionTitle,
                 int questionCount,
                 OffsetDateTime createdAt
@@ -595,6 +602,7 @@ public class QuizController {
     public record InstructorQuizStatisticsResponse(
             String courseTitle,
             String sectionTitle,
+            int week,
             String quizTitle,
             Summary summary,
             List<ScoreDistribution> scoreDistribution,
