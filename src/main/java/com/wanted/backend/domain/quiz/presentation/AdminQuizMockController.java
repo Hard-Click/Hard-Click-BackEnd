@@ -115,6 +115,7 @@ public class AdminQuizMockController {
         QuizController.InstructorQuizStatisticsResponse response = new QuizController.InstructorQuizStatisticsResponse(
                 "React 완벽 가이드",
                 "1주차: React 기초 개념",
+                1,
                 "React 기초 개념 퀴즈",
                 new QuizController.InstructorQuizStatisticsResponse.Summary(6, 5, 1, 80),
                 List.of(

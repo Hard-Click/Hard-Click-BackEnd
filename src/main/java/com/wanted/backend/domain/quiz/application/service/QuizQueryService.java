@@ -53,7 +53,8 @@ public class QuizQueryService implements QuizQueryUseCase {
         Map<Long, String> courseTitles = courseTitlePort.findTitlesByCourseIds(
                 quizzes.stream().map(Quiz::getCourseId).distinct().toList());
 
-        Map<Long, String> sectionTitles = courseSectionTitlePort.findTitlesBySectionIds(
+        // 섹션명 + 주차(orderIndex)를 함께 조회 — FE가 sectionTitle 파싱 없이 weekNumber를 바로 쓰도록
+        Map<Long, CourseSectionTitlePort.SectionInfo> sections = courseSectionTitlePort.findSectionsByIds(
                 quizzes.stream().map(Quiz::getSectionId).distinct().toList());
 
         return quizzes.stream()
@@ -63,7 +64,8 @@ public class QuizQueryService implements QuizQueryUseCase {
                         quiz.getCourseId(),
                         courseTitles.getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId()),
                         quiz.getSectionId(),
-                        sectionTitles.getOrDefault(quiz.getSectionId(), "섹션 #" + quiz.getSectionId()),
+                        weekOf(sections, quiz.getSectionId()),
+                        sectionTitleOf(sections, quiz.getSectionId()),
                         quiz.getQuestions().size(),
                         quiz.getCreatedAt()))
                 .toList();
@@ -236,7 +238,9 @@ public class QuizQueryService implements QuizQueryUseCase {
         }
 
         int week = weekOf(sections, quiz.getSectionId());
-        int scoreDiff = calculateScoreDiff(quiz, submission.getScore(), courseQuizzes, sections, submissionByQuizId);
+        // 이전 주차 점수를 노출해 FE가 "이전 없음(null)"과 "동점(diff=0)"을 구분하게 한다.
+        Integer previousScore = previousWeekScore(quiz, courseQuizzes, sections, submissionByQuizId);
+        int scoreDiff = previousScore == null ? 0 : submission.getScore() - previousScore;
 
         Map<Long, QuizSubmissionAnswer> answerByQuestionId = submission.getAnswers().stream()
                 .collect(Collectors.toMap(QuizSubmissionAnswer::getQuestionId, Function.identity()));
@@ -281,6 +285,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                 submission.getCorrectCount(),
                 submission.getIncorrectCount(),
                 scoreDiff,
+                previousScore,
                 wrongNotes,
                 questions);
     }
@@ -297,8 +302,10 @@ public class QuizQueryService implements QuizQueryUseCase {
 
         String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(quiz.getCourseId()))
                 .getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId());
-        String sectionTitle = courseSectionTitlePort.findTitlesBySectionIds(List.of(quiz.getSectionId()))
-                .getOrDefault(quiz.getSectionId(), "섹션 #" + quiz.getSectionId());
+        Map<Long, CourseSectionTitlePort.SectionInfo> sections =
+                courseSectionTitlePort.findSectionsByIds(List.of(quiz.getSectionId()));
+        String sectionTitle = sectionTitleOf(sections, quiz.getSectionId());
+        int week = weekOf(sections, quiz.getSectionId());
 
         // 전체 수강생 + 각 수강생의 응시(제출) 현황을 조합
         Map<Long, QuizSubmission> submissionByMemberId = quizSubmissionRepository.findByQuizId(query.quizId()).stream()
@@ -340,7 +347,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                 .toList();
         students = paginate(students, query.page(), query.size());
 
-        return new InstructorQuizStatistics(courseTitle, sectionTitle, quiz.getTitle(),
+        return new InstructorQuizStatistics(courseTitle, sectionTitle, week, quiz.getTitle(),
                 summary, distribution, students);
     }
 
@@ -405,20 +412,23 @@ public class QuizQueryService implements QuizQueryUseCase {
         return info == null ? 0 : info.orderIndex();
     }
 
-    // scoreDiff = 현재 점수 − 바로 이전 주차(내가 제출한) 퀴즈 점수. 이전 주차 제출이 없으면 0.
-    private int calculateScoreDiff(Quiz currentQuiz, int currentScore, List<Quiz> courseQuizzes,
-                                    Map<Long, CourseSectionTitlePort.SectionInfo> sections,
-                                    Map<Long, QuizSubmission> submissionByQuizId) {
+    private String sectionTitleOf(Map<Long, CourseSectionTitlePort.SectionInfo> sections, Long sectionId) {
+        CourseSectionTitlePort.SectionInfo info = sections.get(sectionId);
+        return info == null ? "섹션 #" + sectionId : info.title();
+    }
+
+    // 바로 이전 주차(내가 제출한) 퀴즈 점수. 이전 주차 제출이 없으면 null (동점 diff=0과 구분 가능).
+    private Integer previousWeekScore(Quiz currentQuiz, List<Quiz> courseQuizzes,
+                                       Map<Long, CourseSectionTitlePort.SectionInfo> sections,
+                                       Map<Long, QuizSubmission> submissionByQuizId) {
         int currentWeek = weekOf(sections, currentQuiz.getSectionId());
 
-        Integer previousScore = courseQuizzes.stream()
+        return courseQuizzes.stream()
                 .filter(q -> !q.getId().equals(currentQuiz.getId()))
                 .filter(q -> submissionByQuizId.containsKey(q.getId()))
                 .filter(q -> weekOf(sections, q.getSectionId()) < currentWeek)
                 .max(Comparator.comparingInt(q -> weekOf(sections, q.getSectionId())))
                 .map(q -> submissionByQuizId.get(q.getId()).getScore())
                 .orElse(null);
-
-        return previousScore == null ? 0 : currentScore - previousScore;
     }
 }

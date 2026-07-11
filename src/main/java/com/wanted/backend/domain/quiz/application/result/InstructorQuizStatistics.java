@@ -10,6 +10,7 @@ import java.util.List;
 public record InstructorQuizStatistics(
         String courseTitle,
         String sectionTitle,
+        int week,
         String quizTitle,
         Summary summary,
         List<ScoreDistribution> scoreDistribution,

@@ -53,7 +53,7 @@ class QuizControllerTest {
         CustomUserDetails userDetails = mock(CustomUserDetails.class);
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizzes(1L, 10L, null)).thenReturn(List.of(
-                new InstructorQuizSummary(90L, "1주차 퀴즈", 10L, "React 완벽 가이드", 100L,
+                new InstructorQuizSummary(90L, "1주차 퀴즈", 10L, "React 완벽 가이드", 100L, 1,
                         "섹션 1: React 기초", 8, java.time.LocalDateTime.of(2026, 5, 10, 15, 30))
         ));
 
@@ -68,6 +68,8 @@ class QuizControllerTest {
         assertThat(item.quizId()).isEqualTo(90L);
         assertThat(item.quizTitle()).isEqualTo("1주차 퀴즈");
         assertThat(item.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(item.sectionId()).isEqualTo(100L);
+        assertThat(item.weekNumber()).isEqualTo(1);
         assertThat(item.sectionTitle()).isEqualTo("섹션 1: React 기초");
         assertThat(item.questionCount()).isEqualTo(8);
         assertThat(item.createdAt().toLocalDateTime())
@@ -205,7 +207,7 @@ class QuizControllerTest {
                         new QuizReport.OptionView(102L, 2, "보기2")));
         when(quizQueryUseCase.getMyQuizReport(1L, 90L)).thenReturn(new QuizReport(
                 90L, 2, "2주차 퀴즈", java.time.LocalDateTime.of(2026, 5, 12, 0, 0),
-                60, 100, 1, 1, -15, List.of(wrong), List.of(correctQ, wrong)));
+                60, 100, 1, 1, -15, 75, List.of(wrong), List.of(correctQ, wrong)));
 
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.QuizReportResponse>> result =
                 controller.getMyQuizReport(userDetails, 90L);
@@ -217,6 +219,7 @@ class QuizControllerTest {
         assertThat(response.score()).isEqualTo(60);
         assertThat(response.totalScore()).isEqualTo(100);
         assertThat(response.scoreDiff()).isEqualTo(-15);
+        assertThat(response.previousScore()).isEqualTo(75);
         assertThat(response.wrongNotes()).hasSize(1);
         assertThat(response.wrongNotes().get(0).questionId()).isEqualTo(20L);
         assertThat(response.wrongNotes().get(0).correctOptionId()).isEqualTo(201L);
@@ -277,7 +280,7 @@ class QuizControllerTest {
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new InstructorQuizStatistics(
-                        "React 완벽 가이드", "1주차: React 기초", "React 기초 개념 퀴즈",
+                        "React 완벽 가이드", "1주차: React 기초", 1, "React 기초 개념 퀴즈",
                         new InstructorQuizStatistics.Summary(6, 5, 1, 80),
                         List.of(new InstructorQuizStatistics.ScoreDistribution("90~100", 2, 40)),
                         List.of(new InstructorQuizStatistics.StudentScore(
@@ -311,7 +314,7 @@ class QuizControllerTest {
         CustomUserDetails userDetails = mock(CustomUserDetails.class);
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new InstructorQuizStatistics("c", "s", "q",
+                .thenReturn(new InstructorQuizStatistics("c", "s", 1, "q",
                         new InstructorQuizStatistics.Summary(0, 0, 0, 0), List.of(), List.of()));
 
         controller.getInstructorQuizStatistics(userDetails, 90L, null, "이상한값", null, null, null);
