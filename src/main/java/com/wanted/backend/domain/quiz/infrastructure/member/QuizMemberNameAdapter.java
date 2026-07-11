@@ -10,10 +10,12 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+// 클래스명은 도메인별로 고유해야 한다 — community의 MemberNameAdapter와 빈 이름이 겹치면
+// ConflictingBeanDefinitionException으로 부팅이 실패한다(참조 엔티티 명명 규칙과 동일).
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class MemberNameAdapter implements MemberNamePort {
+public class QuizMemberNameAdapter implements MemberNamePort {
 
     private final QuizMemberReferenceJpaRepository memberRepository;
 
