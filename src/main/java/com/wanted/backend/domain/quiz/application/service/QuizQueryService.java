@@ -216,7 +216,8 @@ public class QuizQueryService implements QuizQueryUseCase {
 
     @Override
     public QuizReport getMyQuizReport(Long memberId, Long quizId) {
-        Quiz quiz = quizRepository.findById(quizId)
+        // 리포트는 학생의 과거 응시 기록이므로, 섹션 삭제로 soft-delete된 퀴즈여도 조회 가능해야 한다.
+        Quiz quiz = quizRepository.findByIdIncludingDeleted(quizId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
 
         // 수강 중인 강의의 퀴즈 리포트만 조회 가능 (비수강자의 정답/해설 열람 차단)
