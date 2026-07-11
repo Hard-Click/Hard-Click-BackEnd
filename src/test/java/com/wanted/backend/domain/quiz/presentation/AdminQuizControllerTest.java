@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.presentation;
 import com.wanted.backend.domain.quiz.application.command.CreateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.AdminCourseQuizzes;
 import com.wanted.backend.domain.quiz.application.result.AdminQuizCourse;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
@@ -10,6 +11,7 @@ import com.wanted.backend.domain.quiz.application.usecase.AdminQuizCourseQueryUs
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.response.AdminCourseQuizListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.AdminQuizCourseListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
@@ -216,5 +218,27 @@ class AdminQuizControllerTest {
         assertThat(second.visible()).isFalse();
         assertThat(second.studentCount()).isZero();
         assertThat(second.instructorName()).isEqualTo("알 수 없음");
+    }
+
+    @Test
+    void getCourseQuizzesMapsWeeklyQuizzesWithStatusAndExamDate() {
+        when(quizQueryUseCase.getCourseQuizzesByAdmin(1L, null)).thenReturn(
+                new AdminCourseQuizzes(1L, "React 완벽 가이드", List.of(
+                        new AdminCourseQuizzes.WeeklyQuiz(90L, 1, "1주차 퀴즈", 10,
+                                LocalDateTime.of(2026, 5, 12, 0, 0)))));
+
+        ResponseEntity<ApiResponse<AdminCourseQuizListResponse>> result = controller.getCourseQuizzes(1L, null);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        AdminCourseQuizListResponse response = result.getBody().data();
+        assertThat(response.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(response.weeks()).hasSize(1);
+        AdminCourseQuizListResponse.WeeklyQuiz week = response.weeks().get(0);
+        assertThat(week.quizId()).isEqualTo(90L);
+        assertThat(week.weekNumber()).isEqualTo(1);
+        assertThat(week.status()).isEqualTo("완료");           // 등록된 퀴즈는 항상 완료
+        assertThat(week.totalQuestionCount()).isEqualTo(10);
+        assertThat(week.examDate()).isNotNull();               // createdAt → examDate
+        verify(quizQueryUseCase).getCourseQuizzesByAdmin(1L, null);
     }
 }
