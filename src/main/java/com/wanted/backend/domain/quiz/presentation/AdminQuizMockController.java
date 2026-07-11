@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.quiz.presentation;
 
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatisticsResponse;
 import com.wanted.backend.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -109,28 +110,28 @@ public class AdminQuizMockController {
 
     @GetMapping("/{quizId}/statistics")
     @Operation(summary = "퀴즈 점수 현황 조회", description = "퀴즈의 응시 현황, 점수 분포, 수강생별 점수를 조회합니다. ADMIN 권한 필요. (Mock)")
-    public ResponseEntity<ApiResponse<QuizController.InstructorQuizStatisticsResponse>> getQuizStatistics(
+    public ResponseEntity<ApiResponse<InstructorQuizStatisticsResponse>> getQuizStatistics(
             @Parameter(description = "퀴즈 ID", example = "90") @PathVariable Long quizId
     ) {
-        QuizController.InstructorQuizStatisticsResponse response = new QuizController.InstructorQuizStatisticsResponse(
+        InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 "React 완벽 가이드",
                 "1주차: React 기초 개념",
                 1,
                 "React 기초 개념 퀴즈",
-                new QuizController.InstructorQuizStatisticsResponse.Summary(6, 5, 1, 80),
+                new InstructorQuizStatisticsResponse.Summary(6, 5, 1, 80),
                 List.of(
-                        new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("90~100", 2, 40),
-                        new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("70~89", 2, 40),
-                        new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("50~69", 1, 20),
-                        new QuizController.InstructorQuizStatisticsResponse.ScoreDistribution("0~49", 0, 0)
+                        new InstructorQuizStatisticsResponse.ScoreDistribution("90~100", 2, 40),
+                        new InstructorQuizStatisticsResponse.ScoreDistribution("70~89", 2, 40),
+                        new InstructorQuizStatisticsResponse.ScoreDistribution("50~69", 1, 20),
+                        new InstructorQuizStatisticsResponse.ScoreDistribution("0~49", 0, 0)
                 ),
                 List.of(
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("choiyea2026", "최예아", true, 100, OffsetDateTime.parse("2026-05-10T00:00:00+09:00")),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("kimminsu92", "김민수", true, 90, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("leesujin01", "이수진", true, 80, OffsetDateTime.parse("2026-05-13T00:00:00+09:00")),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("parkjihyun7", "박지현", true, 70, OffsetDateTime.parse("2026-05-11T00:00:00+09:00")),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("jungyumin5", "정유민", true, 60, OffsetDateTime.parse("2026-05-14T00:00:00+09:00")),
-                        new QuizController.InstructorQuizStatisticsResponse.StudentScore("hanseoyeong3", "한서영", false, null, null)
+                        new InstructorQuizStatisticsResponse.StudentScore("choiyea2026", "최예아", true, 100, OffsetDateTime.parse("2026-05-10T00:00:00+09:00")),
+                        new InstructorQuizStatisticsResponse.StudentScore("kimminsu92", "김민수", true, 90, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
+                        new InstructorQuizStatisticsResponse.StudentScore("leesujin01", "이수진", true, 80, OffsetDateTime.parse("2026-05-13T00:00:00+09:00")),
+                        new InstructorQuizStatisticsResponse.StudentScore("parkjihyun7", "박지현", true, 70, OffsetDateTime.parse("2026-05-11T00:00:00+09:00")),
+                        new InstructorQuizStatisticsResponse.StudentScore("jungyumin5", "정유민", true, 60, OffsetDateTime.parse("2026-05-14T00:00:00+09:00")),
+                        new InstructorQuizStatisticsResponse.StudentScore("hanseoyeong3", "한서영", false, null, null)
                 )
         );
 

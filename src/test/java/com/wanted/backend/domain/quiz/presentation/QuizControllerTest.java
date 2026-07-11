@@ -16,6 +16,17 @@ import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
+import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.request.QuizSubmissionRequest;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizMutationResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatisticsResponse;
+import com.wanted.backend.domain.quiz.presentation.response.MyQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizReportResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizSubmissionResponse;
+import com.wanted.backend.domain.quiz.presentation.response.StudentQuizDetailResponse;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import com.wanted.backend.global.security.CustomUserDetails;
@@ -57,14 +68,14 @@ class QuizControllerTest {
                         "섹션 1: React 기초", 8, java.time.LocalDateTime.of(2026, 5, 10, 15, 30))
         ));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizListResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizListResponse>> result =
                 controller.getInstructorQuizzes(userDetails, 10L, null);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.InstructorQuizListResponse response = result.getBody().data();
+        InstructorQuizListResponse response = result.getBody().data();
         assertThat(response.courseId()).isEqualTo(10L);
         assertThat(response.quizzes()).hasSize(1);
-        QuizController.InstructorQuizListResponse.InstructorQuizItem item = response.quizzes().get(0);
+        InstructorQuizListResponse.InstructorQuizItem item = response.quizzes().get(0);
         assertThat(item.quizId()).isEqualTo(90L);
         assertThat(item.quizTitle()).isEqualTo("1주차 퀴즈");
         assertThat(item.courseTitle()).isEqualTo("React 완벽 가이드");
@@ -82,7 +93,7 @@ class QuizControllerTest {
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizzes(1L, null, null)).thenReturn(List.of());
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizListResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizListResponse>> result =
                 controller.getInstructorQuizzes(userDetails, null, null);
 
         assertThat(result.getBody().data().quizzes()).isEmpty();
@@ -102,17 +113,17 @@ class QuizControllerTest {
                                 new InstructorQuizDetail.OptionDetail(7L, 2, "메모리에 존재하는 DOM의 표현", true))))
         ));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizDetailResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizDetailResponse>> result =
                 controller.getInstructorQuizDetail(userDetails, 90L);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.InstructorQuizDetailResponse response = result.getBody().data();
+        InstructorQuizDetailResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.courseTitle()).isEqualTo("React 완벽 가이드");
         assertThat(response.sectionTitle()).isEqualTo("섹션 1: React 기초");
         assertThat(response.questionCount()).isEqualTo(1);
         assertThat(response.questions()).hasSize(1);
-        QuizController.InstructorQuizDetailResponse.Question question = response.questions().get(0);
+        InstructorQuizDetailResponse.Question question = response.questions().get(0);
         assertThat(question.questionId()).isEqualTo(5L);
         assertThat(question.correctOptionId()).isEqualTo(7L);
         assertThat(question.explanation()).isEqualTo("가상 DOM 설명");
@@ -140,14 +151,14 @@ class QuizControllerTest {
                 new QuizSubmissionResult(55L, 90L, 75, 8, 6, 2,
                         java.time.LocalDateTime.of(2026, 5, 10, 15, 30)));
 
-        QuizController.QuizSubmissionRequest request = new QuizController.QuizSubmissionRequest(
-                List.of(new QuizController.QuizSubmissionRequest.Answer(11L, 22L)));
+        QuizSubmissionRequest request = new QuizSubmissionRequest(
+                List.of(new QuizSubmissionRequest.Answer(11L, 22L)));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.QuizSubmissionResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizSubmissionResponse>> result =
                 controller.submitQuiz(userDetails, 90L, request);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.QuizSubmissionResponse response = result.getBody().data();
+        QuizSubmissionResponse response = result.getBody().data();
         assertThat(response.submissionId()).isEqualTo(55L);
         assertThat(response.score()).isEqualTo(75);
         assertThat(response.correctCount()).isEqualTo(6);
@@ -185,8 +196,8 @@ class QuizControllerTest {
         when(quizSubmissionUseCase.submit(org.mockito.ArgumentMatchers.any()))
                 .thenThrow(new BusinessException(ErrorCode.QUIZ_ALREADY_SUBMITTED));
 
-        QuizController.QuizSubmissionRequest request = new QuizController.QuizSubmissionRequest(
-                List.of(new QuizController.QuizSubmissionRequest.Answer(11L, 22L)));
+        QuizSubmissionRequest request = new QuizSubmissionRequest(
+                List.of(new QuizSubmissionRequest.Answer(11L, 22L)));
 
         assertThatThrownBy(() -> controller.submitQuiz(userDetails, 90L, request))
                 .isInstanceOf(BusinessException.class)
@@ -209,11 +220,11 @@ class QuizControllerTest {
                 90L, 2, "2주차 퀴즈", java.time.LocalDateTime.of(2026, 5, 12, 0, 0),
                 60, 100, 1, 1, -15, 75, List.of(wrong), List.of(correctQ, wrong)));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.QuizReportResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizReportResponse>> result =
                 controller.getMyQuizReport(userDetails, 90L);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.QuizReportResponse response = result.getBody().data();
+        QuizReportResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.week()).isEqualTo(2);
         assertThat(response.score()).isEqualTo(60);
@@ -249,11 +260,11 @@ class QuizControllerTest {
                                 new StudentQuizDetail.Option(101L, 1, "보기1"),
                                 new StudentQuizDetail.Option(102L, 2, "보기2"))))));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.StudentQuizDetailResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<StudentQuizDetailResponse>> result =
                 controller.getStudentQuizDetail(userDetails, 90L);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.StudentQuizDetailResponse response = result.getBody().data();
+        StudentQuizDetailResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.submitted()).isFalse();
         assertThat(response.answeredCount()).isZero();
@@ -287,11 +298,11 @@ class QuizControllerTest {
                                 "choiyea2026", "최예아", true, 100,
                                 java.time.LocalDateTime.of(2026, 5, 10, 0, 0)))));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizStatisticsResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizStatisticsResponse>> result =
                 controller.getInstructorQuizStatistics(userDetails, 90L, "최", "SCORE_DESC", "SUBMITTED", 0, 10);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.InstructorQuizStatisticsResponse response = result.getBody().data();
+        InstructorQuizStatisticsResponse response = result.getBody().data();
         assertThat(response.summary().totalCount()).isEqualTo(6);
         assertThat(response.summary().submittedCount()).isEqualTo(5);
         assertThat(response.students().get(0).userId()).isEqualTo("choiyea2026");
@@ -350,24 +361,24 @@ class QuizControllerTest {
                         new MyQuizList.MyQuizItem(92L, 3, "State와 Lifecycle", 10, false, null, null))
         ));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<MyQuizListResponse>> result =
                 controller.getMyQuizzes(userDetails, 10L);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.MyQuizListResponse response = result.getBody().data();
+        MyQuizListResponse response = result.getBody().data();
         assertThat(response.courseId()).isEqualTo(10L);
         assertThat(response.courseTitle()).isEqualTo("React 완벽 가이드");
         assertThat(response.summary().completedCount()).isEqualTo(2);
         assertThat(response.summary().averageScore()).isEqualTo(85);
         assertThat(response.quizzes()).hasSize(2);
 
-        QuizController.MyQuizListResponse.MyQuizItem completed = response.quizzes().get(0);
+        MyQuizListResponse.MyQuizItem completed = response.quizzes().get(0);
         assertThat(completed.weekNumber()).isEqualTo(1);
         assertThat(completed.completed()).isTrue();
         assertThat(completed.score()).isEqualTo(80);
         assertThat(completed.submittedAt()).isNotNull();
 
-        QuizController.MyQuizListResponse.MyQuizItem notSubmitted = response.quizzes().get(1);
+        MyQuizListResponse.MyQuizItem notSubmitted = response.quizzes().get(1);
         assertThat(notSubmitted.completed()).isFalse();
         assertThat(notSubmitted.score()).isNull();
         assertThat(notSubmitted.submittedAt()).isNull();
@@ -380,10 +391,10 @@ class QuizControllerTest {
         when(quizQueryUseCase.getMyQuizzes(1L, 10L))
                 .thenReturn(new MyQuizList(10L, "React 완벽 가이드", 0, 0, List.of()));
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.MyQuizListResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<MyQuizListResponse>> result =
                 controller.getMyQuizzes(userDetails, 10L);
 
-        QuizController.MyQuizListResponse response = result.getBody().data();
+        MyQuizListResponse response = result.getBody().data();
         assertThat(response.summary().completedCount()).isZero();
         assertThat(response.summary().averageScore()).isZero();
         assertThat(response.quizzes()).isEmpty();
@@ -401,16 +412,16 @@ class QuizControllerTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
     }
 
-    private QuizController.InstructorQuizRequest quizRequest() {
-        return new QuizController.InstructorQuizRequest(
+    private InstructorQuizRequest quizRequest() {
+        return new InstructorQuizRequest(
                 "React 기초 개념 퀴즈", 10L, 100L,
-                List.of(new QuizController.InstructorQuizRequest.Question(
+                List.of(new InstructorQuizRequest.Question(
                         "React의 가상 DOM이란?", "설명", 2,
                         List.of(
-                                new QuizController.InstructorQuizRequest.Option("보기1"),
-                                new QuizController.InstructorQuizRequest.Option("보기2"),
-                                new QuizController.InstructorQuizRequest.Option("보기3"),
-                                new QuizController.InstructorQuizRequest.Option("보기4")
+                                new InstructorQuizRequest.Option("보기1"),
+                                new InstructorQuizRequest.Option("보기2"),
+                                new InstructorQuizRequest.Option("보기3"),
+                                new InstructorQuizRequest.Option("보기4")
                         )))
         );
     }
@@ -421,11 +432,11 @@ class QuizControllerTest {
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizCommandUseCase.create(org.mockito.ArgumentMatchers.any())).thenReturn(999L);
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizMutationResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizMutationResponse>> result =
                 controller.createInstructorQuiz(userDetails, quizRequest());
 
         assertThat(result.getStatusCode().value()).isEqualTo(201);
-        QuizController.InstructorQuizMutationResponse response = result.getBody().data();
+        InstructorQuizMutationResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(999L);
         assertThat(response.quizTitle()).isEqualTo("React 기초 개념 퀴즈");
         assertThat(response.questionCount()).isEqualTo(1);
@@ -450,11 +461,11 @@ class QuizControllerTest {
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizCommandUseCase.update(org.mockito.ArgumentMatchers.any())).thenReturn(90L);
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizMutationResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizMutationResponse>> result =
                 controller.updateInstructorQuiz(userDetails, 90L, quizRequest());
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.InstructorQuizMutationResponse response = result.getBody().data();
+        InstructorQuizMutationResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.quizTitle()).isEqualTo("React 기초 개념 퀴즈");
         assertThat(response.questionCount()).isEqualTo(1);
@@ -477,11 +488,11 @@ class QuizControllerTest {
         CustomUserDetails userDetails = mock(CustomUserDetails.class);
         when(userDetails.getMemberId()).thenReturn(1L);
 
-        ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizController.InstructorQuizDeleteResponse>> result =
+        ResponseEntity<com.wanted.backend.global.common.ApiResponse<InstructorQuizDeleteResponse>> result =
                 controller.deleteInstructorQuiz(userDetails, 90L);
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
-        QuizController.InstructorQuizDeleteResponse response = result.getBody().data();
+        InstructorQuizDeleteResponse response = result.getBody().data();
         assertThat(response.quizId()).isEqualTo(90L);
         assertThat(response.status()).isEqualTo("DELETED");
 

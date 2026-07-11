@@ -16,18 +16,22 @@ import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
+import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.request.QuizSubmissionRequest;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizMutationResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatisticsResponse;
+import com.wanted.backend.domain.quiz.presentation.response.MyQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizReportResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizSubmissionResponse;
+import com.wanted.backend.domain.quiz.presentation.response.StudentQuizDetailResponse;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -437,190 +441,4 @@ public class QuizController {
         return items.subList(fromIndex, toIndex);
     }
 
-    public record MyQuizListResponse(
-            Long courseId,
-            String courseTitle,
-            Summary summary,
-            List<MyQuizItem> quizzes
-    ) {
-        public record Summary(int completedCount, int averageScore) {
-        }
-
-        public record MyQuizItem(
-                Long quizId,
-                int weekNumber,
-                String quizTitle,
-                int questionCount,
-                boolean completed,
-                Integer score,
-                OffsetDateTime submittedAt
-        ) {
-        }
-    }
-
-    public record StudentQuizDetailResponse(
-            Long quizId,
-            String quizTitle,
-            String courseTitle,
-            String sectionTitle,
-            int totalQuestionCount,
-            int answeredCount,
-            boolean submitted,
-            List<Question> questions
-    ) {
-        public record Question(Long questionId, int questionNumber, String questionText, List<Option> options) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText) {
-        }
-    }
-
-    public record QuizSubmissionRequest(List<Answer> answers) {
-        public record Answer(Long questionId, Long selectedOptionId) {
-        }
-    }
-
-    public record QuizSubmissionResponse(
-            Long submissionId,
-            Long quizId,
-            int score,
-            int totalQuestionCount,
-            int correctCount,
-            int incorrectCount,
-            OffsetDateTime submittedAt
-    ) {
-    }
-
-    public record QuizReportResponse(
-            Long quizId,
-            int week,
-            String quizTitle,
-            OffsetDateTime submittedAt,
-            int score,
-            int totalScore,
-            int correctCount,
-            int incorrectCount,
-            int scoreDiff,
-            Integer previousScore,
-            List<QuestionResult> wrongNotes,
-            List<QuestionResult> questions
-    ) {
-        public record QuestionResult(
-                Long questionId,
-                int questionNumber,
-                String questionText,
-                Long correctOptionId,
-                Long selectedOptionId,
-                boolean correct,
-                String explanation,
-                List<Option> options
-        ) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText) {
-        }
-    }
-
-    public record InstructorQuizListResponse(
-            Long courseId,
-            Long sectionId,
-            List<InstructorQuizItem> quizzes
-    ) {
-        public record InstructorQuizItem(
-                Long quizId,
-                String quizTitle,
-                String courseTitle,
-                Long sectionId,
-                int weekNumber,
-                String sectionTitle,
-                int questionCount,
-                OffsetDateTime createdAt
-        ) {
-        }
-    }
-
-    public record InstructorQuizDetailResponse(
-            Long quizId,
-            String quizTitle,
-            Long courseId,
-            String courseTitle,
-            Long sectionId,
-            String sectionTitle,
-            int questionCount,
-            OffsetDateTime createdAt,
-            List<Question> questions
-    ) {
-        public record Question(
-                Long questionId,
-                int questionNumber,
-                String questionText,
-                Long correctOptionId,
-                String explanation,
-                List<Option> options
-        ) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText, boolean correct) {
-        }
-    }
-
-    public record InstructorQuizRequest(
-            @NotBlank(message = "퀴즈 제목은 필수입니다.") String quizTitle,
-            @NotNull(message = "강의 ID는 필수입니다.") Long courseId,
-            @NotNull(message = "섹션 ID는 필수입니다.") Long sectionId,
-            @NotEmpty(message = "문항은 최소 1개 이상이어야 합니다.") @Valid List<Question> questions
-    ) {
-        public record Question(
-                @NotBlank(message = "문제 내용은 필수입니다.") String questionText,
-                String explanation,
-                @Min(value = 1, message = "정답 보기 번호는 1~4 사이여야 합니다.")
-                @Max(value = 4, message = "정답 보기 번호는 1~4 사이여야 합니다.")
-                @Schema(description = "정답 보기 번호(1~4)", example = "2") int correctOptionNumber,
-                @Size(min = 4, max = 4, message = "보기는 4개가 필요합니다.") @Valid List<Option> options
-        ) {
-        }
-
-        public record Option(@NotBlank(message = "보기 내용은 필수입니다.") String optionText) {
-        }
-    }
-
-    public record InstructorQuizMutationResponse(
-            Long quizId,
-            String quizTitle,
-            int questionCount,
-            OffsetDateTime updatedAt
-    ) {
-    }
-
-    public record InstructorQuizDeleteResponse(
-            Long quizId,
-            String status,
-            OffsetDateTime deletedAt
-    ) {
-    }
-
-    public record InstructorQuizStatisticsResponse(
-            String courseTitle,
-            String sectionTitle,
-            int week,
-            String quizTitle,
-            Summary summary,
-            List<ScoreDistribution> scoreDistribution,
-            List<StudentScore> students
-    ) {
-        public record Summary(int totalCount, int submittedCount, int notSubmittedCount, int averageScore) {
-        }
-
-        public record ScoreDistribution(String range, int count, int percentage) {
-        }
-
-        public record StudentScore(
-                String userId,
-                String name,
-                boolean submitted,
-                Integer score,
-                OffsetDateTime submittedAt
-        ) {
-        }
-    }
 }
