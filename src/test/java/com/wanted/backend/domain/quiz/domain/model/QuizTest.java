@@ -61,8 +61,10 @@ class QuizTest {
         QuizQuestion replacement2 = QuizQuestion.create(2, "새 질문2", null, 3,
                 List.of("보기1", "보기2", "보기3", "보기4"));
 
-        quiz.update(20L, 200L, "새 제목", List.of(replacement1, replacement2));
+        // 다른 강의(주인 2L)로 이동 → 소유자도 함께 갱신된다
+        quiz.update(2L, 20L, 200L, "새 제목", List.of(replacement1, replacement2));
 
+        assertThat(quiz.getInstructorId()).isEqualTo(2L);
         assertThat(quiz.getCourseId()).isEqualTo(20L);
         assertThat(quiz.getSectionId()).isEqualTo(200L);
         assertThat(quiz.getTitle()).isEqualTo("새 제목");
@@ -76,15 +78,17 @@ class QuizTest {
                 List.of("보기1", "보기2", "보기3", "보기4"));
         Quiz quiz = Quiz.create(1L, 10L, 100L, "제목", List.of(question));
 
-        assertThatThrownBy(() -> quiz.update(10L, 100L, " ", List.of(question)))
+        assertThatThrownBy(() -> quiz.update(1L, 10L, 100L, " ", List.of(question)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", List.of()))
+        assertThatThrownBy(() -> quiz.update(1L, 10L, 100L, "제목", List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> quiz.update(10L, 100L, "제목", null))
+        assertThatThrownBy(() -> quiz.update(1L, 10L, 100L, "제목", null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> quiz.update(null, 100L, "제목", List.of(question)))
+        assertThatThrownBy(() -> quiz.update(1L, null, 100L, "제목", List.of(question)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> quiz.update(10L, null, "제목", List.of(question)))
+        assertThatThrownBy(() -> quiz.update(1L, 10L, null, "제목", List.of(question)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> quiz.update(null, 10L, 100L, "제목", List.of(question)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

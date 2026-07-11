@@ -2,7 +2,6 @@ package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
-import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
@@ -54,10 +53,6 @@ import java.util.List;
 @RequestMapping("/api")
 @Tag(name = "Quiz", description = "학생/강사 퀴즈 API")
 public class QuizController {
-
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_PAGE_SIZE = 10;
-    private static final int MAX_PAGE_SIZE = 50;
 
     private final QuizCommandUseCase quizCommandUseCase;
     private final QuizQueryUseCase quizQueryUseCase;
@@ -272,7 +267,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         Long quizId = quizCommandUseCase.create(command);
@@ -300,7 +295,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         quizCommandUseCase.update(command);
@@ -343,15 +338,8 @@ public class QuizController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
     ) {
-        QuizStatisticsQuery query = new QuizStatisticsQuery(
-                userDetails.getMemberId(),
-                quizId,
-                keyword,
-                parseSort(sort),
-                parseFilter(filter),
-                normalizePage(page),
-                normalizeSize(size)
-        );
+        QuizStatisticsQuery query = QuizStatisticsQuery.of(
+                userDetails.getMemberId(), quizId, keyword, sort, filter, page, size);
 
         InstructorQuizStatistics statistics = quizQueryUseCase.getInstructorQuizStatistics(query);
 
@@ -381,64 +369,6 @@ public class QuizController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
-    }
-
-    private QuizStatisticsQuery.SortType parseSort(String sort) {
-        if (sort == null || sort.isBlank()) {
-            return QuizStatisticsQuery.SortType.SCORE_DESC;
-        }
-        try {
-            return QuizStatisticsQuery.SortType.valueOf(sort.strip().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return QuizStatisticsQuery.SortType.SCORE_DESC;
-        }
-    }
-
-    private QuizStatisticsQuery.FilterType parseFilter(String filter) {
-        if (filter == null || filter.isBlank()) {
-            return QuizStatisticsQuery.FilterType.ALL;
-        }
-        try {
-            return QuizStatisticsQuery.FilterType.valueOf(filter.strip().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return QuizStatisticsQuery.FilterType.ALL;
-        }
-    }
-
-    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
-        return questions.stream()
-                .map(q -> new QuizQuestionCommand(
-                        q.questionText(),
-                        q.explanation(),
-                        q.correctOptionNumber(),
-                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
-                ))
-                .toList();
-    }
-
-    private int normalizePage(Integer page) {
-        if (page == null || page < DEFAULT_PAGE) {
-            return DEFAULT_PAGE;
-        }
-        return page;
-    }
-
-    private int normalizeSize(Integer size) {
-        if (size == null || size <= 0) {
-            return DEFAULT_PAGE_SIZE;
-        }
-        return Math.min(size, MAX_PAGE_SIZE);
-    }
-
-    private <T> List<T> paginate(List<T> items, int page, int size) {
-        long offset = (long) page * size;
-        if (offset >= items.size()) {
-            return List.of();
-        }
-
-        int fromIndex = (int) offset;
-        int toIndex = Math.min(fromIndex + size, items.size());
-        return items.subList(fromIndex, toIndex);
     }
 
 }

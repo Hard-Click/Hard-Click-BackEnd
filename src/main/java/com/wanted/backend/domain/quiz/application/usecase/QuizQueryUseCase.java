@@ -16,6 +16,9 @@ public interface QuizQueryUseCase {
 
     InstructorQuizDetail getInstructorQuizDetail(Long instructorId, Long quizId);
 
+    // 관리자(ADMIN)용 — 소유권 검증 없이 상세 조회 (인가는 컨트롤러 @PreAuthorize가 보장).
+    InstructorQuizDetail getDetailByAdmin(Long quizId);
+
     MyQuizList getMyQuizzes(Long memberId, Long courseId);
 
     StudentQuizDetail getStudentQuizDetail(Long memberId, Long quizId);
@@ -23,4 +26,7 @@ public interface QuizQueryUseCase {
     QuizReport getMyQuizReport(Long memberId, Long quizId);
 
     InstructorQuizStatistics getInstructorQuizStatistics(QuizStatisticsQuery query);
+
+    // 관리자(ADMIN)용 — 소유권 검증 없이 통계 조회 (인가는 컨트롤러 @PreAuthorize가 보장).
+    InstructorQuizStatistics getStatisticsByAdmin(QuizStatisticsQuery query);
 }

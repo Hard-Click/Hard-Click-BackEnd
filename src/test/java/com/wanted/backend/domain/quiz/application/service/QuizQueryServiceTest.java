@@ -196,6 +196,40 @@ class QuizQueryServiceTest {
     }
 
     @Test
+    void getQuizDetailReturnsDetailWithoutOwnershipCheck() {
+        // 관리자(ADMIN) core 조회 — 다른 강사 소유 퀴즈여도 소유권을 따지지 않고 상세를 반환한다.
+        QuizQuestion question = QuizQuestion.restore(11L, 1, "React의 가상 DOM이란?", "가상 DOM 설명",
+                List.of(
+                        QuizOption.restore(21L, 1, "보기1", false),
+                        QuizOption.restore(22L, 2, "보기2", true),
+                        QuizOption.restore(23L, 3, "보기3", false),
+                        QuizOption.restore(24L, 4, "보기4", false)));
+        Quiz quiz = Quiz.restore(90L, INSTRUCTOR_ID, COURSE_ID, SECTION_ID, "React 기초 개념 퀴즈",
+                List.of(question), LocalDateTime.of(2026, 5, 10, 15, 30));
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초"));
+
+        InstructorQuizDetail detail = service.getDetailByAdmin(90L);
+
+        assertThat(detail.quizId()).isEqualTo(90L);
+        assertThat(detail.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(detail.questionCount()).isEqualTo(1);
+        assertThat(detail.questions().get(0).correctOptionId()).isEqualTo(22L);
+    }
+
+    @Test
+    void getQuizDetailRejectsWhenTheQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getDetailByAdmin(90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
     void myQuizzesJoinSubmissionStatusSortByWeekAndSummarizeCompletion() {
         // 강의에 3주차/1주차 퀴즈(정렬 뒤섞임). 1주만 제출(80점), 3주 미제출.
         Quiz week3 = quiz(93L, COURSE_ID, 300L, "State와 Lifecycle", 10);
@@ -562,6 +596,32 @@ class QuizQueryServiceTest {
                         QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10)))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+    }
+
+    @Test
+    void getQuizStatisticsAggregatesWithoutOwnershipCheck() {
+        stubStatsCommon(); // 퀴즈는 INSTRUCTOR_ID(1L) 소유
+
+        // 관리자(ADMIN) core — instructorId=null(소유권 무시)로도 통계가 반환된다
+        InstructorQuizStatistics stats = service.getStatisticsByAdmin(
+                new QuizStatisticsQuery(null, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10));
+
+        assertThat(stats.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(stats.summary().totalCount()).isEqualTo(3);
+        assertThat(stats.summary().averageScore()).isEqualTo(75);
+        assertThat(stats.students()).hasSize(3);
+    }
+
+    @Test
+    void getQuizStatisticsRejectsWhenTheQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getStatisticsByAdmin(
+                new QuizStatisticsQuery(null, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
     }
 
     @Test
