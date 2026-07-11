@@ -64,6 +64,14 @@ public class QuizCommandService implements QuizCommandUseCase {
         quizRepository.deleteById(command.quizId());
     }
 
+    @Override
+    public void deleteBySectionIds(List<Long> sectionIds) {
+        if (sectionIds == null || sectionIds.isEmpty()) {
+            return;
+        }
+        quizRepository.deleteBySectionIds(sectionIds);
+    }
+
     private void validateCourseOwnership(Long courseId, Long sectionId, Long instructorId) {
         CourseOwnershipPort.CourseSectionOwnership ownership = courseOwnershipPort
                 .findOwnership(courseId, sectionId)

@@ -242,4 +242,19 @@ class QuizCommandServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
         verify(quizRepository, never()).deleteById(any());
     }
+
+    @Test
+    void deleteBySectionIdsCascadesToTheGivenSections() {
+        service.deleteBySectionIds(List.of(100L, 200L));
+
+        verify(quizRepository).deleteBySectionIds(List.of(100L, 200L));
+    }
+
+    @Test
+    void deleteBySectionIdsIsNoOpWhenTheSectionListIsEmptyOrNull() {
+        service.deleteBySectionIds(List.of());
+        service.deleteBySectionIds(null);
+
+        verify(quizRepository, never()).deleteBySectionIds(any());
+    }
 }

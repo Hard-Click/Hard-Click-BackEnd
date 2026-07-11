@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.infrastructure.persistence;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,4 +30,8 @@ public interface QuizJpaRepository extends JpaRepository<QuizJpaEntity, Long> {
     // 주차 정렬은 앱에서 섹션 order_index로 하되 동일 주차 내 순서 결정성을 위해 sectionId,id로 1차 정렬한다.
     @EntityGraph(attributePaths = "questions")
     List<QuizJpaEntity> findByCourseIdOrderBySectionIdAscIdAsc(Long courseId);
+
+    // 섹션 삭제 cascade — 파생 delete 메서드로 표현(쿼리 직접 삽입 금지 규칙 준수).
+    // 엔티티를 로딩 후 제거하므로 questions/options(cascade ALL·orphanRemoval)까지 함께 삭제된다.
+    void deleteBySectionIdIn(Collection<Long> sectionIds);
 }

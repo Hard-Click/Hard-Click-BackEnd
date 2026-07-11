@@ -85,6 +85,12 @@ public class QuizRepositoryAdapter implements QuizRepository {
         quizJpaRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional
+    public void deleteBySectionIds(List<Long> sectionIds) {
+        quizJpaRepository.deleteBySectionIdIn(sectionIds);
+    }
+
     private void appendQuestions(QuizJpaEntity entity, Quiz quiz) {
         for (QuizQuestion question : quiz.getQuestions()) {
             QuizQuestionJpaEntity questionEntity = entity.addQuestion(

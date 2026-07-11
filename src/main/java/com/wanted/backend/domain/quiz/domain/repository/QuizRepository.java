@@ -18,4 +18,7 @@ public interface QuizRepository {
     Quiz update(Quiz quiz);
 
     void deleteById(Long id);
+
+    // 섹션 삭제 cascade: 해당 섹션들에 속한 퀴즈를 일괄 삭제한다(문항·보기·제출은 FK ON DELETE CASCADE).
+    void deleteBySectionIds(List<Long> sectionIds);
 }
