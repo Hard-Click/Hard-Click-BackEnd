@@ -12,6 +12,7 @@ import com.wanted.backend.domain.cource.application.port.VideoStoragePort;
 import com.wanted.backend.domain.cource.application.usecase.CourseCommandUseCase;
 import com.wanted.backend.domain.cource.domain.dto.CourseAuthorInfo;
 import com.wanted.backend.domain.cource.domain.event.CourseCreatedEvent;
+import com.wanted.backend.domain.cource.domain.event.SectionDeletedEvent;
 import com.wanted.backend.domain.cource.domain.model.Course;
 import com.wanted.backend.domain.cource.domain.model.CourseSection;
 import com.wanted.backend.domain.cource.domain.model.CourseStatus;
@@ -35,6 +36,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -106,6 +110,12 @@ public class CourseCommandService implements CourseCommandUseCase {
             throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
         }
 
+        // 삭제될 섹션 계산: 기존 섹션 중 수정 요청에 남지 않은 것 → 해당 섹션 퀴즈를 cascade 삭제한다.
+        List<Long> existingSectionIds = course.getSections().stream()
+                .map(CourseSection::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
         List<CourseSection> newSections = command.sections().stream()
                 .map(sc -> {
                     List<Lesson> lessons = sc.lessons().stream()
@@ -121,12 +131,26 @@ public class CourseCommandService implements CourseCommandUseCase {
                 })
                 .toList();
 
+        Set<Long> keptSectionIds = newSections.stream()
+                .map(CourseSection::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<Long> deletedSectionIds = existingSectionIds.stream()
+                .filter(id -> !keptSectionIds.contains(id))
+                .toList();
+
         course.update(command.title(), command.subject(), command.description(),
                 command.thumbnailUrl(), command.priceType(), command.price(), newSections,
                 command.learningObjectives(), command.targetAudience(),
                 command.techTags(), command.level());
 
         courseRepository.save(course);
+
+        // 삭제된 섹션의 퀴즈를 같은 트랜잭션에서 정리(quiz 리스너가 동기 구독). orphan 방지.
+        if (!deletedSectionIds.isEmpty()) {
+            eventPublisher.publishEvent(SectionDeletedEvent.of(deletedSectionIds));
+        }
 
         // 섹션/레슨 변경을 재생 스키마(course_curriculum/video)에 반영
         registerVideoCatalogSync(command.courseId());

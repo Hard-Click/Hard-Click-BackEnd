@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +36,12 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Quiz> findById(Long id) {
+        return quizJpaRepository.findWithQuestionsByIdAndDeletedAtIsNull(id).map(this::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Quiz> findByIdIncludingDeleted(Long id) {
         return quizJpaRepository.findWithQuestionsById(id).map(this::toDomain);
     }
 
@@ -43,14 +50,16 @@ public class QuizRepositoryAdapter implements QuizRepository {
     public List<Quiz> findAllByInstructor(Long instructorId, Long courseId, Long sectionId) {
         List<QuizJpaEntity> entities;
         if (courseId != null && sectionId != null) {
-            entities = quizJpaRepository.findByInstructorIdAndCourseIdAndSectionIdOrderByCreatedAtAsc(
+            entities = quizJpaRepository.findByInstructorIdAndCourseIdAndSectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(
                     instructorId, courseId, sectionId);
         } else if (courseId != null) {
-            entities = quizJpaRepository.findByInstructorIdAndCourseIdOrderByCreatedAtAsc(instructorId, courseId);
+            entities = quizJpaRepository.findByInstructorIdAndCourseIdAndDeletedAtIsNullOrderByCreatedAtAsc(
+                    instructorId, courseId);
         } else if (sectionId != null) {
-            entities = quizJpaRepository.findByInstructorIdAndSectionIdOrderByCreatedAtAsc(instructorId, sectionId);
+            entities = quizJpaRepository.findByInstructorIdAndSectionIdAndDeletedAtIsNullOrderByCreatedAtAsc(
+                    instructorId, sectionId);
         } else {
-            entities = quizJpaRepository.findByInstructorIdOrderByCreatedAtAsc(instructorId);
+            entities = quizJpaRepository.findByInstructorIdAndDeletedAtIsNullOrderByCreatedAtAsc(instructorId);
         }
 
         return entities.stream().map(this::toDomain).toList();
@@ -59,14 +68,14 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional(readOnly = true)
     public List<Quiz> findAllByCourseId(Long courseId) {
-        return quizJpaRepository.findByCourseIdOrderBySectionIdAscIdAsc(courseId).stream()
+        return quizJpaRepository.findByCourseIdAndDeletedAtIsNullOrderBySectionIdAscIdAsc(courseId).stream()
                 .map(this::toDomain).toList();
     }
 
     @Override
     @Transactional
     public Quiz update(Quiz quiz) {
-        QuizJpaEntity entity = quizJpaRepository.findWithQuestionsById(quiz.getId())
+        QuizJpaEntity entity = quizJpaRepository.findWithQuestionsByIdAndDeletedAtIsNull(quiz.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
         entity.update(quiz.getCourseId(), quiz.getSectionId(), quiz.getTitle());
 
@@ -82,7 +91,20 @@ public class QuizRepositoryAdapter implements QuizRepository {
     @Override
     @Transactional
     public void deleteById(Long id) {
-        quizJpaRepository.deleteById(id);
+        // 강사 수동 삭제도 soft-delete로 통일 — hard-delete하면 학생 제출 이력이
+        // FK ON DELETE CASCADE로 함께 사라진다. 이미 삭제된 퀴즈면 no-op(멱등).
+        quizJpaRepository.findByIdAndDeletedAtIsNull(id)
+                .ifPresent(quiz -> quiz.softDelete(LocalDateTime.now()));
+    }
+
+    @Override
+    @Transactional
+    public void deleteBySectionIds(List<Long> sectionIds) {
+        // hard-delete하면 quiz_submission이 FK ON DELETE CASCADE로 함께 사라지므로,
+        // 활성 퀴즈를 로딩해 soft-delete(deleted_at)로 전환한다. 제출 이력은 그대로 보존된다.
+        LocalDateTime now = LocalDateTime.now();
+        quizJpaRepository.findBySectionIdInAndDeletedAtIsNull(sectionIds)
+                .forEach(quiz -> quiz.softDelete(now));
     }
 
     private void appendQuestions(QuizJpaEntity entity, Quiz quiz) {
