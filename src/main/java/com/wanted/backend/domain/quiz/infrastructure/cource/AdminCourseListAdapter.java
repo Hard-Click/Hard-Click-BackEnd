@@ -43,7 +43,8 @@ public class AdminCourseListAdapter implements AdminCourseListPort {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return courseRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+        // createdAt 동점 시 순서 결정성을 위해 id를 2차 정렬 키로 사용(목록 흔들림 방지).
+        return courseRepository.findAll(spec, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id"))).stream()
                 .map(c -> new AdminCourse(
                         c.getId(),
                         c.getTitle(),

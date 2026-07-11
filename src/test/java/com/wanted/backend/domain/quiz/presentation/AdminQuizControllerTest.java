@@ -189,4 +189,32 @@ class AdminQuizControllerTest {
         assertThat(item.registeredAt()).isNotNull();
         verify(adminQuizCourseQueryUseCase).getCourses("수학1", 5L, null, "React");
     }
+
+    @Test
+    void getQuizCoursesReturnsEmptyListWhenNoMatch() {
+        when(adminQuizCourseQueryUseCase.getCourses(null, null, null, null)).thenReturn(List.of());
+
+        ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> result =
+                controller.getQuizCourses(null, null, null, null);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        assertThat(result.getBody().data().courses()).isEmpty();
+        verify(adminQuizCourseQueryUseCase).getCourses(null, null, null, null);
+    }
+
+    @Test
+    void getQuizCoursesMapsMultipleItemsIncludingFallbacks() {
+        when(adminQuizCourseQueryUseCase.getCourses(null, null, null, null)).thenReturn(List.of(
+                new AdminQuizCourse(1L, "React 기초", true, 10, "김강사", Instant.parse("2026-05-10T00:00:00Z")),
+                new AdminQuizCourse(2L, "Vue 기초", false, 0, "알 수 없음", Instant.parse("2026-05-11T00:00:00Z"))));
+
+        ResponseEntity<ApiResponse<AdminQuizCourseListResponse>> result =
+                controller.getQuizCourses(null, null, null, null);
+
+        assertThat(result.getBody().data().courses()).hasSize(2);
+        AdminQuizCourseListResponse.AdminQuizCourseItem second = result.getBody().data().courses().get(1);
+        assertThat(second.visible()).isFalse();
+        assertThat(second.studentCount()).isZero();
+        assertThat(second.instructorName()).isEqualTo("알 수 없음");
+    }
 }
