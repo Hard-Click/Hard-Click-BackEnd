@@ -71,6 +71,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                 .toList();
     }
 
+    // 강사용 — 본인 소유 퀴즈만 상세 조회 (소유권 검증 후 core로 위임).
     @Override
     public InstructorQuizDetail getInstructorQuizDetail(Long instructorId, Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
@@ -81,6 +82,19 @@ public class QuizQueryService implements QuizQueryUseCase {
             throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
         }
 
+        return toInstructorQuizDetail(quiz);
+    }
+
+    // 관리자(ADMIN)용 — 소유권 검증 없이 상세 조회. 인가는 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")가 보장한다.
+    @Override
+    public InstructorQuizDetail getQuizDetail(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        return toInstructorQuizDetail(quiz);
+    }
+
+    private InstructorQuizDetail toInstructorQuizDetail(Quiz quiz) {
         String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(quiz.getCourseId()))
                 .getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId());
         String sectionTitle = courseSectionTitlePort.findTitlesBySectionIds(List.of(quiz.getSectionId()))
@@ -301,6 +315,19 @@ public class QuizQueryService implements QuizQueryUseCase {
             throw new BusinessException(ErrorCode.QUIZ_NOT_AUTHORIZED);
         }
 
+        return buildStatistics(quiz, query);
+    }
+
+    // 관리자(ADMIN)용 — 소유권 검증 없이 통계 조회. 인가는 컨트롤러 @PreAuthorize("hasRole('ADMIN')")가 보장한다.
+    @Override
+    public InstructorQuizStatistics getQuizStatistics(QuizStatisticsQuery query) {
+        Quiz quiz = quizRepository.findById(query.quizId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+
+        return buildStatistics(quiz, query);
+    }
+
+    private InstructorQuizStatistics buildStatistics(Quiz quiz, QuizStatisticsQuery query) {
         String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(quiz.getCourseId()))
                 .getOrDefault(quiz.getCourseId(), "강의 #" + quiz.getCourseId());
         Map<Long, CourseSectionTitlePort.SectionInfo> sections =
