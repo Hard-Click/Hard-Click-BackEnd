@@ -253,6 +253,21 @@ class QuizQueryServiceTest {
     }
 
     @Test
+    void getCourseQuizzesByAdminBreaksSameWeekTiesByQuizId() {
+        // 같은 주차(섹션 동일) 내에서는 quizId 오름차순 — 입력이 뒤섞여도 90 → 92
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(92L, COURSE_ID, SECTION_ID, "두 번째 퀴즈", 1),
+                quiz(90L, COURSE_ID, SECTION_ID, "첫 번째 퀴즈", 1)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+
+        assertThat(service.getCourseQuizzesByAdmin(COURSE_ID, null).weeks())
+                .extracting(AdminCourseQuizzes.WeeklyQuiz::quizId)
+                .containsExactly(90L, 92L);
+    }
+
+    @Test
     void getCourseQuizzesByAdminFiltersBySectionId() {
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
                 quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5),
