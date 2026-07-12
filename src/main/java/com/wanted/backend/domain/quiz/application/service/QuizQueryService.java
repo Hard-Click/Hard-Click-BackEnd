@@ -5,6 +5,7 @@ import com.wanted.backend.domain.quiz.application.port.CourseStudentPort;
 import com.wanted.backend.domain.quiz.application.port.CourseTitlePort;
 import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.AdminCourseQuizzes;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
@@ -83,6 +84,33 @@ public class QuizQueryService implements QuizQueryUseCase {
         }
 
         return toInstructorQuizDetail(quiz);
+    }
+
+    // 관리자(ADMIN)용 — 특정 강의의 주차별 퀴즈 목록. 소유권 검증 없이 조회(인가는 컨트롤러 @PreAuthorize가 보장).
+    @Override
+    public AdminCourseQuizzes getCourseQuizzesByAdmin(Long courseId, Long sectionId) {
+        List<Quiz> quizzes = quizRepository.findAllByCourseId(courseId).stream()
+                .filter(q -> sectionId == null || sectionId.equals(q.getSectionId()))
+                .toList();
+
+        String courseTitle = courseTitlePort.findTitlesByCourseIds(List.of(courseId))
+                .getOrDefault(courseId, "강의 #" + courseId);
+        Map<Long, CourseSectionTitlePort.SectionInfo> sections = courseSectionTitlePort.findSectionsByIds(
+                quizzes.stream().map(Quiz::getSectionId).distinct().toList());
+
+        List<AdminCourseQuizzes.WeeklyQuiz> weeks = quizzes.stream()
+                .map(quiz -> new AdminCourseQuizzes.WeeklyQuiz(
+                        quiz.getId(),
+                        weekOf(sections, quiz.getSectionId()),
+                        quiz.getTitle(),
+                        quiz.getQuestions().size(),
+                        quiz.getCreatedAt()))
+                // 주차 오름차순, 동일 주차 내 quizId로 순서 결정성 보장
+                .sorted(Comparator.comparingInt(AdminCourseQuizzes.WeeklyQuiz::weekNumber)
+                        .thenComparing(AdminCourseQuizzes.WeeklyQuiz::quizId))
+                .toList();
+
+        return new AdminCourseQuizzes(courseId, courseTitle, weeks);
     }
 
     // 관리자(ADMIN)용 — 소유권 검증 없이 상세 조회. 인가는 컨트롤러의 @PreAuthorize("hasRole('ADMIN')")가 보장한다.

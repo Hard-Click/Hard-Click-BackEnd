@@ -7,6 +7,7 @@ import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
+import com.wanted.backend.domain.quiz.application.result.AdminCourseQuizzes;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
@@ -227,6 +228,69 @@ class QuizQueryServiceTest {
         assertThatThrownBy(() -> service.getDetailByAdmin(90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminReturnsWeeklyQuizzesSortedByWeek() {
+        // 섹션 order(주차)로 정렬: quiz90(week1) → quiz91(week2). 입력은 뒤섞여 있어도 결과는 주차순.
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5),
+                quiz(90L, COURSE_ID, SECTION_ID, "1주차 퀴즈", 8)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1),
+                101L, new CourseSectionTitlePort.SectionInfo("섹션 2", 2)));
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, null);
+
+        assertThat(result.courseId()).isEqualTo(COURSE_ID);
+        assertThat(result.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(result.weeks()).extracting(AdminCourseQuizzes.WeeklyQuiz::weekNumber).containsExactly(1, 2);
+        assertThat(result.weeks().get(0).quizId()).isEqualTo(90L);
+        assertThat(result.weeks().get(0).questionCount()).isEqualTo(8);
+        assertThat(result.weeks().get(1).quizId()).isEqualTo(91L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminBreaksSameWeekTiesByQuizId() {
+        // 같은 주차(섹션 동일) 내에서는 quizId 오름차순 — 입력이 뒤섞여도 90 → 92
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(92L, COURSE_ID, SECTION_ID, "두 번째 퀴즈", 1),
+                quiz(90L, COURSE_ID, SECTION_ID, "첫 번째 퀴즈", 1)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+
+        assertThat(service.getCourseQuizzesByAdmin(COURSE_ID, null).weeks())
+                .extracting(AdminCourseQuizzes.WeeklyQuiz::quizId)
+                .containsExactly(90L, 92L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminFiltersBySectionId() {
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5),
+                quiz(90L, COURSE_ID, SECTION_ID, "1주차 퀴즈", 8)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of(COURSE_ID, "React"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, SECTION_ID);
+
+        assertThat(result.weeks()).extracting(AdminCourseQuizzes.WeeklyQuiz::quizId).containsExactly(90L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminFallsBackToPlaceholderTitleAndEmptyWhenNoQuizzes() {
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of());
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of());
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, null);
+
+        assertThat(result.courseTitle()).isEqualTo("강의 #" + COURSE_ID);
+        assertThat(result.weeks()).isEmpty();
     }
 
     @Test

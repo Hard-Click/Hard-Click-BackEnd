@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.presentation;
 import com.wanted.backend.domain.quiz.application.command.CreateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateAdminQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
+import com.wanted.backend.domain.quiz.application.result.AdminCourseQuizzes;
 import com.wanted.backend.domain.quiz.application.result.AdminQuizCourse;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
@@ -10,6 +11,7 @@ import com.wanted.backend.domain.quiz.application.usecase.AdminQuizCourseQueryUs
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.response.AdminCourseQuizListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.AdminQuizCourseListResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
 import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
@@ -18,7 +20,6 @@ import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatis
 import com.wanted.backend.global.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -112,20 +113,25 @@ public class AdminQuizController {
     }
 
     @GetMapping("/courses/{courseId}")
-    @Operation(summary = "강의별 주차 퀴즈 목록 조회", description = "특정 강의의 주차(섹션)별 퀴즈 목록을 조회합니다. ADMIN 권한 필요. (Mock)")
+    @Operation(summary = "강의별 주차 퀴즈 목록 조회", description = "특정 강의의 주차(섹션)별 퀴즈 목록을 조회합니다. sectionId로 특정 주차만 필터 가능. ADMIN 권한 필요.")
     public ResponseEntity<ApiResponse<AdminCourseQuizListResponse>> getCourseQuizzes(
             @Parameter(description = "강의 ID", example = "1") @PathVariable Long courseId,
             @Parameter(description = "섹션(주차) ID", example = "1") @RequestParam(required = false) Long sectionId
     ) {
+        AdminCourseQuizzes result = quizQueryUseCase.getCourseQuizzesByAdmin(courseId, sectionId);
+
         AdminCourseQuizListResponse response = new AdminCourseQuizListResponse(
-                courseId,
-                "React 완벽 가이드",
-                List.of(
-                        new AdminCourseQuizListResponse.WeeklyQuiz(90L, 1, "React 기초 개념", "완료", 10, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
-                        new AdminCourseQuizListResponse.WeeklyQuiz(91L, 2, "React 기초 개념", "완료", 10, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
-                        new AdminCourseQuizListResponse.WeeklyQuiz(92L, 3, "React 기초 개념", "완료", 10, OffsetDateTime.parse("2026-05-12T00:00:00+09:00")),
-                        new AdminCourseQuizListResponse.WeeklyQuiz(93L, 4, "React 기초 개념", "완료", 10, OffsetDateTime.parse("2026-05-12T00:00:00+09:00"))
-                )
+                result.courseId(),
+                result.courseTitle(),
+                result.weeks().stream()
+                        .map(w -> new AdminCourseQuizListResponse.WeeklyQuiz(
+                                w.quizId(),
+                                w.weekNumber(),
+                                w.quizTitle(),
+                                "완료",   // 등록된 퀴즈는 항상 등록 완료 상태
+                                w.questionCount(),
+                                w.createdAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
+                        .toList()
         );
 
         return ApiResponse.success("강의의 주차별 퀴즈 목록을 조회했습니다.", response);
@@ -234,24 +240,6 @@ public class AdminQuizController {
         );
 
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
-    }
-
-    @Schema(description = "강의별 주차 퀴즈 목록")
-    public record AdminCourseQuizListResponse(
-            @Schema(description = "강의 ID", example = "1") Long courseId,
-            @Schema(description = "강의명", example = "React 완벽 가이드") String courseTitle,
-            @Schema(description = "주차별 퀴즈 목록") List<WeeklyQuiz> weeks
-    ) {
-        @Schema(description = "주차별 퀴즈")
-        public record WeeklyQuiz(
-                @Schema(description = "퀴즈 ID", example = "90") Long quizId,
-                @Schema(description = "주차", example = "1") int weekNumber,
-                @Schema(description = "퀴즈명", example = "React 기초 개념") String quizTitle,
-                @Schema(description = "등록 상태", example = "완료") String status,
-                @Schema(description = "총 문제 수", example = "10") int totalQuestionCount,
-                @Schema(description = "응시일") OffsetDateTime examDate
-        ) {
-        }
     }
 
 }
