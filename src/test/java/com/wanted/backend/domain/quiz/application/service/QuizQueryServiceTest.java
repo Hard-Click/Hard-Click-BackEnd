@@ -617,7 +617,8 @@ class QuizQueryServiceTest {
                 statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL));
 
         assertThat(stats.courseTitle()).isEqualTo("React 완벽 가이드");
-        assertThat(stats.week()).isEqualTo(1);
+        assertThat(stats.sectionId()).isEqualTo(SECTION_ID);
+        assertThat(stats.weekNumber()).isEqualTo(1);
         assertThat(stats.summary().totalCount()).isEqualTo(3);
         assertThat(stats.summary().submittedCount()).isEqualTo(2);
         assertThat(stats.summary().notSubmittedCount()).isEqualTo(1);

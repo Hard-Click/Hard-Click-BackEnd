@@ -291,7 +291,7 @@ class QuizControllerTest {
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(new InstructorQuizStatistics(
-                        "React 완벽 가이드", "1주차: React 기초", 1, "React 기초 개념 퀴즈",
+                        "React 완벽 가이드", 100L, "1주차: React 기초", 1, "React 기초 개념 퀴즈",
                         new InstructorQuizStatistics.Summary(6, 5, 1, 80),
                         List.of(new InstructorQuizStatistics.ScoreDistribution("90~100", 2, 40)),
                         List.of(new InstructorQuizStatistics.StudentScore(
@@ -303,6 +303,8 @@ class QuizControllerTest {
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
         InstructorQuizStatisticsResponse response = result.getBody().data();
+        assertThat(response.sectionId()).isEqualTo(100L);
+        assertThat(response.weekNumber()).isEqualTo(1);
         assertThat(response.summary().totalCount()).isEqualTo(6);
         assertThat(response.summary().submittedCount()).isEqualTo(5);
         assertThat(response.students().get(0).userId()).isEqualTo("choiyea2026");
@@ -325,7 +327,7 @@ class QuizControllerTest {
         CustomUserDetails userDetails = mock(CustomUserDetails.class);
         when(userDetails.getMemberId()).thenReturn(1L);
         when(quizQueryUseCase.getInstructorQuizStatistics(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new InstructorQuizStatistics("c", "s", 1, "q",
+                .thenReturn(new InstructorQuizStatistics("c", 100L, "s", 1, "q",
                         new InstructorQuizStatistics.Summary(0, 0, 0, 0), List.of(), List.of()));
 
         controller.getInstructorQuizStatistics(userDetails, 90L, null, "이상한값", null, null, null);
