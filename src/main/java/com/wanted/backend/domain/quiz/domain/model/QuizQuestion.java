@@ -30,9 +30,7 @@ public class QuizQuestion {
         if (correctOptionNumber < 1 || correctOptionNumber > optionTexts.size()) {
             throw new IllegalArgumentException("정답 보기 번호가 올바르지 않습니다.");
         }
-        if (difficulty != null && (difficulty < MIN_DIFFICULTY || difficulty > MAX_DIFFICULTY)) {
-            throw new IllegalArgumentException("난이도는 1(하)~3(상) 사이여야 합니다.");
-        }
+        validateDifficulty(difficulty);
 
         QuizQuestion question = new QuizQuestion();
         question.questionNumber = questionNumber;
@@ -60,6 +58,8 @@ public class QuizQuestion {
 
     public static QuizQuestion restore(Long id, int questionNumber, String questionText, String explanation,
                                         Integer difficulty, List<QuizOption> options) {
+        // 복원 시에도 범위를 검증해 잘못된 DB 값(0/4 등)이 상세 응답으로 새어나가지 않게 한다. null(미지정)은 허용.
+        validateDifficulty(difficulty);
         QuizQuestion question = new QuizQuestion();
         question.id = id;
         question.questionNumber = questionNumber;
@@ -68,6 +68,13 @@ public class QuizQuestion {
         question.difficulty = difficulty;
         question.options = new ArrayList<>(options);
         return question;
+    }
+
+    // 난이도는 선택(null=미지정)이지만, 값이 있으면 1(하)~3(상)이어야 한다. 생성·복원 공통 검증.
+    private static void validateDifficulty(Integer difficulty) {
+        if (difficulty != null && (difficulty < MIN_DIFFICULTY || difficulty > MAX_DIFFICULTY)) {
+            throw new IllegalArgumentException("난이도는 1(하)~3(상) 사이여야 합니다.");
+        }
     }
 
     public Long getId() { return id; }

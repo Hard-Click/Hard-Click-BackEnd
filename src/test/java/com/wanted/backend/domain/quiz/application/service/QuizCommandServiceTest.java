@@ -48,7 +48,7 @@ class QuizCommandServiceTest {
 
     private QuizQuestionCommand question() {
         return new QuizQuestionCommand(
-                "React의 가상 DOM이란 무엇인가요?", "설명", null, 2,
+                "React의 가상 DOM이란 무엇인가요?", "설명", 2, 2,
                 List.of("보기1", "보기2", "보기3", "보기4"));
     }
 
