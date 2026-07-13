@@ -16,6 +16,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +47,9 @@ public class QuizQuestionJpaEntity {
     private String explanation;
 
     // 난이도 1=하/2=중/3=상 (V3.5.1, nullable). 강사 등록/수정 시 저장.
+    // 컬럼이 TINYINT라 JDBC 타입을 TINYINT로 지정(Integer↔INTEGER 기본 매핑이면 validate가 타입 불일치로 실패).
     @Column(name = "difficulty")
+    @JdbcTypeCode(SqlTypes.TINYINT)
     private Integer difficulty;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
