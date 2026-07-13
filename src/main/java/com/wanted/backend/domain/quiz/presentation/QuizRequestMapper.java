@@ -16,6 +16,7 @@ final class QuizRequestMapper {
                 .map(q -> new QuizQuestionCommand(
                         q.questionText(),
                         q.explanation(),
+                        q.difficulty(),
                         q.correctOptionNumber(),
                         q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()))
                 .toList();

@@ -44,17 +44,23 @@ public class QuizQuestionJpaEntity {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
+    // 난이도 1=하/2=중/3=상 (V3.5.1, nullable). 강사 등록/수정 시 저장.
+    @Column(name = "difficulty")
+    private Integer difficulty;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 20)
     @OrderBy("optionNumber ASC")
     private List<QuizOptionJpaEntity> options = new ArrayList<>();
 
-    static QuizQuestionJpaEntity of(QuizJpaEntity quiz, int questionNumber, String questionText, String explanation) {
+    static QuizQuestionJpaEntity of(QuizJpaEntity quiz, int questionNumber, String questionText,
+                                    String explanation, Integer difficulty) {
         QuizQuestionJpaEntity entity = new QuizQuestionJpaEntity();
         entity.quiz = quiz;
         entity.questionNumber = questionNumber;
         entity.questionText = questionText;
         entity.explanation = explanation;
+        entity.difficulty = difficulty;
         return entity;
     }
 

@@ -107,7 +107,7 @@ class QuizControllerTest {
                 90L, "React 기초 개념 퀴즈", 10L, "React 완벽 가이드", 100L, "섹션 1: React 기초", 1,
                 java.time.LocalDateTime.of(2026, 5, 10, 15, 30),
                 List.of(new InstructorQuizDetail.QuestionDetail(
-                        5L, 1, "React의 가상 DOM이란?", 7L, "가상 DOM 설명",
+                        5L, 1, "React의 가상 DOM이란?", 7L, "가상 DOM 설명", 2,
                         List.of(
                                 new InstructorQuizDetail.OptionDetail(6L, 1, "실제 DOM의 복사본", false),
                                 new InstructorQuizDetail.OptionDetail(7L, 2, "메모리에 존재하는 DOM의 표현", true))))
@@ -418,7 +418,7 @@ class QuizControllerTest {
         return new InstructorQuizRequest(
                 "React 기초 개념 퀴즈", 10L, 100L,
                 List.of(new InstructorQuizRequest.Question(
-                        "React의 가상 DOM이란?", "설명", 2,
+                        "React의 가상 DOM이란?", "설명", 3, 2,
                         List.of(
                                 new InstructorQuizRequest.Option("보기1"),
                                 new InstructorQuizRequest.Option("보기2"),

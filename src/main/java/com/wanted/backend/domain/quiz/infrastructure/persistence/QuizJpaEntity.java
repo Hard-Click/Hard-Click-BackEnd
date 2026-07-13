@@ -69,8 +69,9 @@ public class QuizJpaEntity {
         return entity;
     }
 
-    public QuizQuestionJpaEntity addQuestion(int questionNumber, String questionText, String explanation) {
-        QuizQuestionJpaEntity question = QuizQuestionJpaEntity.of(this, questionNumber, questionText, explanation);
+    public QuizQuestionJpaEntity addQuestion(int questionNumber, String questionText, String explanation,
+                                             Integer difficulty) {
+        QuizQuestionJpaEntity question = QuizQuestionJpaEntity.of(this, questionNumber, questionText, explanation, difficulty);
         questions.add(question);
         return question;
     }

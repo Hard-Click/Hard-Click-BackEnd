@@ -20,6 +20,10 @@ public record InstructorQuizRequest(
     public record Question(
             @NotBlank(message = "문제 내용은 필수입니다.") String questionText,
             String explanation,
+            @NotNull(message = "난이도는 필수입니다.")
+            @Min(value = 1, message = "난이도는 1(하)~3(상) 사이여야 합니다.")
+            @Max(value = 3, message = "난이도는 1(하)~3(상) 사이여야 합니다.")
+            @Schema(description = "난이도(필수, 1=하/2=중/3=상)", example = "2") Integer difficulty,
             @Min(value = 1, message = "정답 보기 번호는 1~4 사이여야 합니다.")
             @Max(value = 4, message = "정답 보기 번호는 1~4 사이여야 합니다.")
             @Schema(description = "정답 보기 번호(1~4)", example = "2") int correctOptionNumber,

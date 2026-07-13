@@ -147,7 +147,7 @@ public class QuizCommandService implements QuizCommandUseCase {
                 .mapToObj(i -> {
                     QuizQuestionCommand q = questionCommands.get(i);
                     return QuizQuestion.create(i + 1, q.questionText(), q.explanation(),
-                            q.correctOptionNumber(), q.optionTexts());
+                            q.difficulty(), q.correctOptionNumber(), q.optionTexts());
                 })
                 .toList();
     }

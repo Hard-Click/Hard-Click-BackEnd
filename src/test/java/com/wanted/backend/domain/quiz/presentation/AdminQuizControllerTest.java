@@ -55,7 +55,7 @@ class AdminQuizControllerTest {
                 90L, "React 기초 개념 퀴즈", 10L, "React 완벽 가이드", 100L, "섹션 1: React 기초", 1,
                 LocalDateTime.of(2026, 5, 10, 15, 30),
                 List.of(new InstructorQuizDetail.QuestionDetail(
-                        5L, 1, "React의 가상 DOM이란?", 7L, "가상 DOM 설명",
+                        5L, 1, "React의 가상 DOM이란?", 7L, "가상 DOM 설명", 2,
                         List.of(
                                 new InstructorQuizDetail.OptionDetail(6L, 1, "실제 DOM의 복사본", false),
                                 new InstructorQuizDetail.OptionDetail(7L, 2, "메모리에 존재하는 DOM의 표현", true))))
@@ -72,6 +72,7 @@ class AdminQuizControllerTest {
         InstructorQuizDetailResponse.Question question = response.questions().get(0);
         assertThat(question.correctOptionId()).isEqualTo(7L);
         assertThat(question.explanation()).isEqualTo("가상 DOM 설명");
+        assertThat(question.difficulty()).isEqualTo(2);
         assertThat(question.options()).hasSize(2);
         assertThat(question.options().get(1).correct()).isTrue();
         verify(quizQueryUseCase).getDetailByAdmin(90L);
@@ -92,7 +93,7 @@ class AdminQuizControllerTest {
     void createQuizDelegatesToAdminUseCaseAndMapsTheRequest() {
         InstructorQuizRequest request = new InstructorQuizRequest(
                 "관리자 등록 퀴즈", 10L, 100L,
-                List.of(new InstructorQuizRequest.Question("문제 내용", "해설", 2,
+                List.of(new InstructorQuizRequest.Question("문제 내용", "해설", 1, 2,
                         List.of(
                                 new InstructorQuizRequest.Option("보기1"),
                                 new InstructorQuizRequest.Option("보기2"),
@@ -114,13 +115,14 @@ class AdminQuizControllerTest {
         assertThat(captor.getValue().sectionId()).isEqualTo(100L);
         assertThat(captor.getValue().questions()).hasSize(1);
         assertThat(captor.getValue().questions().get(0).correctOptionNumber()).isEqualTo(2);
+        assertThat(captor.getValue().questions().get(0).difficulty()).isEqualTo(1);
     }
 
     @Test
     void updateQuizDelegatesToAdminUseCaseAndMapsTheRequest() {
         InstructorQuizRequest request = new InstructorQuizRequest(
                 "수정된 퀴즈", 10L, 100L,
-                List.of(new InstructorQuizRequest.Question("문제 내용", "해설", 3,
+                List.of(new InstructorQuizRequest.Question("문제 내용", "해설", 2, 3,
                         List.of(
                                 new InstructorQuizRequest.Option("보기1"),
                                 new InstructorQuizRequest.Option("보기2"),

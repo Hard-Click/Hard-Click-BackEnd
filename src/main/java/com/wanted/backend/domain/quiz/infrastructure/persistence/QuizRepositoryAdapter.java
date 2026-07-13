@@ -110,7 +110,8 @@ public class QuizRepositoryAdapter implements QuizRepository {
     private void appendQuestions(QuizJpaEntity entity, Quiz quiz) {
         for (QuizQuestion question : quiz.getQuestions()) {
             QuizQuestionJpaEntity questionEntity = entity.addQuestion(
-                    question.getQuestionNumber(), question.getQuestionText(), question.getExplanation());
+                    question.getQuestionNumber(), question.getQuestionText(), question.getExplanation(),
+                    question.getDifficulty());
             for (QuizOption option : question.getOptions()) {
                 questionEntity.addOption(option.getOptionNumber(), option.getOptionText(), option.isCorrect());
             }
@@ -121,6 +122,7 @@ public class QuizRepositoryAdapter implements QuizRepository {
         var questions = entity.getQuestions().stream()
                 .map(q -> QuizQuestion.restore(
                         q.getId(), q.getQuestionNumber(), q.getQuestionText(), q.getExplanation(),
+                        q.getDifficulty(),
                         q.getOptions().stream()
                                 .map(o -> QuizOption.restore(o.getId(), o.getOptionNumber(), o.getOptionText(), o.isCorrect()))
                                 .toList()))
