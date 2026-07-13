@@ -122,7 +122,7 @@ identity:
 
   email:
     allowed-domain: gmail.com
-    code-ttl: ${IDENTITY_EMAIL_CODE_TTL:300000}
+    code-ttl: ${IDENTITY_EMAIL_CODE_TTL:180000}
     verified-token-ttl: ${IDENTITY_EMAIL_VERIFIED_TOKEN_TTL:300000}
     processing-reservation-ttl: ${IDENTITY_EMAIL_PROCESSING_RESERVATION_TTL:300000}
     completion-retry-attempts: ${IDENTITY_EMAIL_COMPLETION_RETRY_ATTEMPTS:3}
