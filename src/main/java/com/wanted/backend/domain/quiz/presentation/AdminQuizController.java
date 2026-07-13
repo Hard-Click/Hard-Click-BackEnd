@@ -74,6 +74,7 @@ public class AdminQuizController {
                                 question.questionText(),
                                 question.correctOptionId(),
                                 question.explanation(),
+                                question.difficulty(),
                                 question.options().stream()
                                         .map(option -> new InstructorQuizDetailResponse.Option(
                                                 option.optionId(),

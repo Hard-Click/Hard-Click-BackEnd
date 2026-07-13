@@ -139,6 +139,7 @@ public class QuizQueryService implements QuizQueryUseCase {
                                 .findFirst()
                                 .orElse(null),
                         question.getExplanation(),
+                        question.getDifficulty(),
                         question.getOptions().stream()
                                 .map(option -> new InstructorQuizDetail.OptionDetail(
                                         option.getId(),

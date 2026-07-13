@@ -20,6 +20,7 @@ public record InstructorQuizDetailResponse(
             String questionText,
             Long correctOptionId,
             String explanation,
+            Integer difficulty,
             List<Option> options
     ) {
     }
