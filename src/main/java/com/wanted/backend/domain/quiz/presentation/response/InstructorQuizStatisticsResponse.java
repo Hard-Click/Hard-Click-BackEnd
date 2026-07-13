@@ -7,8 +7,9 @@ import java.util.List;
 // (강사 QuizController와 관리자 AdminQuizController가 함께 사용 → 컨트롤러 간 결합 방지).
 public record InstructorQuizStatisticsResponse(
         String courseTitle,
+        Long sectionId,
         String sectionTitle,
-        int week,
+        int weekNumber,
         String quizTitle,
         Summary summary,
         List<ScoreDistribution> scoreDistribution,

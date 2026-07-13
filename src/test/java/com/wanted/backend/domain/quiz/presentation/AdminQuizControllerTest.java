@@ -147,7 +147,7 @@ class AdminQuizControllerTest {
     @Test
     void getQuizStatisticsMapsResultAndBuildsQueryWithoutInstructor() {
         when(quizQueryUseCase.getStatisticsByAdmin(any(QuizStatisticsQuery.class))).thenReturn(
-                new InstructorQuizStatistics("React 완벽 가이드", "1주차", 1, "React 기초 개념 퀴즈",
+                new InstructorQuizStatistics("React 완벽 가이드", 100L, "1주차", 1, "React 기초 개념 퀴즈",
                         new InstructorQuizStatistics.Summary(3, 2, 1, 75),
                         List.of(new InstructorQuizStatistics.ScoreDistribution("90~100", 1, 50)),
                         List.of(new InstructorQuizStatistics.StudentScore("choiaa", "최아", true, 90,
@@ -158,6 +158,8 @@ class AdminQuizControllerTest {
 
         assertThat(result.getStatusCode().value()).isEqualTo(200);
         InstructorQuizStatisticsResponse response = result.getBody().data();
+        assertThat(response.sectionId()).isEqualTo(100L);
+        assertThat(response.weekNumber()).isEqualTo(1);
         assertThat(response.summary().totalCount()).isEqualTo(3);
         assertThat(response.summary().averageScore()).isEqualTo(75);
         assertThat(response.students()).hasSize(1);

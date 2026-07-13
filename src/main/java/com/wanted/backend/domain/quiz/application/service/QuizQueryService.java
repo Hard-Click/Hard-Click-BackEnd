@@ -361,7 +361,7 @@ public class QuizQueryService implements QuizQueryUseCase {
         Map<Long, CourseSectionTitlePort.SectionInfo> sections =
                 courseSectionTitlePort.findSectionsByIds(List.of(quiz.getSectionId()));
         String sectionTitle = sectionTitleOf(sections, quiz.getSectionId());
-        int week = weekOf(sections, quiz.getSectionId());
+        int weekNumber = weekOf(sections, quiz.getSectionId());
 
         // 전체 수강생 + 각 수강생의 응시(제출) 현황을 조합
         Map<Long, QuizSubmission> submissionByMemberId = quizSubmissionRepository.findByQuizId(query.quizId()).stream()
@@ -403,8 +403,8 @@ public class QuizQueryService implements QuizQueryUseCase {
                 .toList();
         students = paginate(students, query.page(), query.size());
 
-        return new InstructorQuizStatistics(courseTitle, sectionTitle, week, quiz.getTitle(),
-                summary, distribution, students);
+        return new InstructorQuizStatistics(courseTitle, quiz.getSectionId(), sectionTitle, weekNumber,
+                quiz.getTitle(), summary, distribution, students);
     }
 
     private List<InstructorQuizStatistics.ScoreDistribution> scoreDistribution(

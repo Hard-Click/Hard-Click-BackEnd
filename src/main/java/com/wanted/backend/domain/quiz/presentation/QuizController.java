@@ -345,8 +345,9 @@ public class QuizController {
 
         InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 statistics.courseTitle(),
+                statistics.sectionId(),
                 statistics.sectionTitle(),
-                statistics.week(),
+                statistics.weekNumber(),
                 statistics.quizTitle(),
                 new InstructorQuizStatisticsResponse.Summary(
                         statistics.summary().totalCount(),

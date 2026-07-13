@@ -9,8 +9,9 @@ import java.util.List;
  */
 public record InstructorQuizStatistics(
         String courseTitle,
+        Long sectionId,
         String sectionTitle,
-        int week,
+        int weekNumber,
         String quizTitle,
         Summary summary,
         List<ScoreDistribution> scoreDistribution,
