@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.order.application.service;
 
 import com.wanted.backend.domain.order.application.dto.OrderDetailResult;
+import com.wanted.backend.domain.order.application.port.OrderCourseProgressPort;
 import com.wanted.backend.domain.order.application.port.OrderCourseQueryPort;
 import com.wanted.backend.domain.order.application.port.OrderEnrollmentStatusPort;
 import com.wanted.backend.domain.order.application.port.OrderSubscriptionPlanPort;
@@ -9,6 +10,7 @@ import com.wanted.backend.domain.order.domain.model.Order;
 import com.wanted.backend.domain.order.domain.model.OrderItem;
 import com.wanted.backend.domain.order.domain.model.OrderStatus;
 import com.wanted.backend.domain.order.domain.model.OrderType;
+import com.wanted.backend.domain.order.domain.policy.OrderRefundPolicy;
 import com.wanted.backend.domain.order.domain.repository.OrderRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
@@ -16,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,6 +33,8 @@ public class GetOrderService implements GetOrderUseCase {
     private final OrderEnrollmentStatusPort orderEnrollmentStatusPort;
     private final OrderCourseQueryPort orderCourseQueryPort;
     private final OrderSubscriptionPlanPort orderSubscriptionPlanPort;
+    private final OrderCourseProgressPort orderCourseProgressPort;
+    private final Clock clock;
 
     @Override
     public OrderDetailResult getOrder(Long memberId, Long orderId) {
@@ -67,11 +73,24 @@ public class GetOrderService implements GetOrderUseCase {
                 order.getStatus() == OrderStatus.PAID
                         || order.getStatus() == OrderStatus.PARTIAL_REFUNDED;
 
+        // 강의 항목 환불 정책(7일 이내 + 진도율 10% 미만) 판정을 위한 진도율 조회
+        Map<Long, Integer> progressByCourseId = courseIds.isEmpty()
+                ? Map.of()
+                : orderCourseProgressPort.findProgressPercents(memberId, courseIds);
+        LocalDateTime now = LocalDateTime.now(clock);
+
         List<OrderDetailResult.Item> items = rawItems.stream()
                 .map(item -> {
 
-                    boolean refundable =
-                            orderPaid && !item.isRefunded();
+                    boolean refundable;
+                    if (item.getCourseId() == null) {
+                        // 구독 등 비강의 항목: 7일/진도율 규칙 미적용(진도 개념 없음)
+                        refundable = orderPaid && !item.isRefunded();
+                    } else {
+                        int progressPercent = progressByCourseId.getOrDefault(item.getCourseId(), 0);
+                        refundable = orderPaid && !item.isRefunded()
+                                && OrderRefundPolicy.isCourseItemRefundable(order.getPaidAt(), now, progressPercent);
+                    }
 
                     int refundAmount =
                             item.isRefunded() ? 0 : item.getPrice();
