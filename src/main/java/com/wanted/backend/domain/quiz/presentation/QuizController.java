@@ -2,7 +2,6 @@ package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.CreateQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.DeleteQuizCommand;
-import com.wanted.backend.domain.quiz.application.command.QuizQuestionCommand;
 import com.wanted.backend.domain.quiz.application.command.SubmitQuizCommand;
 import com.wanted.backend.domain.quiz.application.command.UpdateQuizCommand;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
@@ -16,18 +15,22 @@ import com.wanted.backend.domain.quiz.application.result.StudentQuizDetail;
 import com.wanted.backend.domain.quiz.application.usecase.QuizCommandUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizQueryUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.QuizSubmissionUseCase;
+import com.wanted.backend.domain.quiz.presentation.request.InstructorQuizRequest;
+import com.wanted.backend.domain.quiz.presentation.request.QuizSubmissionRequest;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDeleteResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizDetailResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizMutationResponse;
+import com.wanted.backend.domain.quiz.presentation.response.InstructorQuizStatisticsResponse;
+import com.wanted.backend.domain.quiz.presentation.response.MyQuizListResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizReportResponse;
+import com.wanted.backend.domain.quiz.presentation.response.QuizSubmissionResponse;
+import com.wanted.backend.domain.quiz.presentation.response.StudentQuizDetailResponse;
 import com.wanted.backend.global.common.ApiResponse;
 import com.wanted.backend.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -50,10 +53,6 @@ import java.util.List;
 @RequestMapping("/api")
 @Tag(name = "Quiz", description = "학생/강사 퀴즈 API")
 public class QuizController {
-
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_PAGE_SIZE = 10;
-    private static final int MAX_PAGE_SIZE = 50;
 
     private final QuizCommandUseCase quizCommandUseCase;
     private final QuizQueryUseCase quizQueryUseCase;
@@ -168,6 +167,7 @@ public class QuizController {
                 report.correctCount(),
                 report.incorrectCount(),
                 report.scoreDiff(),
+                report.previousScore(),
                 report.wrongNotes().stream().map(QuizController::toQuestionResultResponse).toList(),
                 report.questions().stream().map(QuizController::toQuestionResultResponse).toList()
         );
@@ -207,6 +207,8 @@ public class QuizController {
                                 summary.quizId(),
                                 summary.quizTitle(),
                                 summary.courseTitle(),
+                                summary.sectionId(),
+                                summary.weekNumber(),
                                 summary.sectionTitle(),
                                 summary.questionCount(),
                                 summary.createdAt().atZone(ZoneId.systemDefault()).toOffsetDateTime()))
@@ -241,6 +243,7 @@ public class QuizController {
                                 question.questionText(),
                                 question.correctOptionId(),
                                 question.explanation(),
+                                question.difficulty(),
                                 question.options().stream()
                                         .map(option -> new InstructorQuizDetailResponse.Option(
                                                 option.optionId(),
@@ -265,7 +268,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         Long quizId = quizCommandUseCase.create(command);
@@ -293,7 +296,7 @@ public class QuizController {
                 request.courseId(),
                 request.sectionId(),
                 request.quizTitle(),
-                toQuestionCommands(request.questions())
+                QuizRequestMapper.toQuestionCommands(request.questions())
         );
 
         quizCommandUseCase.update(command);
@@ -336,21 +339,16 @@ public class QuizController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
     ) {
-        QuizStatisticsQuery query = new QuizStatisticsQuery(
-                userDetails.getMemberId(),
-                quizId,
-                keyword,
-                parseSort(sort),
-                parseFilter(filter),
-                normalizePage(page),
-                normalizeSize(size)
-        );
+        QuizStatisticsQuery query = QuizStatisticsQuery.of(
+                userDetails.getMemberId(), quizId, keyword, sort, filter, page, size);
 
         InstructorQuizStatistics statistics = quizQueryUseCase.getInstructorQuizStatistics(query);
 
         InstructorQuizStatisticsResponse response = new InstructorQuizStatisticsResponse(
                 statistics.courseTitle(),
+                statistics.sectionId(),
                 statistics.sectionTitle(),
+                statistics.weekNumber(),
                 statistics.quizTitle(),
                 new InstructorQuizStatisticsResponse.Summary(
                         statistics.summary().totalCount(),
@@ -375,244 +373,4 @@ public class QuizController {
         return ApiResponse.success("퀴즈 점수 현황을 조회했습니다.", response);
     }
 
-    private QuizStatisticsQuery.SortType parseSort(String sort) {
-        if (sort == null || sort.isBlank()) {
-            return QuizStatisticsQuery.SortType.SCORE_DESC;
-        }
-        try {
-            return QuizStatisticsQuery.SortType.valueOf(sort.strip().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return QuizStatisticsQuery.SortType.SCORE_DESC;
-        }
-    }
-
-    private QuizStatisticsQuery.FilterType parseFilter(String filter) {
-        if (filter == null || filter.isBlank()) {
-            return QuizStatisticsQuery.FilterType.ALL;
-        }
-        try {
-            return QuizStatisticsQuery.FilterType.valueOf(filter.strip().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return QuizStatisticsQuery.FilterType.ALL;
-        }
-    }
-
-    private List<QuizQuestionCommand> toQuestionCommands(List<InstructorQuizRequest.Question> questions) {
-        return questions.stream()
-                .map(q -> new QuizQuestionCommand(
-                        q.questionText(),
-                        q.explanation(),
-                        q.correctOptionNumber(),
-                        q.options().stream().map(InstructorQuizRequest.Option::optionText).toList()
-                ))
-                .toList();
-    }
-
-    private int normalizePage(Integer page) {
-        if (page == null || page < DEFAULT_PAGE) {
-            return DEFAULT_PAGE;
-        }
-        return page;
-    }
-
-    private int normalizeSize(Integer size) {
-        if (size == null || size <= 0) {
-            return DEFAULT_PAGE_SIZE;
-        }
-        return Math.min(size, MAX_PAGE_SIZE);
-    }
-
-    private <T> List<T> paginate(List<T> items, int page, int size) {
-        long offset = (long) page * size;
-        if (offset >= items.size()) {
-            return List.of();
-        }
-
-        int fromIndex = (int) offset;
-        int toIndex = Math.min(fromIndex + size, items.size());
-        return items.subList(fromIndex, toIndex);
-    }
-
-    public record MyQuizListResponse(
-            Long courseId,
-            String courseTitle,
-            Summary summary,
-            List<MyQuizItem> quizzes
-    ) {
-        public record Summary(int completedCount, int averageScore) {
-        }
-
-        public record MyQuizItem(
-                Long quizId,
-                int weekNumber,
-                String quizTitle,
-                int questionCount,
-                boolean completed,
-                Integer score,
-                OffsetDateTime submittedAt
-        ) {
-        }
-    }
-
-    public record StudentQuizDetailResponse(
-            Long quizId,
-            String quizTitle,
-            String courseTitle,
-            String sectionTitle,
-            int totalQuestionCount,
-            int answeredCount,
-            boolean submitted,
-            List<Question> questions
-    ) {
-        public record Question(Long questionId, int questionNumber, String questionText, List<Option> options) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText) {
-        }
-    }
-
-    public record QuizSubmissionRequest(List<Answer> answers) {
-        public record Answer(Long questionId, Long selectedOptionId) {
-        }
-    }
-
-    public record QuizSubmissionResponse(
-            Long submissionId,
-            Long quizId,
-            int score,
-            int totalQuestionCount,
-            int correctCount,
-            int incorrectCount,
-            OffsetDateTime submittedAt
-    ) {
-    }
-
-    public record QuizReportResponse(
-            Long quizId,
-            int week,
-            String quizTitle,
-            OffsetDateTime submittedAt,
-            int score,
-            int totalScore,
-            int correctCount,
-            int incorrectCount,
-            int scoreDiff,
-            List<QuestionResult> wrongNotes,
-            List<QuestionResult> questions
-    ) {
-        public record QuestionResult(
-                Long questionId,
-                int questionNumber,
-                String questionText,
-                Long correctOptionId,
-                Long selectedOptionId,
-                boolean correct,
-                String explanation,
-                List<Option> options
-        ) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText) {
-        }
-    }
-
-    public record InstructorQuizListResponse(
-            Long courseId,
-            Long sectionId,
-            List<InstructorQuizItem> quizzes
-    ) {
-        public record InstructorQuizItem(
-                Long quizId,
-                String quizTitle,
-                String courseTitle,
-                String sectionTitle,
-                int questionCount,
-                OffsetDateTime createdAt
-        ) {
-        }
-    }
-
-    public record InstructorQuizDetailResponse(
-            Long quizId,
-            String quizTitle,
-            Long courseId,
-            String courseTitle,
-            Long sectionId,
-            String sectionTitle,
-            int questionCount,
-            OffsetDateTime createdAt,
-            List<Question> questions
-    ) {
-        public record Question(
-                Long questionId,
-                int questionNumber,
-                String questionText,
-                Long correctOptionId,
-                String explanation,
-                List<Option> options
-        ) {
-        }
-
-        public record Option(Long optionId, int optionNumber, String optionText, boolean correct) {
-        }
-    }
-
-    public record InstructorQuizRequest(
-            @NotBlank(message = "퀴즈 제목은 필수입니다.") String quizTitle,
-            @NotNull(message = "강의 ID는 필수입니다.") Long courseId,
-            @NotNull(message = "섹션 ID는 필수입니다.") Long sectionId,
-            @NotEmpty(message = "문항은 최소 1개 이상이어야 합니다.") @Valid List<Question> questions
-    ) {
-        public record Question(
-                @NotBlank(message = "문제 내용은 필수입니다.") String questionText,
-                String explanation,
-                @Min(value = 1, message = "정답 보기 번호는 1~4 사이여야 합니다.")
-                @Max(value = 4, message = "정답 보기 번호는 1~4 사이여야 합니다.")
-                @Schema(description = "정답 보기 번호(1~4)", example = "2") int correctOptionNumber,
-                @Size(min = 4, max = 4, message = "보기는 4개가 필요합니다.") @Valid List<Option> options
-        ) {
-        }
-
-        public record Option(@NotBlank(message = "보기 내용은 필수입니다.") String optionText) {
-        }
-    }
-
-    public record InstructorQuizMutationResponse(
-            Long quizId,
-            String quizTitle,
-            int questionCount,
-            OffsetDateTime updatedAt
-    ) {
-    }
-
-    public record InstructorQuizDeleteResponse(
-            Long quizId,
-            String status,
-            OffsetDateTime deletedAt
-    ) {
-    }
-
-    public record InstructorQuizStatisticsResponse(
-            String courseTitle,
-            String sectionTitle,
-            String quizTitle,
-            Summary summary,
-            List<ScoreDistribution> scoreDistribution,
-            List<StudentScore> students
-    ) {
-        public record Summary(int totalCount, int submittedCount, int notSubmittedCount, int averageScore) {
-        }
-
-        public record ScoreDistribution(String range, int count, int percentage) {
-        }
-
-        public record StudentScore(
-                String userId,
-                String name,
-                boolean submitted,
-                Integer score,
-                OffsetDateTime submittedAt
-        ) {
-        }
-    }
 }

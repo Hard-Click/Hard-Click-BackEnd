@@ -17,6 +17,7 @@ public record QuizReport(
         int correctCount,
         int incorrectCount,
         int scoreDiff,
+        Integer previousScore,
         List<QuestionResult> wrongNotes,
         List<QuestionResult> questions
 ) {

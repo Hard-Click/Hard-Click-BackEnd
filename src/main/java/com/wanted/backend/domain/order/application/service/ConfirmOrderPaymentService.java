@@ -149,6 +149,10 @@ public class ConfirmOrderPaymentService implements ConfirmOrderPaymentUseCase {
                 orderCartDeletePort.deleteByMemberIdAndCourseIds(order.getMemberId(), purchasedCourseIds);
             }
         } catch (RuntimeException e) {
+            // 결제(과금)는 이미 확정됐으나 지급만 실패한 상태 — 무음으로 삼키면 사용자는 과금 후 아무것도
+            // 못 받는다. 수동 보정 대상임을 알람으로 표면화하기 위해 실패 메트릭을 남긴다.
+            meterRegistry.counter("order.payment.access_grant.failed",
+                    "type", order.getType().name()).increment();
             log.error("[ACCESS_GRANT_FAILED] 결제는 완료됐지만 수강권/구독권 지급 실패 — orderNo: {}, type: {}",
                     order.getOrderNo(), order.getType(), e);
         }

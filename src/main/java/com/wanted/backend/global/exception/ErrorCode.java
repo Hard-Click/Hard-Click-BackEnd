@@ -157,6 +157,8 @@ import org.springframework.http.HttpStatus;
     ORDER_ITEM_ALREADY_REFUNDED(HttpStatus.CONFLICT, "ORD008", "이미 환불된 주문 항목입니다."),
     ORDER_ENROLLMENT_REVOKE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ORD009", "수강 권한 박탈에 실패했습니다."),
     ORDER_INVALID_STATUS(HttpStatus.INTERNAL_SERVER_ERROR, "ORD010", "알 수 없는 주문 상태입니다."),
+    REFUND_WINDOW_EXPIRED(HttpStatus.CONFLICT, "ORD011", "결제 후 7일이 지나 환불할 수 없습니다."),
+    REFUND_PROGRESS_EXCEEDED(HttpStatus.CONFLICT, "ORD012", "진도율 10% 이상 수강한 강의는 환불할 수 없습니다."),
     // 순공 세션 관련 예외
     STUDY_TIMER_SESSION_ALREADY_RUNNING(HttpStatus.CONFLICT, "ST001", "이미 실행 중인 순공시간 세션이 있습니다."),
     STUDY_TIMER_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "ST002", "존재하지 않는 순공시간 세션입니다."),

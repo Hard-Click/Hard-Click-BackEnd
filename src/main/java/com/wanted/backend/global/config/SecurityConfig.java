@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/signup",
+                                "/api/auth/logout",
+                                "/api/auth/refresh",
                                 "/api/auth/check-username",
                                 "/api/auth/check-email",
                                 "/api/auth/email/send",
@@ -101,7 +103,9 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
-                "https://hard-click-front-end.vercel.app"
+                "https://hard-click-front-end.vercel.app",
+                "https://www.flown.site",
+                "https://flown.site"
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"));

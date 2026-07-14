@@ -48,6 +48,11 @@ public class QuizJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    // 소프트 삭제 시각. NULL = 활성. 섹션 삭제 cascade가 hard-delete 대신 이 값을 채운다
+    // (학생 제출 이력 quiz_submission을 보존하기 위함).
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 20)
     @OrderBy("questionNumber ASC")
@@ -64,8 +69,9 @@ public class QuizJpaEntity {
         return entity;
     }
 
-    public QuizQuestionJpaEntity addQuestion(int questionNumber, String questionText, String explanation) {
-        QuizQuestionJpaEntity question = QuizQuestionJpaEntity.of(this, questionNumber, questionText, explanation);
+    public QuizQuestionJpaEntity addQuestion(int questionNumber, String questionText, String explanation,
+                                             Integer difficulty) {
+        QuizQuestionJpaEntity question = QuizQuestionJpaEntity.of(this, questionNumber, questionText, explanation, difficulty);
         questions.add(question);
         return question;
     }
@@ -78,5 +84,10 @@ public class QuizJpaEntity {
 
     public void clearQuestions() {
         questions.clear();
+    }
+
+    // 섹션 삭제 cascade용 소프트 삭제. 행·제출 이력은 남기고 활성 조회에서만 제외된다.
+    public void softDelete(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

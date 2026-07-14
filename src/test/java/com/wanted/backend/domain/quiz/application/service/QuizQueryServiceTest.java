@@ -7,6 +7,7 @@ import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.query.QuizStatisticsQuery;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizDetail;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizStatistics;
+import com.wanted.backend.domain.quiz.application.result.AdminCourseQuizzes;
 import com.wanted.backend.domain.quiz.application.result.InstructorQuizSummary;
 import com.wanted.backend.domain.quiz.application.result.MyQuizList;
 import com.wanted.backend.domain.quiz.application.result.QuizReport;
@@ -81,8 +82,9 @@ class QuizQueryServiceTest {
         ));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
-                .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초", 101L, "섹션 2: Hooks"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1: React 기초", 1),
+                101L, new CourseSectionTitlePort.SectionInfo("섹션 2: Hooks", 2)));
 
         List<InstructorQuizSummary> summaries = service.getInstructorQuizzes(INSTRUCTOR_ID, COURSE_ID, null);
 
@@ -91,8 +93,11 @@ class QuizQueryServiceTest {
         assertThat(first.quizId()).isEqualTo(90L);
         assertThat(first.quizTitle()).isEqualTo("1주차 퀴즈");
         assertThat(first.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(first.sectionId()).isEqualTo(SECTION_ID);
+        assertThat(first.weekNumber()).isEqualTo(1);
         assertThat(first.sectionTitle()).isEqualTo("섹션 1: React 기초");
         assertThat(first.questionCount()).isEqualTo(8);
+        assertThat(summaries.get(1).weekNumber()).isEqualTo(2);
         assertThat(summaries.get(1).sectionTitle()).isEqualTo("섹션 2: Hooks");
         assertThat(summaries.get(1).questionCount()).isEqualTo(5);
     }
@@ -102,18 +107,20 @@ class QuizQueryServiceTest {
         when(quizRepository.findAllByInstructor(INSTRUCTOR_ID, null, null))
                 .thenReturn(List.of(quiz(90L, 999L, 888L, "퀴즈", 1)));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of());
 
         List<InstructorQuizSummary> summaries = service.getInstructorQuizzes(INSTRUCTOR_ID, null, null);
 
         assertThat(summaries.get(0).courseTitle()).isEqualTo("강의 #999");
+        // dangling 섹션: weekNumber 0 + 섹션명 폴백 → FE 정규식 파싱 실패 대신 명시적 0 제공
+        assertThat(summaries.get(0).weekNumber()).isZero();
         assertThat(summaries.get(0).sectionTitle()).isEqualTo("섹션 #888");
     }
 
     @Test
     void instructorQuizzesReturnAnEmptyListWhenTheInstructorHasNoQuizzes() {
         when(quizRepository.findAllByInstructor(INSTRUCTOR_ID, null, null)).thenReturn(List.of());
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of());
 
         assertThat(service.getInstructorQuizzes(INSTRUCTOR_ID, null, null)).isEmpty();
     }
@@ -187,6 +194,103 @@ class QuizQueryServiceTest {
         assertThatThrownBy(() -> service.getInstructorQuizDetail(999L, 90L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_AUTHORIZED);
+    }
+
+    @Test
+    void getQuizDetailReturnsDetailWithoutOwnershipCheck() {
+        // 관리자(ADMIN) core 조회 — 다른 강사 소유 퀴즈여도 소유권을 따지지 않고 상세를 반환한다.
+        QuizQuestion question = QuizQuestion.restore(11L, 1, "React의 가상 DOM이란?", "가상 DOM 설명",
+                List.of(
+                        QuizOption.restore(21L, 1, "보기1", false),
+                        QuizOption.restore(22L, 2, "보기2", true),
+                        QuizOption.restore(23L, 3, "보기3", false),
+                        QuizOption.restore(24L, 4, "보기4", false)));
+        Quiz quiz = Quiz.restore(90L, INSTRUCTOR_ID, COURSE_ID, SECTION_ID, "React 기초 개념 퀴즈",
+                List.of(question), LocalDateTime.of(2026, 5, 10, 15, 30));
+        when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, "섹션 1: React 기초"));
+
+        InstructorQuizDetail detail = service.getDetailByAdmin(90L);
+
+        assertThat(detail.quizId()).isEqualTo(90L);
+        assertThat(detail.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(detail.questionCount()).isEqualTo(1);
+        assertThat(detail.questions().get(0).correctOptionId()).isEqualTo(22L);
+    }
+
+    @Test
+    void getQuizDetailRejectsWhenTheQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getDetailByAdmin(90L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminReturnsWeeklyQuizzesSortedByWeek() {
+        // 섹션 order(주차)로 정렬: quiz90(week1) → quiz91(week2). 입력은 뒤섞여 있어도 결과는 주차순.
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5),
+                quiz(90L, COURSE_ID, SECTION_ID, "1주차 퀴즈", 8)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
+                .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
+                SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1),
+                101L, new CourseSectionTitlePort.SectionInfo("섹션 2", 2)));
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, null);
+
+        assertThat(result.courseId()).isEqualTo(COURSE_ID);
+        assertThat(result.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(result.weeks()).extracting(AdminCourseQuizzes.WeeklyQuiz::weekNumber).containsExactly(1, 2);
+        assertThat(result.weeks().get(0).quizId()).isEqualTo(90L);
+        assertThat(result.weeks().get(0).questionCount()).isEqualTo(8);
+        assertThat(result.weeks().get(1).quizId()).isEqualTo(91L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminBreaksSameWeekTiesByQuizId() {
+        // 같은 주차(섹션 동일) 내에서는 quizId 오름차순 — 입력이 뒤섞여도 90 → 92
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(92L, COURSE_ID, SECTION_ID, "두 번째 퀴즈", 1),
+                quiz(90L, COURSE_ID, SECTION_ID, "첫 번째 퀴즈", 1)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+
+        assertThat(service.getCourseQuizzesByAdmin(COURSE_ID, null).weeks())
+                .extracting(AdminCourseQuizzes.WeeklyQuiz::quizId)
+                .containsExactly(90L, 92L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminFiltersBySectionId() {
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(
+                quiz(91L, COURSE_ID, 101L, "2주차 퀴즈", 5),
+                quiz(90L, COURSE_ID, SECTION_ID, "1주차 퀴즈", 8)));
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of(COURSE_ID, "React"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("섹션 1", 1)));
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, SECTION_ID);
+
+        assertThat(result.weeks()).extracting(AdminCourseQuizzes.WeeklyQuiz::quizId).containsExactly(90L);
+    }
+
+    @Test
+    void getCourseQuizzesByAdminFallsBackToPlaceholderTitleAndEmptyWhenNoQuizzes() {
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of());
+        when(courseTitlePort.findTitlesByCourseIds(anyCollection())).thenReturn(Map.of());
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of());
+
+        AdminCourseQuizzes result = service.getCourseQuizzesByAdmin(COURSE_ID, null);
+
+        assertThat(result.courseTitle()).isEqualTo("강의 #" + COURSE_ID);
+        assertThat(result.weeks()).isEmpty();
     }
 
     @Test
@@ -317,7 +421,7 @@ class QuizQueryServiceTest {
     void quizReportComputesScoreDiffAgainstPreviousWeekAndSeparatesWrongNotes() {
         Quiz current = reportQuiz(90L, 200L, "2주차 퀴즈");   // week 2
         Quiz previous = reportQuiz(91L, 100L, "1주차 퀴즈");  // week 1
-        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findByIdIncludingDeleted(90L)).thenReturn(Optional.of(current));
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current, previous));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection())).thenReturn(Map.of(
@@ -343,8 +447,9 @@ class QuizQueryServiceTest {
         assertThat(report.totalScore()).isEqualTo(100);
         assertThat(report.correctCount()).isEqualTo(1);
         assertThat(report.incorrectCount()).isEqualTo(1);
-        // 이전 주차 75점 대비 -15
+        // 이전 주차 75점 대비 -15, previousScore로 이전 점수 노출
         assertThat(report.scoreDiff()).isEqualTo(-15);
+        assertThat(report.previousScore()).isEqualTo(75);
         assertThat(report.questions()).hasSize(2);
         // 오답노트는 틀린 문항(Q2)만
         assertThat(report.wrongNotes()).hasSize(1);
@@ -359,7 +464,7 @@ class QuizQueryServiceTest {
     @Test
     void quizReportScoreDiffIsZeroWhenNoPreviousWeekSubmission() {
         Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");   // week 1, 이전 없음
-        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findByIdIncludingDeleted(90L)).thenReturn(Optional.of(current));
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
@@ -374,12 +479,14 @@ class QuizQueryServiceTest {
 
         QuizReport report = service.getMyQuizReport(MEMBER_ID, 90L);
 
+        // 이전 주차 제출 없음 → previousScore null (scoreDiff 0과 구분)
+        assertThat(report.previousScore()).isNull();
         assertThat(report.scoreDiff()).isZero();
     }
 
     @Test
     void quizReportRejectsWhenQuizDoesNotExist() {
-        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+        when(quizRepository.findByIdIncludingDeleted(90L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
                 .isInstanceOf(BusinessException.class)
@@ -389,7 +496,7 @@ class QuizQueryServiceTest {
     @Test
     void quizReportRejectsWhenNotSubmitted() {
         Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");
-        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findByIdIncludingDeleted(90L)).thenReturn(Optional.of(current));
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(current));
         when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
@@ -405,7 +512,7 @@ class QuizQueryServiceTest {
     @Test
     void quizReportRejectsWhenNotEnrolled() {
         Quiz current = reportQuiz(90L, 100L, "1주차 퀴즈");
-        when(quizRepository.findById(90L)).thenReturn(Optional.of(current));
+        when(quizRepository.findByIdIncludingDeleted(90L)).thenReturn(Optional.of(current));
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.getMyQuizReport(MEMBER_ID, 90L))
@@ -490,8 +597,8 @@ class QuizQueryServiceTest {
         when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
-                .thenReturn(Map.of(SECTION_ID, "1주차: React 기초"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("1주차: React 기초", 1)));
         // 수강생 3명 (member1/2 응시, member3 미응시)
         when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of(
                 new CourseStudentPort.CourseStudent(1L, "choiaa", "최아"),
@@ -510,6 +617,8 @@ class QuizQueryServiceTest {
                 statsQuery(QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL));
 
         assertThat(stats.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(stats.sectionId()).isEqualTo(SECTION_ID);
+        assertThat(stats.weekNumber()).isEqualTo(1);
         assertThat(stats.summary().totalCount()).isEqualTo(3);
         assertThat(stats.summary().submittedCount()).isEqualTo(2);
         assertThat(stats.summary().notSubmittedCount()).isEqualTo(1);
@@ -555,6 +664,32 @@ class QuizQueryServiceTest {
     }
 
     @Test
+    void getQuizStatisticsAggregatesWithoutOwnershipCheck() {
+        stubStatsCommon(); // 퀴즈는 INSTRUCTOR_ID(1L) 소유
+
+        // 관리자(ADMIN) core — instructorId=null(소유권 무시)로도 통계가 반환된다
+        InstructorQuizStatistics stats = service.getStatisticsByAdmin(
+                new QuizStatisticsQuery(null, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10));
+
+        assertThat(stats.courseTitle()).isEqualTo("React 완벽 가이드");
+        assertThat(stats.summary().totalCount()).isEqualTo(3);
+        assertThat(stats.summary().averageScore()).isEqualTo(75);
+        assertThat(stats.students()).hasSize(3);
+    }
+
+    @Test
+    void getQuizStatisticsRejectsWhenTheQuizDoesNotExist() {
+        when(quizRepository.findById(90L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getStatisticsByAdmin(
+                new QuizStatisticsQuery(null, 90L, null,
+                        QuizStatisticsQuery.SortType.SCORE_DESC, QuizStatisticsQuery.FilterType.ALL, 0, 10)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_NOT_FOUND);
+    }
+
+    @Test
     void instructorQuizStatisticsRejectsWhenQuizDoesNotExist() {
         when(quizRepository.findById(90L)).thenReturn(Optional.empty());
 
@@ -585,8 +720,8 @@ class QuizQueryServiceTest {
         when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
-                .thenReturn(Map.of(SECTION_ID, "1주차"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("1주차", 1)));
         // 세 명 모두 동점(80) — userId 오름차순(aaa, bbb, ccc)으로 확정돼야 함
         when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of(
                 new CourseStudentPort.CourseStudent(3L, "ccc", "병"),
@@ -610,8 +745,8 @@ class QuizQueryServiceTest {
         when(quizRepository.findById(90L)).thenReturn(Optional.of(quiz));
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))
                 .thenReturn(Map.of(COURSE_ID, "React 완벽 가이드"));
-        when(courseSectionTitlePort.findTitlesBySectionIds(anyCollection()))
-                .thenReturn(Map.of(SECTION_ID, "1주차"));
+        when(courseSectionTitlePort.findSectionsByIds(anyCollection()))
+                .thenReturn(Map.of(SECTION_ID, new CourseSectionTitlePort.SectionInfo("1주차", 1)));
         when(courseStudentPort.findActiveStudents(COURSE_ID)).thenReturn(List.of());
         when(quizSubmissionRepository.findByQuizId(90L)).thenReturn(List.of());
 

@@ -8,6 +8,7 @@ public record InstructorQuizSummary(
         Long courseId,
         String courseTitle,
         Long sectionId,
+        int weekNumber,
         String sectionTitle,
         int questionCount,
         LocalDateTime createdAt

@@ -1,10 +1,12 @@
 package com.wanted.backend.domain.order.application.service;
 
+import com.wanted.backend.domain.order.application.port.OrderCourseProgressPort;
 import com.wanted.backend.domain.order.application.port.OrderEnrollmentRevocationPort;
 import com.wanted.backend.domain.order.application.usecase.RefundOrderItemUseCase;
 import com.wanted.backend.domain.order.domain.model.Order;
 import com.wanted.backend.domain.order.domain.model.OrderItem;
 import com.wanted.backend.domain.order.domain.model.OrderStatus;
+import com.wanted.backend.domain.order.domain.policy.OrderRefundPolicy;
 import com.wanted.backend.domain.order.domain.repository.OrderRepository;
 import com.wanted.backend.domain.payment.application.port.PgClient;
 import com.wanted.backend.global.exception.BusinessException;
@@ -16,7 +18,9 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,8 +45,10 @@ public class RefundOrderItemService implements RefundOrderItemUseCase {
 
     private final OrderRepository orderRepository;
     private final OrderEnrollmentRevocationPort enrollmentRevocationPort;
+    private final OrderCourseProgressPort orderCourseProgressPort;
     private final PgClient pgClient;
     private final StringRedisTemplate redisTemplate;
+    private final Clock clock;
 
     @Override
     public void refund(Long memberId, Long orderId, Long courseId, String idempotencyKey) {
@@ -74,6 +80,19 @@ public class RefundOrderItemService implements RefundOrderItemUseCase {
 
             if (item.isRefunded()) {
                 return;
+            }
+
+            // 환불 정책 재검증(서버 강제): 프론트 문구(7일 이내 + 진도율 10% 미만)만으론 우회 가능하므로
+            // 실제 환불 실행 시점에 다시 확인한다. GetOrderService.refundable과 동일 규칙(OrderRefundPolicy)을 공유.
+            LocalDateTime now = LocalDateTime.now(clock);
+            if (!OrderRefundPolicy.withinRefundWindow(order.getPaidAt(), now)) {
+                throw new BusinessException(ErrorCode.REFUND_WINDOW_EXPIRED);
+            }
+            int progressPercent = orderCourseProgressPort
+                    .findProgressPercents(memberId, List.of(courseId))
+                    .getOrDefault(courseId, 0);
+            if (!OrderRefundPolicy.progressWithinLimit(progressPercent)) {
+                throw new BusinessException(ErrorCode.REFUND_PROGRESS_EXCEEDED);
             }
 
             boolean allOthersAlreadyRefunded = order.getItems().stream()

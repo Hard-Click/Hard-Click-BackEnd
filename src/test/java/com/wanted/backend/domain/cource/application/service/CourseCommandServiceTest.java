@@ -2,12 +2,17 @@ package com.wanted.backend.domain.cource.application.service;
 
 import com.wanted.backend.domain.cource.application.command.ConfirmVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
+import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
 import com.wanted.backend.domain.cource.application.port.ThumbnailStoragePort;
 import com.wanted.backend.domain.cource.application.port.VideoStoragePort;
 import com.wanted.backend.domain.cource.domain.dto.CourseAuthorInfo;
+import com.wanted.backend.domain.cource.domain.event.SectionDeletedEvent;
+import com.wanted.backend.domain.cource.domain.model.Course;
+import com.wanted.backend.domain.cource.domain.model.CourseSection;
 import com.wanted.backend.domain.cource.domain.model.CourseStatus;
 import com.wanted.backend.domain.cource.domain.model.Lesson;
+import com.wanted.backend.domain.cource.domain.model.PriceType;
 import com.wanted.backend.domain.cource.domain.repository.CourseRepository;
 import com.wanted.backend.domain.cource.domain.repository.LessonRepository;
 import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
@@ -24,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,19 +43,21 @@ import static org.mockito.Mockito.when;
 
 class CourseCommandServiceTest {
 
+    private CourseRepository courseRepository;
     private LessonRepository lessonRepository;
     private VideoStoragePort videoStoragePort;
     private CourseVideoCatalogSyncPort videoCatalogSyncPort;
+    private ApplicationEventPublisher eventPublisher;
     private CourseCommandService service;
     private ResourcelessTransactionManager transactionManager;
 
     @BeforeEach
     void setUp() {
-        CourseRepository courseRepository = mock(CourseRepository.class);
+        courseRepository = mock(CourseRepository.class);
         lessonRepository = mock(LessonRepository.class);
         videoStoragePort = mock(VideoStoragePort.class);
         ThumbnailStoragePort thumbnailStoragePort = mock(ThumbnailStoragePort.class);
-        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
         NotificationRepository notificationRepository = mock(NotificationRepository.class);
         videoCatalogSyncPort = mock(CourseVideoCatalogSyncPort.class);
         Clock clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC);
@@ -201,5 +209,58 @@ class CourseCommandServiceTest {
                 .doesNotThrowAnyException();
 
         verify(lessonRepository).save(any(Lesson.class));
+    }
+
+    @Test
+    void 강의_수정으로_섹션이_삭제되면_해당_섹션의_퀴즈_삭제_이벤트를_발행한다() {
+        Long courseId = 100L;
+        Long authorId = 1L;
+        Course course = courseWithSections(courseId, authorId, 1L, 2L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 1주차(id=1)만 유지 → 2주차(id=2) 삭제
+        updateInTransaction(updateKeepingSections(courseId, authorId, 1L));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(SectionDeletedEvent.class);
+        assertThat(((SectionDeletedEvent) captor.getValue()).sectionIds()).containsExactly(2L);
+    }
+
+    @Test
+    void 강의_수정_시_삭제된_섹션이_없으면_이벤트를_발행하지_않는다() {
+        Long courseId = 100L;
+        Long authorId = 1L;
+        Course course = courseWithSections(courseId, authorId, 1L, 2L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 기존 섹션(1,2) 모두 유지
+        updateInTransaction(updateKeepingSections(courseId, authorId, 1L, 2L));
+
+        verify(eventPublisher, never()).publishEvent(any(SectionDeletedEvent.class));
+    }
+
+    private void updateInTransaction(UpdateCourseCommand command) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                service.update(command));
+    }
+
+    private Course courseWithSections(Long courseId, Long authorId, Long... sectionIds) {
+        List<CourseSection> sections = java.util.Arrays.stream(sectionIds)
+                .map(id -> CourseSection.restore(id, id + "주차", id.intValue() - 1, List.of()))
+                .toList();
+        return Course.restore(courseId, authorId, "제목", "과목", "설명", null,
+                PriceType.FREE, 0, CourseStatus.PUBLISHED, sections, Instant.now(),
+                List.of(), List.of(), List.of(), "BEGINNER");
+    }
+
+    private UpdateCourseCommand updateKeepingSections(Long courseId, Long authorId, Long... keptSectionIds) {
+        List<UpdateCourseCommand.SectionCommand> sections = java.util.Arrays.stream(keptSectionIds)
+                .map(id -> new UpdateCourseCommand.SectionCommand(id, id + "주차", id.intValue() - 1, List.of()))
+                .toList();
+        return new UpdateCourseCommand(courseId, authorId, "제목", "과목", "설명", null,
+                PriceType.FREE, 0, sections, List.of(), List.of(), List.of(), "BEGINNER");
     }
 }

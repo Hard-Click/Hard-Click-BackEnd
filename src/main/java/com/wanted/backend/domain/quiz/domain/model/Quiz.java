@@ -46,9 +46,15 @@ public class Quiz {
         return quiz;
     }
 
-    public void update(Long courseId, Long sectionId, String title, List<QuizQuestion> questions) {
+    public void update(Long instructorId, Long courseId, Long sectionId, String title,
+                       List<QuizQuestion> questions) {
         validateContents(courseId, sectionId, title, questions);
+        if (instructorId == null) {
+            throw new IllegalArgumentException("강사 식별자는 필수입니다.");
+        }
 
+        // 관리자가 다른 강의로 이동하면 소유자도 대상 강의의 주인으로 갱신된다.
+        this.instructorId = instructorId;
         this.courseId = courseId;
         this.sectionId = sectionId;
         this.title = title;

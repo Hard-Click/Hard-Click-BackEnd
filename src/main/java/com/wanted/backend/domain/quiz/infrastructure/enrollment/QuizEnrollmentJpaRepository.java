@@ -20,4 +20,11 @@ public interface QuizEnrollmentJpaRepository extends JpaRepository<QuizEnrollmen
 
     java.util.List<QuizEnrollmentReferenceJpaEntity> findByCourseIdAndStatusInAndExpiredAtGreaterThanEqual(
             Long courseId, Collection<EnrollmentStatus> statuses, LocalDateTime now);
+
+    // 관리자 강의 목록의 강의별 수강생 수 — 여러 강의를 두 쿼리(만료 null/미만료)로 배치 조회 후 앱에서 집계한다.
+    java.util.List<QuizEnrollmentReferenceJpaEntity> findByCourseIdInAndStatusInAndExpiredAtIsNull(
+            Collection<Long> courseIds, Collection<EnrollmentStatus> statuses);
+
+    java.util.List<QuizEnrollmentReferenceJpaEntity> findByCourseIdInAndStatusInAndExpiredAtGreaterThanEqual(
+            Collection<Long> courseIds, Collection<EnrollmentStatus> statuses, LocalDateTime now);
 }

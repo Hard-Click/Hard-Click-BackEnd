@@ -14,7 +14,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final String[] ALLOWED_ORIGINS = {
             "http://localhost:3000",
-            "https://hard-click-front-end.vercel.app"
+            "https://hard-click-front-end.vercel.app",
+            "https://www.flown.site",
+            "https://flown.site"
     };
 
     private static final int MAX_MESSAGE_SIZE_BYTES = 64 * 1024;
