@@ -45,6 +45,17 @@ public class Enrollment {
         return this;
     }
 
+    /**
+     * 환불/만료 등으로 비활성화된 기존 수강 행을 재수강(재구매) 시 다시 활성화한다.
+     * 유니크 제약(uk_enrollment_member_course) 때문에 새 행을 만들지 않고 기존 행을 재사용한다.
+     */
+    public Enrollment reactivate(Instant now) {
+        this.status = EnrollmentStatus.IN_PROGRESS;
+        this.enrolledAt = now;
+        this.expiredAt = null;
+        return this;
+    }
+
     public EnrollmentStatus getEffectiveStatus() {
         if (expiredAt != null && expiredAt.isBefore(LocalDateTime.now())) {
             return EnrollmentStatus.EXPIRED;
