@@ -1,6 +1,9 @@
 spring:
   flyway:
-    # prod: 운영 환경에서는 out-of-order 비활성화
-    # DB 마이그레이션 순서 의존성(V3.1.3 → V3.1.2)을 보장한다.
-    # (docs/DB_MIGRATION_RULES.md 11번 "운영 환경 원칙" 참고)
-    out-of-order: false
+    # prod out-of-order 활성화.
+    # 담당자별 버전 레인(V3.1.x~V3.5.x)이 병렬로 머지되어 낮은 버전이 뒤늦게 들어오는 구조라,
+    # out-of-order=false면 하위 버전이 미적용된 상태에서 상위 버전이 적용돼 있을 때
+    # "Detected resolved migration not applied to database"로 부팅이 막힌다.
+    # (2026-07-14 프로덕션 장애: V3.3.3 누락으로 크래시 루프 → 이 설정으로 복구)
+    # dev/local/CI(out-of-order=true)와 동일하게 맞춰 누락된 하위 마이그레이션이 정상 적용되게 한다.
+    out-of-order: true
