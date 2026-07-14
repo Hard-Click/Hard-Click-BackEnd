@@ -28,4 +28,7 @@ public class CartCourseJpaEntity {
 
     @Column(name = "author_id", nullable = false)
     private Long authorId;
+
+    @Column(name = "status")
+    private String status;
 }

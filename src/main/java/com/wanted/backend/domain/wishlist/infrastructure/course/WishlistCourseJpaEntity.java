@@ -34,4 +34,7 @@ public class WishlistCourseJpaEntity {
 
     @Column(name = "author_id")
     private Long authorId;
+
+    @Column(name = "status")
+    private String status;
 }
