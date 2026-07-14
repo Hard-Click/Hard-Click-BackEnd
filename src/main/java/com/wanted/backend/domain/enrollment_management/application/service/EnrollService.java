@@ -8,6 +8,7 @@ import com.wanted.backend.domain.enrollment_management.domain.repository.Enrollm
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,14 @@ public class EnrollService implements EnrollUseCase {
         }
 
         Enrollment enrollment = Enrollment.create(command.memberId(), command.courseId(), Instant.now(clock));
-        return enrollmentRepository.save(enrollment).getId();
+        try {
+            // IDENTITY 전략이라 save 시 INSERT가 즉시 flush됨 → 동시 최초 등록 레이스는 여기서 표면화된다.
+            return enrollmentRepository.save(enrollment).getId();
+        } catch (DataIntegrityViolationException e) {
+            // 동시 요청으로 다른 스레드가 먼저 INSERT하여 uk_enrollment_member_course 위반 →
+            // 이미 수강 중인 것과 동일하므로 500 대신 멱등하게 ENROLLMENT_ALREADY_EXISTS로 매핑한다.
+            throw new BusinessException(ErrorCode.ENROLLMENT_ALREADY_EXISTS);
+        }
     }
 
     private boolean isActive(Enrollment enrollment) {
