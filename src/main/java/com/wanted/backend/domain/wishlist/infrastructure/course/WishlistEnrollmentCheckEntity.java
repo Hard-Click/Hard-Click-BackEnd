@@ -22,4 +22,7 @@ public class WishlistEnrollmentCheckEntity {
 
     @Column(name = "course_id")
     private Long courseId;
+
+    @Column(name = "status")
+    private String status;
 }
