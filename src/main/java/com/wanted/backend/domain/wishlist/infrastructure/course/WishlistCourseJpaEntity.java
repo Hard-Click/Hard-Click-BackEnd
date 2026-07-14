@@ -6,10 +6,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.SQLRestriction;
 
+// 카탈로그에서 내려간(DELETED/DRAFT) 강의는 찜 상세에서 제외 — PUBLISHED만 노출.
+// status(enum) 컬럼을 필드로 매핑하면 Hibernate validate가 enum↔varchar로 실패하므로 SQL 레벨 필터로 처리.
 @Immutable
 @Entity(name = "WishlistCourse")
 @Getter
+@SQLRestriction("status = 'PUBLISHED'")
 @Table(name = "course")
 public class WishlistCourseJpaEntity {
 
@@ -34,7 +38,4 @@ public class WishlistCourseJpaEntity {
 
     @Column(name = "author_id")
     private Long authorId;
-
-    @Column(name = "status")
-    private String status;
 }
