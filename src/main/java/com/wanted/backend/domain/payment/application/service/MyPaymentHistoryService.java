@@ -84,7 +84,14 @@ public class MyPaymentHistoryService implements GetMyPaymentHistoryUseCase {
             Map<Long, String> planNameById
     ) {
         if (Objects.equals(data.paymentType(), PaymentType.SUBSCRIPTION)) {
-            return planNameById.getOrDefault(data.subscriptionPlanId(), "(삭제된 구독 플랜)");
+            Long planId = data.subscriptionPlanId();
+            // 결제는 됐으나 구독이 생성되지 않은 주문(과거 subscription_id auto_increment 버그로 지급 실패)은
+            // planId가 null이다. planNameById가 불변 Map(Map.of())일 때 getOrDefault(null, ...)은
+            // NPE를 던지므로(불변 Map은 null 키 조회 거부) 반드시 null을 먼저 방어한다.
+            if (planId == null) {
+                return "구독권";
+            }
+            return planNameById.getOrDefault(planId, "(삭제된 구독 플랜)");
         }
 
         if (data.courseIds().isEmpty()) {

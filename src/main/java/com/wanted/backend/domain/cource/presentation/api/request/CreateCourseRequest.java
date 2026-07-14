@@ -23,10 +23,6 @@ public record CreateCourseRequest(
         @NotNull(message = "과목은 필수입니다.")
         SubjectType subject,
 
-        @Schema(description = "강의 설명", example = "수능 수학Ⅱ 미적분 단원의 킬러 문제를 완전 정복하는 특강입니다.")
-        @NotBlank(message = "강의 설명은 필수입니다.")
-        String description,
-
         @Schema(description = "썸네일 이미지 URL", example = "https://example.com/thumbnail.png")
         String thumbnailUrl,
 
@@ -69,7 +65,8 @@ public record CreateCourseRequest(
                         })
                         .toList();
 
-        return new CreateCourseCommand(authorId, title, subject.name(), description,
+        // 강의 등록 시 강의 설명은 입력받지 않는다. course.description은 DB에서 NOT NULL이므로 빈 문자열로 저장한다.
+        return new CreateCourseCommand(authorId, title, subject.name(), "",
                 thumbnailUrl, priceType, price, sectionCommands,
                 learningObjectives, targetAudience, techTags, level.getLabel());
     }
