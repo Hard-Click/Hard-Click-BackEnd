@@ -242,7 +242,12 @@ import org.springframework.http.HttpStatus;
     CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
     CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
     CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다."),
-    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다.");
+    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다."),
+
+    /* =========================================================================
+       학습 스케줄(schedule) 관련 예외 (SC000)
+       ========================================================================= */
+    SCHEDULE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "SC001", "본인의 스케줄 항목만 처리할 수 있습니다.");
 
 
     private final HttpStatus status;
