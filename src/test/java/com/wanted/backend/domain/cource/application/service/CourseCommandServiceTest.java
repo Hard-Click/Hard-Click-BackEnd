@@ -3,6 +3,7 @@ package com.wanted.backend.domain.cource.application.service;
 import com.wanted.backend.domain.cource.application.command.ConfirmVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
+import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
 import com.wanted.backend.domain.cource.application.port.ThumbnailStoragePort;
 import com.wanted.backend.domain.cource.application.port.VideoStoragePort;
@@ -60,6 +61,7 @@ class CourseCommandServiceTest {
         eventPublisher = mock(ApplicationEventPublisher.class);
         NotificationRepository notificationRepository = mock(NotificationRepository.class);
         videoCatalogSyncPort = mock(CourseVideoCatalogSyncPort.class);
+        CourseLearningPolicyPort courseLearningPolicyPort = mock(CourseLearningPolicyPort.class);
         Clock clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC);
         // 실제 DB 없이도 TransactionTemplate의 트랜잭션 동기화(afterCommit)가 동작하게 해주는
         // 리소스 없는 트랜잭션 매니저(테스트 더블) — 단위테스트 표준 패턴.
@@ -74,7 +76,8 @@ class CourseCommandServiceTest {
                 transactionManager,
                 clock,
                 notificationRepository,
-                videoCatalogSyncPort
+                videoCatalogSyncPort,
+                courseLearningPolicyPort
         );
     }
 
