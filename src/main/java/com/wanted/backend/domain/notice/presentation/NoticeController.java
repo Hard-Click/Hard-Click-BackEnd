@@ -7,6 +7,7 @@ import com.wanted.backend.domain.notice.application.usecase.NoticeCommandUseCase
 import com.wanted.backend.domain.notice.application.usecase.NoticeQueryUseCase;
 import com.wanted.backend.domain.notice.presentation.request.CreateGlobalNoticeRequest;
 import com.wanted.backend.domain.notice.presentation.request.CreateNoticeRequest;
+import com.wanted.backend.domain.notice.presentation.request.GetNoticeListRequest;
 import com.wanted.backend.domain.notice.presentation.request.UpdateNoticeRequest;
 import com.wanted.backend.domain.notice.presentation.response.CreateNoticeResponse;
 import com.wanted.backend.domain.notice.presentation.response.NoticeDetailResponse;
@@ -125,22 +126,14 @@ public class NoticeController {
     })
     public ResponseEntity<ApiResponse<NoticeListResponse>> getNotices(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "공지사항 타입 (GLOBAL: 전체 공지, COURSE: 강의 공지)", example = "GLOBAL")
-            @RequestParam String type,
-            @Parameter(description = "강의 공지 조회 시 강의 ID (COURSE 타입일 때 필수)", example = "5")
-            @RequestParam(required = false) Long courseId,
-            @Parameter(description = "제목 검색 키워드", example = "업로드")
-            @RequestParam(required = false) String keyword,
-            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "페이지당 조회 수", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
+            @Valid @ModelAttribute GetNoticeListRequest request) {
 
         Long memberId = userDetails != null ? userDetails.getMemberId() : null;
         String role = userDetails != null ? userDetails.getRole() : null;
 
         NoticeListResult result = noticeQueryUseCase.getList(
-                new GetNoticeListCommand(type, courseId, keyword, page, size, memberId, role));
+                new GetNoticeListCommand(request.getType(), request.getCourseId(), request.getKeyword(),
+                        request.getPage(), request.getSize(), memberId, role));
 
         return ApiResponse.success("공지사항 목록 조회 성공", NoticeListResponse.from(result));
     }
