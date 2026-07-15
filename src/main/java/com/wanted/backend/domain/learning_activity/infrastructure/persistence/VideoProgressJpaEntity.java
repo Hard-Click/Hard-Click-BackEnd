@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +15,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Table(name = "video_progress")
+@Table(
+        name = "video_progress",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_video_progress_member_video",
+                columnNames = {"member_id", "video_id"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VideoProgressJpaEntity {
 

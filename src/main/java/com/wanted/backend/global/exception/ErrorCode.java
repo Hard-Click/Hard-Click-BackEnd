@@ -251,6 +251,10 @@ import org.springframework.http.HttpStatus;
     TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "SC002", "본인의 할 일만 처리할 수 있습니다."),
     TODO_TIME_RANGE_INCOMPLETE(HttpStatus.BAD_REQUEST, "SC003", "시작 시각과 종료 시각은 함께 입력해야 합니다."),
     TODO_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "SC004", "종료 시각은 시작 시각보다 뒤여야 합니다.");
+    SCHEDULE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "SC001", "본인의 스케줄 항목만 처리할 수 있습니다.");
+       이탈관리(churn) 관련 예외 (CN000)
+       ========================================================================= */
+    CHURN_RISK_NOT_FOUND(HttpStatus.NOT_FOUND, "CN001", "해당 수강생의 이탈 위험 산출 기록이 없습니다.");
 
 
     private final HttpStatus status;
