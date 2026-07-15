@@ -65,7 +65,7 @@ public class SchedulePlanAdapter implements SchedulePlanPort {
 
         List<ScheduleDtos.CalendarItem> items = new ArrayList<>();
         for (Object[] row : rows) {
-            items.add(new ScheduleDtos.CalendarItem(
+            items.add(ScheduleDtos.CalendarItem.ofLesson(
                     toLong(row[0]),
                     toLocalDate(row[1]),
                     toLocalTime(row[2]),

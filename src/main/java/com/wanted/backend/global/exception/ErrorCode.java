@@ -262,7 +262,10 @@ import org.springframework.http.HttpStatus;
     /* =========================================================================
        학습 스케줄(schedule) 관련 예외 (SC000)
        ========================================================================= */
-    SCHEDULE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "SC001", "본인의 스케줄 항목만 처리할 수 있습니다.");
+    SCHEDULE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "SC001", "본인의 스케줄 항목만 처리할 수 있습니다."),
+    TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "SC002", "본인의 할 일만 처리할 수 있습니다."),
+    TODO_TIME_RANGE_INCOMPLETE(HttpStatus.BAD_REQUEST, "SC003", "시작 시각과 종료 시각은 함께 입력해야 합니다."),
+    TODO_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "SC004", "종료 시각은 시작 시각보다 뒤여야 합니다.");
 
 
     private final HttpStatus status;
