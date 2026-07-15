@@ -6,6 +6,7 @@ import com.wanted.backend.domain.cource.application.command.CreateCourseCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
 import com.wanted.backend.domain.cource.application.command.UploadCourseThumbnailCommand;
+import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
 import com.wanted.backend.domain.cource.application.port.ThumbnailStoragePort;
 import com.wanted.backend.domain.cource.application.port.VideoStoragePort;
@@ -55,6 +56,10 @@ public class CourseCommandService implements CourseCommandUseCase {
     private final Clock clock;
     private final NotificationRepository notificationRepository;
     private final CourseVideoCatalogSyncPort videoCatalogSyncPort;
+    private final CourseLearningPolicyPort courseLearningPolicyPort;
+
+    // 강도 상한 미입력 시 적용할 전역 기본 하루 학습 상한(분).
+    private static final int DEFAULT_DAILY_MAX_MINUTES = 120;
 
     @Override
     public Long create(CreateCourseCommand command) {
@@ -87,6 +92,12 @@ public class CourseCommandService implements CourseCommandUseCase {
 
         Course saved = courseRepository.save(course);
         saved.pullDomainEvents().forEach(eventPublisher::publishEvent);
+
+        // CP-SAT 스케줄러 입력용 학습 정책 저장(권장 완강 주수 / 하루 학습 상한).
+        courseLearningPolicyPort.save(
+                saved.getId(),
+                command.recommendedWeeks(),
+                command.dailyMaxMinutes() == null ? DEFAULT_DAILY_MAX_MINUTES : command.dailyMaxMinutes());
 
         eventPublisher.publishEvent(CourseCreatedEvent.of(
                 saved.getId(), command.authorId(), saved.getTitle()));
