@@ -16,7 +16,9 @@ public record CreateCourseCommand(
         List<String> learningObjectives,
         List<String> targetAudience,
         List<String> techTags,
-        String level
+        String level,
+        Integer recommendedWeeks,
+        Integer dailyMaxMinutes
 ) {
     public record SectionCommand(
             String title,

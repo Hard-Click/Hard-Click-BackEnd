@@ -49,7 +49,15 @@ public record CreateCourseRequest(
 
         @Schema(description = "난이도 (입문 / 중급 / 심화)", example = "중급")
         @NotNull(message = "난이도는 필수입니다.")
-        CourseLevel level
+        CourseLevel level,
+
+        @Schema(description = "권장 완강 기간(주). CP-SAT 스케줄러 입력.", example = "12")
+        @Min(value = 1, message = "권장 완강 기간은 1주 이상이어야 합니다.")
+        Integer recommendedWeeks,
+
+        @Schema(description = "코스별 강도 상한(하루 최대 학습 분). 비우면 120분 적용.", example = "120")
+        @Min(value = 1, message = "강도 상한은 1분 이상이어야 합니다.")
+        Integer dailyMaxMinutes
 ) {
     public CreateCourseCommand toCommand(Long authorId) {
         List<CreateCourseCommand.SectionCommand> sectionCommands = sections == null
@@ -68,6 +76,7 @@ public record CreateCourseRequest(
         // 강의 등록 시 강의 설명은 입력받지 않는다. course.description은 DB에서 NOT NULL이므로 빈 문자열로 저장한다.
         return new CreateCourseCommand(authorId, title, subject.name(), "",
                 thumbnailUrl, priceType, price, sectionCommands,
-                learningObjectives, targetAudience, techTags, level.getLabel());
+                learningObjectives, targetAudience, techTags, level.getLabel(),
+                recommendedWeeks, dailyMaxMinutes);
     }
 }
