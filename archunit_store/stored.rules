@@ -1,0 +1,3 @@
+#
+#Tue Jul 14 18:37:27 KST 2026
+no\ classes\ that\ reside\ in\ a\ package\ '..application..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ '..infrastructure..',\ because\ application\uC740\ port(\uC778\uD130\uD398\uC774\uC2A4)\uB9CC\ \uC54C\uACE0,\ \uAD6C\uD604(adapter)\uC740\ infrastructure\uAC00\ DI\uB85C\ \uC8FC\uC785\uD55C\uB2E4=7c97bdf0-f2be-4018-82a8-e87708271582
