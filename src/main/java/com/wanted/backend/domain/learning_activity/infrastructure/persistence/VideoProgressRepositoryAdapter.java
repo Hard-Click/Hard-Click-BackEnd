@@ -5,6 +5,7 @@ import com.wanted.backend.domain.learning_activity.domain.repository.VideoProgre
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.util.Optional;
 public class VideoProgressRepositoryAdapter implements VideoProgressRepository {
 
     private final SpringDataVideoProgressRepository repository;
+    private final VideoProgressInserter inserter;
 
     @Override
     public Optional<VideoProgress> findByMemberIdAndVideoId(Long memberId, Long videoId) {
@@ -28,18 +30,12 @@ public class VideoProgressRepositoryAdapter implements VideoProgressRepository {
     @Transactional
     public VideoProgress save(VideoProgress progress) {
         LocalDateTime now = LocalDateTime.now();
-        VideoProgressJpaEntity entity = progress.id() == null
-                ? new VideoProgressJpaEntity(
-                progress.memberId(),
-                progress.courseId(),
-                progress.videoId(),
-                progress.lastPositionSec(),
-                progress.watchTimeSec(),
-                progress.completed(),
-                progress.completedAt(),
-                now
-        )
-                : repository.findById(progress.id())
+
+        if (progress.id() == null) {
+            return insert(progress, now);
+        }
+
+        VideoProgressJpaEntity entity = repository.findById(progress.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.VIDEO_NOT_FOUND));
 
         entity.updateProgress(
@@ -51,6 +47,39 @@ public class VideoProgressRepositoryAdapter implements VideoProgressRepository {
         );
 
         return toDomain(repository.save(entity));
+    }
+
+    /**
+     * 아직 행이 없는 상태에서 동시 요청이 들어오면 모두 "없음"으로 읽고 각자 INSERT를 시도한다.
+     * 유니크 제약이 한쪽을 막아주므로, 밀린 쪽은 먼저 만들어진 행을 읽어 갱신한다.
+     */
+    private VideoProgress insert(VideoProgress progress, LocalDateTime now) {
+        try {
+            return toDomain(inserter.insert(new VideoProgressJpaEntity(
+                    progress.memberId(),
+                    progress.courseId(),
+                    progress.videoId(),
+                    progress.lastPositionSec(),
+                    progress.watchTimeSec(),
+                    progress.completed(),
+                    progress.completedAt(),
+                    now
+            )));
+        } catch (DataIntegrityViolationException alreadyInserted) {
+            VideoProgressJpaEntity entity = repository
+                    .findByMemberIdAndVideoId(progress.memberId(), progress.videoId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.VIDEO_NOT_FOUND));
+
+            entity.updateProgress(
+                    progress.lastPositionSec(),
+                    progress.watchTimeSec(),
+                    progress.completed(),
+                    progress.completedAt(),
+                    now
+            );
+
+            return toDomain(repository.save(entity));
+        }
     }
 
     private VideoProgress toDomain(VideoProgressJpaEntity entity) {

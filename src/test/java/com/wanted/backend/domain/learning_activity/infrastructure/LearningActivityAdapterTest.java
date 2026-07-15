@@ -15,6 +15,7 @@ import com.wanted.backend.domain.learning_activity.infrastructure.enrollment.Enr
 import com.wanted.backend.domain.learning_activity.infrastructure.enrollment.EnrollmentReferenceJpaEntity;
 import com.wanted.backend.domain.learning_activity.infrastructure.enrollment.SpringDataEnrollmentAccessRepository;
 import com.wanted.backend.domain.learning_activity.infrastructure.persistence.CourseProgressQueryAdapter;
+import com.wanted.backend.domain.learning_activity.infrastructure.persistence.VideoProgressInserter;
 import com.wanted.backend.domain.learning_activity.infrastructure.persistence.VideoProgressRepositoryAdapter;
 import com.wanted.backend.domain.learning_activity.infrastructure.persistence.VideoProgressJpaEntity;
 import com.wanted.backend.domain.learning_activity.infrastructure.persistence.SpringDataVideoProgressRepository;
@@ -30,6 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlConfig;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -38,7 +40,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest(properties = {
         "spring.jpa.hibernate.ddl-auto=none",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect"
+        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+        // 스키마는 아래 @Sql로 직접 넣는다. Flyway를 켜두면 MySQL 전용인 V1__baseline.sql을
+        // H2에서 실행하려다 문법 오류로 컨텍스트 로딩이 실패한다.
+        "spring.flyway.enabled=false"
 })
 @EntityScan(basePackageClasses = {
         VideoProgressJpaEntity.class,
@@ -62,12 +67,18 @@ import static org.assertj.core.api.Assertions.assertThat;
         SubscriptionAccessAdapter.class,
         CourseProgressQueryAdapter.class,
         VideoProgressRepositoryAdapter.class,
+        VideoProgressInserter.class,
         LearningActivityAdapterTest.TestConfig.class
 })
-@Sql(scripts = {
-        "/sql/learning_activity_adapter_schema.sql",
-        "/sql/learning_activity_adapter_data.sql"
-})
+// 진도 첫 저장은 별도 트랜잭션(REQUIRES_NEW)에서 INSERT하므로, 준비 데이터가 테스트 트랜잭션에
+// 묶여 있으면 두 트랜잭션이 같은 행을 두고 락 경합에 빠진다. ISOLATED로 미리 커밋해둔다.
+@Sql(
+        scripts = {
+                "/sql/learning_activity_adapter_schema.sql",
+                "/sql/learning_activity_adapter_data.sql"
+        },
+        config = @SqlConfig(transactionMode = SqlConfig.TransactionMode.ISOLATED)
+)
 class LearningActivityAdapterTest {
 
     @TestConfiguration
@@ -83,6 +94,9 @@ class LearningActivityAdapterTest {
 
     @Autowired
     private VideoProgressRepositoryAdapter videoProgressRepositoryAdapter;
+
+    @Autowired
+    private SpringDataVideoProgressRepository springDataVideoProgressRepository;
 
     @Autowired
     private CourseProgressQueryAdapter courseProgressQueryAdapter;
@@ -162,7 +176,8 @@ class LearningActivityAdapterTest {
 
     @Test
     void 영상_진도_저장소_어댑터가_마지막_재생_위치를_저장한다() {
-        VideoProgress progress = VideoProgress.empty(1L, 20L, 10L)
+        // 진도 행이 아직 없는 영상(11) — INSERT 경로
+        VideoProgress progress = VideoProgress.empty(1L, 20L, 11L)
                 .updateLastPosition(142);
 
         VideoProgress saved = videoProgressRepositoryAdapter.save(progress);
@@ -170,10 +185,28 @@ class LearningActivityAdapterTest {
         assertThat(saved.id()).isNotNull();
         assertThat(saved.memberId()).isEqualTo(1L);
         assertThat(saved.courseId()).isEqualTo(20L);
-        assertThat(saved.videoId()).isEqualTo(10L);
+        assertThat(saved.videoId()).isEqualTo(11L);
         assertThat(saved.lastPositionSec()).isEqualTo(142);
         assertThat(saved.watchTimeSec()).isZero();
         assertThat(saved.completed()).isFalse();
+    }
+
+    @Test
+    void 영상_진도_저장소_어댑터가_이미_있는_행에_중복_INSERT하지_않고_갱신한다() {
+        // 첫 시청 시 동시 요청이 모두 "진도 없음"으로 읽고 각자 INSERT를 시도하던 상황.
+        // 경합에 밀린 요청이 빈 진도(id=null)를 들고 오더라도 기존 행(100)을 갱신해야 하고,
+        // 중복 행이 생기면 이후 findByMemberIdAndVideoId가 NonUniqueResultException으로 터진다.
+        VideoProgress raced = VideoProgress.empty(1L, 20L, 10L)
+                .updateLastPosition(77);
+
+        VideoProgress saved = videoProgressRepositoryAdapter.save(raced);
+
+        assertThat(saved.id()).isEqualTo(100L);
+        assertThat(saved.lastPositionSec()).isEqualTo(77);
+        assertThat(springDataVideoProgressRepository.findByMemberIdAndCourseId(1L, 20L))
+                .hasSize(1);
+        assertThat(videoProgressRepositoryAdapter.findByMemberIdAndVideoId(1L, 10L))
+                .isPresent();
     }
 
     @Test

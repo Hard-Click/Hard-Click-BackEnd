@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS video_progress (
     video_id BIGINT NOT NULL,
     last_position_sec INT NOT NULL,
     is_completed TINYINT NOT NULL,
-    updated_at TIMESTAMP NOT NULL
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT uk_video_progress_member_video UNIQUE (member_id, video_id)
 );
 
 CREATE TABLE IF NOT EXISTS enrollment (
