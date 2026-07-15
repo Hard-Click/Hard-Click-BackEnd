@@ -242,7 +242,17 @@ import org.springframework.http.HttpStatus;
     CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
     CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
     CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다."),
-    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다.");
+    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다."),
+
+    /* =========================================================================
+       학습 스케줄 온보딩 관련 예외 (OB000)
+       ========================================================================= */
+    ONBOARDING_INVALID_DAY_OF_WEEK(HttpStatus.BAD_REQUEST, "OB001", "요일은 0(일)~6(토) 범위여야 합니다."),
+    ONBOARDING_INVALID_TIME_SLOT(HttpStatus.BAD_REQUEST, "OB002", "시간 슬롯은 0~47(30분 단위) 범위여야 합니다."),
+    ONBOARDING_NO_AVAILABLE_TIME(HttpStatus.BAD_REQUEST, "OB003", "모든 요일이 불가능하면 학습 일정을 만들 수 없습니다."),
+    ONBOARDING_DUPLICATE_SUBJECT_AREA(HttpStatus.BAD_REQUEST, "OB004", "같은 응시영역의 성적이 중복 입력되었습니다."),
+    ONBOARDING_INVALID_RAW_SCORE(HttpStatus.BAD_REQUEST, "OB005", "원점수가 해당 응시영역의 만점 범위를 벗어났습니다."),
+    ONBOARDING_EXAM_DATE_IN_FUTURE(HttpStatus.BAD_REQUEST, "OB006", "응시일은 미래일 수 없습니다.");
 
 
     private final HttpStatus status;
