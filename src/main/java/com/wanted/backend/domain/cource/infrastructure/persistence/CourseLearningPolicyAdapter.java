@@ -19,12 +19,13 @@ public class CourseLearningPolicyAdapter implements CourseLearningPolicyPort {
     @Override
     public void save(Long courseId, Integer recommendedWeeks, Integer dailyMaxMinutes) {
         // course_id 는 PK(1:1). 강의 수정 시 재호출될 수 있어 upsert(중복 시 갱신)로 둔다.
+        // VALUES() 는 MySQL 8.0.20 에서 deprecated 됐으므로 바인딩 파라미터를 직접 참조한다(버전 무관 안전).
         entityManager.createNativeQuery("""
                 insert into course_learning_policy (course_id, recommended_duration_weeks, daily_recommended_minutes)
                 values (:courseId, :weeks, :daily)
                 on duplicate key update
-                    recommended_duration_weeks = values(recommended_duration_weeks),
-                    daily_recommended_minutes  = values(daily_recommended_minutes)
+                    recommended_duration_weeks = :weeks,
+                    daily_recommended_minutes  = :daily
                 """)
                 .setParameter("courseId", courseId)
                 .setParameter("weeks", recommendedWeeks)
