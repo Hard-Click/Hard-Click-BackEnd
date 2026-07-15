@@ -242,7 +242,12 @@ import org.springframework.http.HttpStatus;
     CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
     CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
     CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다."),
-    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다.");
+    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다."),
+
+    /* =========================================================================
+       이탈관리(churn) 관련 예외 (CN000)
+       ========================================================================= */
+    CHURN_RISK_NOT_FOUND(HttpStatus.NOT_FOUND, "CN001", "해당 수강생의 이탈 위험 산출 기록이 없습니다.");
 
 
     private final HttpStatus status;
