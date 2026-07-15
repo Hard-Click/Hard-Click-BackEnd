@@ -64,41 +64,27 @@ public class NoticeQueryService implements NoticeQueryUseCase {
         } else if ("COURSE".equals(command.type())) {
             String role = command.role();
 
-            if ("ADMIN".equals(role)) {
-                if (command.courseId() == null) {
-                    noticePage = noticeRepository.findAllCourseNotices(
-                            command.keyword() != null ? command.keyword() : "", pageable);
-                } else {
-                    courseName = courseInfoPort.getCourseNameByCourseId(command.courseId());
-                    noticePage = noticeRepository.findCourseNotices(
-                            command.courseId(), command.keyword() != null ? command.keyword() : "", pageable);
-                }
+            if (command.courseId() != null) {
+                // 강의 상세(GET /api/courses/{id})와 동일하게 공개 — 로그인/수강 여부와 무관하게
+                // 특정 강의의 공지는 누구나 조회 가능(permitAll). 수강생 전용 "내 강의 모아보기"만
+                // 로그인을 전제로 하므로 courseId가 없는 아래 분기에서만 역할별로 갈린다.
+                courseName = courseInfoPort.getCourseNameByCourseId(command.courseId());
+                noticePage = noticeRepository.findCourseNotices(
+                        command.courseId(), command.keyword() != null ? command.keyword() : "", pageable);
+            } else if ("ADMIN".equals(role)) {
+                noticePage = noticeRepository.findAllCourseNotices(
+                        command.keyword() != null ? command.keyword() : "", pageable);
             } else if ("INSTRUCTOR".equals(role)) {
                 List<Long> myCourseIds = instructorCoursePort.getCourseIdsByInstructorId(command.memberId());
-                if (command.courseId() != null) {
-                    if (!myCourseIds.contains(command.courseId())) {
-                        throw new BusinessException(ErrorCode.NOTICE_NOT_AUTHORIZED);
-                    }
-                    courseName = courseInfoPort.getCourseNameByCourseId(command.courseId());
-                    noticePage = noticeRepository.findCourseNotices(
-                            command.courseId(), command.keyword() != null ? command.keyword() : "", pageable);
-                } else {
-                    noticePage = noticeRepository.findCourseNoticesByIds(
-                            myCourseIds, command.keyword() != null ? command.keyword() : "", pageable);
-                }
-            } else {
+                noticePage = noticeRepository.findCourseNoticesByIds(
+                        myCourseIds, command.keyword() != null ? command.keyword() : "", pageable);
+            } else if ("STUDENT".equals(role)) {
                 List<Long> enrolledIds = enrolledCoursePort.getEnrolledCourseIdsByMemberId(command.memberId());
-                if (command.courseId() != null) {
-                    if (!enrolledIds.contains(command.courseId())) {
-                        throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-                    }
-                    courseName = courseInfoPort.getCourseNameByCourseId(command.courseId());
-                    noticePage = noticeRepository.findCourseNotices(
-                            command.courseId(), command.keyword() != null ? command.keyword() : "", pageable);
-                } else {
-                    noticePage = noticeRepository.findCourseNoticesByIds(
-                            enrolledIds, command.keyword() != null ? command.keyword() : "", pageable);
-                }
+                noticePage = noticeRepository.findCourseNoticesByIds(
+                        enrolledIds, command.keyword() != null ? command.keyword() : "", pageable);
+            } else {
+                // 비로그인 + courseId 없음 = "내 수강 강의 공지 모아보기"인데 "나"를 특정할 수 없음
+                throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
             }
 
         } else {
@@ -150,9 +136,7 @@ public class NoticeQueryService implements NoticeQueryUseCase {
         Notice notice = noticeRepository.findById(noticeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTICE_NOT_FOUND));
 
-        if ("COURSE".equals(notice.getType())) {
-            validateCourseNoticeAccess(notice.getCourseId(), memberId, role);
-        }
+        // 강의 상세와 동일하게 공개 — 로그인/수강·소유 여부와 무관하게 누구나 조회 가능
 
         boolean isRead = notificationRepository.isNoticeRead(memberId, noticeId);
 
@@ -169,19 +153,5 @@ public class NoticeQueryService implements NoticeQueryUseCase {
                 notice.getId(), notice.getType(), courseName, notice.getTitle(),
                 notice.getContent(), notice.isPinned(), isRead, notice.getCreatedAt(),
                 previousNotice);
-    }
-    private void validateCourseNoticeAccess(Long courseId, Long memberId, String role) {
-        if ("ADMIN".equals(role)) {
-            return;
-        }
-        if ("INSTRUCTOR".equals(role)) {
-            if (!instructorCoursePort.getCourseIdsByInstructorId(memberId).contains(courseId)) {
-                throw new BusinessException(ErrorCode.NOTICE_NOT_AUTHORIZED);
-            }
-            return;
-        }
-        if (!enrolledCoursePort.getEnrolledCourseIdsByMemberId(memberId).contains(courseId)) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
     }
 }

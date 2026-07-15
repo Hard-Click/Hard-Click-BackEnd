@@ -81,6 +81,7 @@ public class SecurityConfig {
                                 new WebExpressionAuthorizationManager(
                                         "hasIpAddress('127.0.0.1') or hasIpAddress('::1') or hasIpAddress('172.16.0.0/12')"))
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/*","/api/courses/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/courses").hasRole("INSTRUCTOR")
                         .requestMatchers(HttpMethod.POST, "/api/courses/lessons/*/video").hasRole("INSTRUCTOR")
                         .requestMatchers(HttpMethod.PATCH, "/api/courses/*", "/api/courses/*/status").hasRole("INSTRUCTOR")
