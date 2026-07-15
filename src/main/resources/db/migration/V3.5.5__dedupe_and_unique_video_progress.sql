@@ -22,5 +22,9 @@ WHERE progress_id IN (
 );
 
 -- 2) 재발 방지: DB 레벨에서 중복을 차단한다.
+--    video_progress는 재생 중 계속 쓰기가 들어오는 테이블이라, 테이블 재빌드(COPY)로 떨어지면
+--    배포 중 쓰기가 오래 막힌다. INPLACE/LOCK=NONE을 명시해 그 경우 조용히 COPY로 가는 대신
+--    마이그레이션이 실패하도록 한다.
 ALTER TABLE video_progress
-    ADD CONSTRAINT uk_video_progress_member_video UNIQUE (member_id, video_id);
+    ADD CONSTRAINT uk_video_progress_member_video UNIQUE (member_id, video_id),
+    ALGORITHM = INPLACE, LOCK = NONE;

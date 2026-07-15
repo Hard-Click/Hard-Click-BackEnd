@@ -65,10 +65,12 @@ public class VideoProgressRepositoryAdapter implements VideoProgressRepository {
                     progress.completedAt(),
                     now
             )));
-        } catch (DataIntegrityViolationException alreadyInserted) {
+        } catch (DataIntegrityViolationException violation) {
+            // NOT NULL·FK 위반도 같은 타입이라, 무조건 경합으로 단정하면 진짜 원인이 가려진다.
+            // 실제로 행이 생겨 있을 때만 경합으로 보고 복구하고, 아니면 원래 예외를 그대로 올린다.
             VideoProgressJpaEntity entity = repository
                     .findByMemberIdAndVideoId(progress.memberId(), progress.videoId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.VIDEO_NOT_FOUND));
+                    .orElseThrow(() -> violation);
 
             entity.updateProgress(
                     progress.lastPositionSec(),
