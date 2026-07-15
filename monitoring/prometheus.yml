@@ -2,7 +2,7 @@ global:
   scrape_interval: 5s
   evaluation_interval: 15s
   external_labels:
-    env: test   # Alertmanager 라우팅 분기 키 — prod 배포 시 prod로 교체
+    env: prod
 
 rule_files:
   - /etc/prometheus/rules/alert-rules/*.yml
@@ -16,5 +16,18 @@ alerting:
 scrape_configs:
   - job_name: hard-click-backend
     metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["host.docker.internal:8080"]
+    ec2_sd_configs:
+      - region: ap-northeast-2
+        port: 8080
+        filters:
+          - name: tag:Role
+            values: ["app"]
+          - name: instance-state-name
+            values: ["running"]
+    relabel_configs:
+      - source_labels: [__meta_ec2_private_ip]
+        regex: '(.+)'
+        target_label: __address__
+        replacement: '${1}:8080'
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance_name
