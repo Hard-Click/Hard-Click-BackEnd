@@ -11,25 +11,28 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_PROFILES_ACTIVE=prod
       - S3_BUCKET=${S3_BUCKET}
       - AWS_REGION=${AWS_REGION:-ap-northeast-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - TOSS_SECRET_KEY=${TOSS_SECRET_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
-    volumes:
-      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
 
-  promtail:
-    image: grafana/promtail:2.9.0
-    container_name: hard-click-promtail
+  redis:
+    image: redis:7
+    container_name: hard-click-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
-      - ./monitoring/promtail-config.prod.yml:/etc/promtail/config.yml:ro
-      - ./logs:/var/log/hard-click:ro
-    command: -config.file=/etc/promtail/config.yml
+      - redis-data:/data
     restart: unless-stopped
-    depends_on:
-      - app
+
+volumes:
+  redis-data:
