@@ -112,8 +112,13 @@ public final class ReviewLoopRunner {
     /** 대상 목록 결정: --files-from 우선, 없으면 --path 스캔. 둘 다 없으면 null(사용법 출력). */
     private static List<Path> resolveTargets(String filesFrom, String path, int max) throws Exception {
         if (filesFrom != null) {
+            Path listFile = Path.of(filesFrom);
+            if (!Files.exists(listFile)) {   // 목록 파일 부재 → 크래시 대신 통과(리뷰 대상 없음)
+                System.out.println("변경파일 목록이 없습니다: " + filesFrom + " → 통과.");
+                return List.of();
+            }
             List<Path> files = new ArrayList<>();
-            for (String line : Files.readAllLines(Path.of(filesFrom))) {
+            for (String line : Files.readAllLines(listFile)) {
                 String s = line.replace("﻿", "").trim();   // BOM/공백 방어
                 if (s.isBlank() || !s.endsWith(".java")) {
                     continue;
@@ -122,6 +127,11 @@ public final class ReviewLoopRunner {
                 if (Files.exists(p)) {
                     files.add(p);
                 }
+            }
+            if (files.size() > max) {   // --files-from에도 max 적용(LLM 호출 폭발·비용 방어). 조용히 자르지 않고 경고.
+                System.out.println("변경 .java " + files.size() + "개 중 " + max + "개만 리뷰 · 나머지 "
+                        + (files.size() - max) + "개 스킵 — 상한 조정: --max N");
+                return List.copyOf(files.subList(0, max));
             }
             return files;
         }
