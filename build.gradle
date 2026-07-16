@@ -86,7 +86,15 @@ tasks.register('reviewCli', JavaExec) {
 //   (-Ppath는 Gradle 예약 프로퍼티 project.path와 충돌하므로 --args 사용)
 tasks.register('reviewLoop', JavaExec) {
     group = 'review-loop'
-    description = '지정 경로의 파일에 리뷰 루프 실행 (--args="--path <dir> --domain X --max N")'
+    description = '지정 경로/변경파일에 리뷰 루프 실행 (--args="--path <dir> | --files-from <list> [--gate]")'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopRunner'
+}
+
+// AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정
+tasks.register('installReviewHooks', Exec) {
+    group = 'review-loop'
+    description = 'pre-push 훅 활성화(git config core.hooksPath .githooks)'
+    commandLine 'git', 'config', 'core.hooksPath', '.githooks'
+    doLast { println 'pre-push 훅 활성화됨(.githooks). 우회 필요 시: git push --no-verify' }
 }
