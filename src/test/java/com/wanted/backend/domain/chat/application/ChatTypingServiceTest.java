@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.chat.application;
 
 import com.wanted.backend.domain.chat.application.event.TypingEvent;
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.application.service.ChatTypingService;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
@@ -13,7 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.Map;
 
@@ -38,7 +38,7 @@ class ChatTypingServiceTest {
     private MemberNamePort memberNamePort;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ChatBroadcastPort chatBroadcastPort;
 
     @Test
     @DisplayName("참여자가 타이핑하면 저장 없이 바로 브로드캐스트된다")
@@ -52,7 +52,7 @@ class ChatTypingServiceTest {
 
         // then
         ArgumentCaptor<TypingEvent> captor = ArgumentCaptor.forClass(TypingEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo("TYPING");
         assertThat(captor.getValue().memberId()).isEqualTo(1L);
         assertThat(captor.getValue().name()).isEqualTo("이*연");
@@ -69,7 +69,7 @@ class ChatTypingServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.CHAT_FORBIDDEN.getMessage());
 
-        verify(messagingTemplate, never()).convertAndSend(org.mockito.ArgumentMatchers.anyString(), any(Object.class));
+        verify(chatBroadcastPort, never()).broadcast(org.mockito.ArgumentMatchers.anyString(), any(Object.class));
     }
 
     @Test
@@ -84,7 +84,7 @@ class ChatTypingServiceTest {
 
         // then
         ArgumentCaptor<TypingEvent> captor = ArgumentCaptor.forClass(TypingEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("알 수 없음");
     }
 
@@ -100,7 +100,7 @@ class ChatTypingServiceTest {
 
         // then
         ArgumentCaptor<TypingEvent> captor = ArgumentCaptor.forClass(TypingEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("이");
     }
 
@@ -116,7 +116,7 @@ class ChatTypingServiceTest {
 
         // then
         ArgumentCaptor<TypingEvent> captor = ArgumentCaptor.forClass(TypingEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("이*");
     }
 }

@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.model.ChatMessageType;
@@ -14,7 +15,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ class StudyLeftBroadcastListenerTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ChatBroadcastPort chatBroadcastPort;
 
     @Test
     @DisplayName("퇴장 이벤트를 받으면 퇴장 메시지와 갱신된 참여자 목록을 함께 브로드캐스트한다")
@@ -57,7 +57,7 @@ class StudyLeftBroadcastListenerTest {
 
         // then
         ArgumentCaptor<SystemLeaveMessage> captor = ArgumentCaptor.forClass(SystemLeaveMessage.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/12"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/12"), captor.capture());
         SystemLeaveMessage message = captor.getValue();
         assertThat(message.type()).isEqualTo("SYSTEM_LEAVE");
         assertThat(message.message()).isEqualTo("김*수님이 퇴장했습니다");
@@ -85,7 +85,7 @@ class StudyLeftBroadcastListenerTest {
 
         // then
         ArgumentCaptor<SystemLeaveMessage> captor = ArgumentCaptor.forClass(SystemLeaveMessage.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/12"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/12"), captor.capture());
         assertThat(captor.getValue().message()).isEqualTo("알 수 없음님이 퇴장했습니다");
     }
 }

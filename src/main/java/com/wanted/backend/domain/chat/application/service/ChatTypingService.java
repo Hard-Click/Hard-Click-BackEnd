@@ -1,12 +1,12 @@
 package com.wanted.backend.domain.chat.application.service;
 
 import com.wanted.backend.domain.chat.application.event.TypingEvent;
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.application.usecase.ChatTypingUseCase;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
@@ -16,14 +16,14 @@ public class ChatTypingService implements ChatTypingUseCase {
 
     private final ChatRoomParticipantRepository chatRoomParticipantRepository;
     private final MemberNamePort memberNamePort;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatBroadcastPort chatBroadcastPort;
 
     public ChatTypingService(ChatRoomParticipantRepository chatRoomParticipantRepository,
                              MemberNamePort memberNamePort,
-                             SimpMessagingTemplate messagingTemplate) {
+                             ChatBroadcastPort chatBroadcastPort) {
         this.chatRoomParticipantRepository = chatRoomParticipantRepository;
         this.memberNamePort = memberNamePort;
-        this.messagingTemplate = messagingTemplate;
+        this.chatBroadcastPort = chatBroadcastPort;
     }
 
     @Override
@@ -34,7 +34,7 @@ public class ChatTypingService implements ChatTypingUseCase {
 
         String name = maskName(resolveName(memberId));
 
-        messagingTemplate.convertAndSend(
+        chatBroadcastPort.broadcast(
                 "/sub/chat-rooms/" + chatRoomId,
                 TypingEvent.of(memberId, name));
     }

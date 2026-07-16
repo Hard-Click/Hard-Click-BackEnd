@@ -2,6 +2,7 @@ package com.wanted.backend.domain.chat.infrastructure.websocket;
 
 import com.wanted.backend.domain.chat.application.event.ChatMessageEvent;
 import com.wanted.backend.domain.chat.application.event.ChatMessagePersistedEvent;
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,7 +11,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -31,7 +31,7 @@ class ChatMessageBroadcastListenerTest {
     private MemberNamePort memberNamePort;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ChatBroadcastPort chatBroadcastPort;
 
     private ChatMessagePersistedEvent event() {
         return new ChatMessagePersistedEvent(45L, 500L, 1L, "안녕하세요", LocalDateTime.now());
@@ -48,7 +48,7 @@ class ChatMessageBroadcastListenerTest {
 
         // then
         ArgumentCaptor<ChatMessageEvent> captor = ArgumentCaptor.forClass(ChatMessageEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo("CHAT");
         assertThat(captor.getValue().messageId()).isEqualTo(500L);
         assertThat(captor.getValue().senderName()).isEqualTo("이*연");
@@ -66,7 +66,7 @@ class ChatMessageBroadcastListenerTest {
 
         // then
         ArgumentCaptor<ChatMessageEvent> captor = ArgumentCaptor.forClass(ChatMessageEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().senderName()).isEqualTo("알 수 없음");
     }
 
@@ -81,7 +81,7 @@ class ChatMessageBroadcastListenerTest {
 
         // then
         ArgumentCaptor<ChatMessageEvent> captor = ArgumentCaptor.forClass(ChatMessageEvent.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         assertThat(captor.getValue().senderName()).isEqualTo("알 수 없음");
     }
 }

@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
@@ -7,7 +8,6 @@ import com.wanted.backend.domain.chat.infrastructure.websocket.message.Participa
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.SystemLeaveMessage;
 import com.wanted.backend.domain.study.application.event.StudyLeftEvent;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,16 +24,16 @@ public class StudyLeftBroadcastListener {
     private final MemberNamePort memberNamePort;
     private final ChatParticipantPresenceResolver presenceResolver;
     private final ChatMessageRepository chatMessageRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatBroadcastPort chatBroadcastPort;
 
     public StudyLeftBroadcastListener(MemberNamePort memberNamePort,
                                       ChatParticipantPresenceResolver presenceResolver,
                                       ChatMessageRepository chatMessageRepository,
-                                      SimpMessagingTemplate messagingTemplate) {
+                                      ChatBroadcastPort chatBroadcastPort) {
         this.memberNamePort = memberNamePort;
         this.presenceResolver = presenceResolver;
         this.chatMessageRepository = chatMessageRepository;
-        this.messagingTemplate = messagingTemplate;
+        this.chatBroadcastPort = chatBroadcastPort;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -46,7 +46,7 @@ public class StudyLeftBroadcastListener {
 
             chatMessageRepository.save(ChatMessage.createSystemLeave(event.chatRoomId(), message));
 
-            messagingTemplate.convertAndSend(
+            chatBroadcastPort.broadcast(
                     "/sub/chat-rooms/" + event.chatRoomId(),
                     SystemLeaveMessage.of(message, participants));
         } catch (Exception e) {
