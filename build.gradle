@@ -98,3 +98,13 @@ tasks.register('installReviewHooks', Exec) {
     commandLine 'git', 'config', 'core.hooksPath', '.githooks'
     doLast { println 'pre-push 훅 활성화됨(.githooks). 우회 필요 시: git push --no-verify' }
 }
+
+// AI 코드 리뷰 루프 · Minor 수정 요청서 생성 (판정=Gemini) — Claude Code 드라이버가 읽어 수정
+//   ./gradlew reviewFix -Pargs="--path src/main/java/com/wanted/backend/domain/cart --domain cart"
+tasks.register('reviewFix', Exec) {
+    group = 'review-loop'
+    description = 'Minor 수정 요청서 생성: Gemini 판정 → 방안 포함 요청서 (Claude Code가 처리) (-Pargs="--path ... | --files-from ...")'
+    commandLine 'bash', 'scripts/review-fix.sh'
+    def a = (project.findProperty('args') ?: '').toString().trim()
+    if (a) { args(a.split(' ')) }
+}
