@@ -17,7 +17,7 @@ public record MyChatRoomResponse(
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss+09:00")
         @Schema(description = "마지막 메시지 전송 시각 (메시지가 없으면 null)", example = "2026-05-11T12:05:00")
         LocalDateTime lastMessageAt,
-        @Schema(description = "안 읽은 메시지 수 (현재는 항상 0)", example = "0")
+        @Schema(description = "안 읽은 메시지 수 (마지막으로 읽은 메시지 이후 개수)", example = "3")
         int unreadCount
 ) {
     public static MyChatRoomResponse from(MyChatRoomDetail detail) {

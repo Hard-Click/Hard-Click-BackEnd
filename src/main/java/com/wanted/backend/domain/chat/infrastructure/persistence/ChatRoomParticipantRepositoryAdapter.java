@@ -18,10 +18,12 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
     @Override
     public ChatRoomParticipant save(ChatRoomParticipant chatRoomParticipant) {
         ChatRoomParticipantJpaEntity entity = new ChatRoomParticipantJpaEntity(
-                chatRoomParticipant.getChatRoomId(), chatRoomParticipant.getMemberId(), chatRoomParticipant.getJoinedAt()
+                chatRoomParticipant.getChatRoomId(), chatRoomParticipant.getMemberId(),
+                chatRoomParticipant.getJoinedAt(), chatRoomParticipant.getLastReadMessageId()
         );
         ChatRoomParticipantJpaEntity saved = repository.save(entity);
-        return ChatRoomParticipant.restore(saved.getId(), saved.getChatRoomId(), saved.getMemberId(), saved.getJoinedAt());
+        return ChatRoomParticipant.restore(saved.getId(), saved.getChatRoomId(), saved.getMemberId(),
+                saved.getJoinedAt(), saved.getLastReadMessageId());
     }
 
     @Override
@@ -46,5 +48,10 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
     @Override
     public void deleteByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
         repository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
+
+    @Override
+    public void updateLastReadMessageId(Long chatRoomId, Long memberId, Long messageId) {
+        repository.updateLastReadMessageId(chatRoomId, memberId, messageId);
     }
 }

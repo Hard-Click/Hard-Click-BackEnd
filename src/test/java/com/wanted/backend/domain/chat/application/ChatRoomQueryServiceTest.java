@@ -198,6 +198,8 @@ class ChatRoomQueryServiceTest {
                 "최근 메시지", LocalDateTime.of(2026, 5, 11, 12, 5));
         given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.of(olderMessage));
         given(chatMessageRepository.findLatestByChatRoomId(13L)).willReturn(Optional.of(newerMessage));
+        given(chatMessageRepository.countUnreadByChatRoomIdAndMemberId(12L, 1L)).willReturn(0L);
+        given(chatMessageRepository.countUnreadByChatRoomIdAndMemberId(13L, 1L)).willReturn(0L);
 
         // when
         List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
@@ -209,6 +211,42 @@ class ChatRoomQueryServiceTest {
         assertThat(result.get(0).lastMessage()).isEqualTo("최근 메시지");
         assertThat(result.get(0).unreadCount()).isEqualTo(0);
         assertThat(result.get(1).chatRoomId()).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("안 읽은 메시지가 있으면 unreadCount에 실제 개수가 반영된다")
+    void getMyRooms_success_unreadCountReflectsRealValue() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+        given(chatMessageRepository.countUnreadByChatRoomIdAndMemberId(12L, 1L)).willReturn(3L);
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result.get(0).unreadCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("unreadCount 조회가 실패해도 0으로 대체되고 목록은 정상 반환된다")
+    void getMyRooms_success_unreadCountPortThrows() {
+        // given
+        ChatRoom room = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L))).willReturn(List.of(room));
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+        given(chatMessageRepository.countUnreadByChatRoomIdAndMemberId(12L, 1L)).willThrow(new RuntimeException("db down"));
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result.get(0).unreadCount()).isEqualTo(0);
     }
 
     @Test

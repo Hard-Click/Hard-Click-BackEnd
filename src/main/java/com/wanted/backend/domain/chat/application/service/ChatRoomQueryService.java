@@ -89,21 +89,31 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
         List<ChatRoom> chatRooms = chatRoomRepository.findAllByIdIn(chatRoomIds);
 
         return chatRooms.stream()
-                .map(this::toMyChatRoomDetail)
+                .map(chatRoom -> toMyChatRoomDetail(chatRoom, memberId))
                 .sorted(Comparator.comparing(MyChatRoomDetail::lastMessageAt,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
     }
 
-    private MyChatRoomDetail toMyChatRoomDetail(ChatRoom chatRoom) {
+    private MyChatRoomDetail toMyChatRoomDetail(ChatRoom chatRoom, Long memberId) {
         String name = resolveStudyTitle(chatRoom.getStudyId());
         Optional<ChatMessage> latest = resolveLatestMessage(chatRoom.getId());
+        int unreadCount = resolveUnreadCount(chatRoom.getId(), memberId);
 
         return new MyChatRoomDetail(
                 chatRoom.getId(), name,
                 latest.map(ChatMessage::getContent).orElse(null),
                 latest.map(ChatMessage::getSentAt).orElse(null),
-                0);
+                unreadCount);
+    }
+
+    private int resolveUnreadCount(Long chatRoomId, Long memberId) {
+        try {
+            return (int) chatMessageRepository.countUnreadByChatRoomIdAndMemberId(chatRoomId, memberId);
+        } catch (Exception e) {
+            log.warn("unreadCount 조회 실패, 0으로 fallback. chatRoomId={}, memberId={}", chatRoomId, memberId, e);
+            return 0;
+        }
     }
 
     private String resolveStudyTitle(Long studyId) {

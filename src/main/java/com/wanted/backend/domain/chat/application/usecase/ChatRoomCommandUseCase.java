@@ -1,5 +1,7 @@
 package com.wanted.backend.domain.chat.application.usecase;
 
+import com.wanted.backend.domain.chat.application.command.MarkChatRoomReadCommand;
+
 public interface ChatRoomCommandUseCase {
     Long createRoom(Long studyId, Long hostId);
 
@@ -8,4 +10,6 @@ public interface ChatRoomCommandUseCase {
     void closeRoom(Long chatRoomId);
 
     void removeParticipant(Long chatRoomId, Long memberId);
+
+    void markRead(MarkChatRoomReadCommand command);
 }

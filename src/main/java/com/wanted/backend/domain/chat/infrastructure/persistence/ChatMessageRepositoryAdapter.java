@@ -42,6 +42,11 @@ public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
         return repository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId).map(this::toDomain);
     }
 
+    @Override
+    public long countUnreadByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
+        return repository.countUnreadByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
+
     private ChatMessage toDomain(ChatMessageJpaEntity entity) {
         return ChatMessage.restore(entity.getId(), entity.getChatRoomId(), entity.getSenderId(),
                 entity.getType(), entity.getContent(), entity.getSentAt());
