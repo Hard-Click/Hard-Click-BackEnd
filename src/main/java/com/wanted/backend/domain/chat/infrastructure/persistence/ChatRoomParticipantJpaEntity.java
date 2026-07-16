@@ -29,7 +29,8 @@ public class ChatRoomParticipantJpaEntity {
 
     protected ChatRoomParticipantJpaEntity() {}
 
-    public ChatRoomParticipantJpaEntity(Long chatRoomId, Long memberId, LocalDateTime joinedAt, Long lastReadMessageId) {
+    public ChatRoomParticipantJpaEntity(Long id, Long chatRoomId, Long memberId, LocalDateTime joinedAt, Long lastReadMessageId) {
+        this.id = id;
         this.chatRoomId = chatRoomId;
         this.memberId = memberId;
         this.joinedAt = joinedAt;

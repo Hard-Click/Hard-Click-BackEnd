@@ -18,7 +18,7 @@ public class ChatRoomParticipantRepositoryAdapter implements ChatRoomParticipant
     @Override
     public ChatRoomParticipant save(ChatRoomParticipant chatRoomParticipant) {
         ChatRoomParticipantJpaEntity entity = new ChatRoomParticipantJpaEntity(
-                chatRoomParticipant.getChatRoomId(), chatRoomParticipant.getMemberId(),
+                chatRoomParticipant.getId(), chatRoomParticipant.getChatRoomId(), chatRoomParticipant.getMemberId(),
                 chatRoomParticipant.getJoinedAt(), chatRoomParticipant.getLastReadMessageId()
         );
         ChatRoomParticipantJpaEntity saved = repository.save(entity);

@@ -60,8 +60,10 @@ class StompChannelInterceptorTest {
     }
 
     private StompChannelInterceptor newInterceptor() {
+        // preSend는 STOMP 스레드에서 markRead를 chatReadExecutor로 위임하므로, 테스트에서는
+        // 결과를 동기적으로 검증할 수 있도록 호출 스레드에서 즉시 실행하는 Executor를 준다.
         return new StompChannelInterceptor(socketTicketCommandUseCase, chatRoomRepository,
-                chatRoomParticipantRepository, chatMessageRepository, chatRoomCommandUseCase);
+                chatRoomParticipantRepository, chatMessageRepository, chatRoomCommandUseCase, Runnable::run);
     }
 
     @Test

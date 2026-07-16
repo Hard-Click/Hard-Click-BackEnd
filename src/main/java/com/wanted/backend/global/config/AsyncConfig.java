@@ -51,4 +51,21 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    // STOMP 구독 시점의 자동 읽음 처리(DB write)를 clientInboundChannel 스레드 풀과 분리한다.
+    // preSend는 한정된 STOMP 스레드 풀에서 동기 실행되므로, 여기서 DB I/O를 직접 하면
+    // 트래픽이 몰릴 때 스레드 풀 고갈로 전체 채팅 기능이 멎을 수 있다.
+    @Bean(name = "chatReadExecutor")
+    public Executor chatReadExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("ChatRead-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
 }

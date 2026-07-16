@@ -6,11 +6,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SpringDataChatRoomParticipantRepository extends JpaRepository<ChatRoomParticipantJpaEntity, Long> {
     List<ChatRoomParticipantJpaEntity> findByChatRoomId(Long chatRoomId);
 
     List<ChatRoomParticipantJpaEntity> findByMemberId(Long memberId);
+
+    Optional<ChatRoomParticipantJpaEntity> findByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 
     boolean existsByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 

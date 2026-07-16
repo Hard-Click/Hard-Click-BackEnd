@@ -9,6 +9,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest(properties = {
@@ -74,5 +76,29 @@ class ChatRoomParticipantRepositoryAdapterTest {
 
         assertThat(em.find(ChatRoomParticipantJpaEntity.class, me.getId()).getLastReadMessageId()).isEqualTo(50L);
         assertThat(em.find(ChatRoomParticipantJpaEntity.class, other.getId()).getLastReadMessageId()).isNull();
+    }
+
+    @Test
+    @DisplayName("이미 존재하는 참여자를 도메인 markRead 후 다시 save해도 새 row가 생기지 않고 기존 row가 갱신된다")
+    void save_existingParticipant_updatesSameRowInsteadOfInserting() {
+        ChatRoomParticipant saved = adapter.save(ChatRoomParticipant.create(100L, 1L));
+        em.flush();
+        em.clear();
+
+        saved.markRead(50L);
+        adapter.save(saved);
+        em.flush();
+        em.clear();
+
+        List<ChatRoomParticipantJpaEntity> rows = em.getEntityManager()
+                .createQuery("SELECT p FROM ChatRoomParticipantJpaEntity p " +
+                        "WHERE p.chatRoomId = :chatRoomId AND p.memberId = :memberId", ChatRoomParticipantJpaEntity.class)
+                .setParameter("chatRoomId", 100L)
+                .setParameter("memberId", 1L)
+                .getResultList();
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getId()).isEqualTo(saved.getId());
+        assertThat(rows.get(0).getLastReadMessageId()).isEqualTo(50L);
     }
 }
