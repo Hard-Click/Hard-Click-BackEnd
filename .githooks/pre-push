@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# AI 코드 리뷰 루프 · pre-push 훅 (로컬 자동 트리거)
+#
+# push 직전에 "이번에 원격으로 나가는 변경 .java"만 골라 로컬 게이트를 돌린다.
+#   - Gate 1 (정적·결정론, 키 불필요): ArchUnit 실패 시 push 차단.
+#   - Gate 2 (LLM 판정, 변경 파일만):  차단 결정(미완성/Critical) 시 push 차단.
+#                                       GEMINI_API_KEY 없으면 러너가 스스로 생략·통과.
+# 급할 때 우회: git push --no-verify  (서버 CI(Gate 3)는 우회 불가)
+#
+# 활성화(클론 후 1회): ./gradlew installReviewHooks   (= git config core.hooksPath .githooks)
+set -u
+
+ZERO="0000000000000000000000000000000000000000"
+BASE_DEFAULT="origin/develop"
+CHANGED="$(git rev-parse --git-dir)/reviewloop-changed.txt"
+: > "$CHANGED"
+
+# stdin(각 줄): <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue            # 브랜치 삭제 push는 스킵
+  if [ "$remote_sha" = "$ZERO" ]; then              # 신규 브랜치 → develop 기준 신규 커밋만
+    range_base="$(git merge-base "$BASE_DEFAULT" "$local_sha" 2>/dev/null || echo "")"
+  else
+    range_base="$remote_sha"
+  fi
+  if [ -n "$range_base" ]; then
+    git diff --name-only --diff-filter=ACMR "$range_base" "$local_sha"
+  else
+    git show --name-only --diff-filter=ACMR --format= "$local_sha"
+  fi
+done | grep -E '\.java$' | sort -u > "$CHANGED"
+
+if [ ! -s "$CHANGED" ]; then
+  echo "[review-loop] 변경된 .java 없음 → 통과"
+  exit 0
+fi
+echo "[review-loop] 변경 .java $(wc -l < "$CHANGED")개 검사..."
+
+# ── Gate 1 (정적·결정론) — 키 불필요. 실패 시 차단. (semgrep 등 풀 세트는 CI에서) ──
+echo "[review-loop] Gate 1 · ArchUnit ..."
+if ! ./gradlew -q test --tests "com.wanted.backend.architecture.ArchitectureRulesTest" --no-daemon; then
+  echo "[review-loop] ❌ Gate 1 실패 → push 중단 (우회: git push --no-verify)"
+  exit 1
+fi
+
+# ── Gate 2 (LLM 판정) — 변경 파일만, 게이트 모드. 차단 결정이면 러너가 exit 1. ──
+echo "[review-loop] Gate 2 · LLM Judge (변경 파일만) ..."
+if ! ./gradlew -q reviewLoop --args="--files-from $CHANGED --gate" --no-daemon; then
+  echo "[review-loop] ❌ Gate 2 차단 결정 → push 중단 (우회: git push --no-verify)"
+  exit 1
+fi
+
+echo "[review-loop] ✅ 통과 → push 진행"
+exit 0
