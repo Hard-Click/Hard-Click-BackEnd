@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
@@ -11,8 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.SetOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -20,18 +23,25 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+// 온라인 상태는 ASG 인스턴스 간에 공유되어야 해서 StringRedisTemplate(Set/Value)로 옮겼다.
+// Mockito는 시퀀스 상태(구독 여러 번 → 연결 해제)를 그대로 stub하기 어려우므로,
+// opsForSet/opsForValue를 이 테스트 안에서만 쓰는 작은 인메모리 페이크로 backing한다.
 @ExtendWith(MockitoExtension.class)
 class ChatPresenceTrackerTest {
 
@@ -42,13 +52,53 @@ class ChatPresenceTrackerTest {
     private MemberNamePort memberNamePort;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ChatBroadcastPort chatBroadcastPort;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private SetOperations<String, String> setOperations;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
+    private final Map<String, Set<String>> fakeSets = new HashMap<>();
+    private final Map<String, String> fakeValues = new HashMap<>();
 
     private ChatPresenceTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new ChatPresenceTracker(chatRoomParticipantRepository, memberNamePort, messagingTemplate);
+        lenient().when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        lenient().when(setOperations.add(anyString(), anyString())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            String value = invocation.getArgument(1);
+            fakeSets.computeIfAbsent(key, k -> new HashSet<>()).add(value);
+            return 1L;
+        });
+        lenient().when(setOperations.remove(anyString(), any())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            String value = (String) invocation.getArgument(1);
+            Set<String> set = fakeSets.get(key);
+            return set != null && set.remove(value) ? 1L : 0L;
+        });
+        lenient().when(setOperations.members(anyString())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            return new HashSet<>(fakeSets.getOrDefault(key, Set.of()));
+        });
+        lenient().when(valueOperations.get(anyString())).thenAnswer(invocation ->
+                fakeValues.get((String) invocation.getArgument(0)));
+        lenient().doAnswer(invocation -> {
+            fakeValues.put(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(valueOperations).set(anyString(), anyString());
+        lenient().when(redisTemplate.delete(anyString())).thenAnswer(invocation ->
+                fakeValues.remove((String) invocation.getArgument(0)) != null);
+
+        tracker = new ChatPresenceTracker(chatRoomParticipantRepository, memberNamePort, chatBroadcastPort, redisTemplate);
     }
 
     @Test
@@ -63,7 +113,7 @@ class ChatPresenceTrackerTest {
 
         // then
         ArgumentCaptor<PresenceUpdateMessage> captor = ArgumentCaptor.forClass(PresenceUpdateMessage.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         PresenceUpdateMessage message = captor.getValue();
         assertThat(message.type()).isEqualTo("PRESENCE_UPDATE");
         assertThat(message.participants()).containsExactlyInAnyOrder(
@@ -78,7 +128,7 @@ class ChatPresenceTrackerTest {
         tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/other-topic", "session-1", new ChatPrincipal(1L))));
 
         // then
-        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+        verify(chatBroadcastPort, never()).broadcast(anyString(), any(Object.class));
     }
 
     @Test
@@ -94,7 +144,7 @@ class ChatPresenceTrackerTest {
 
         // then
         ArgumentCaptor<PresenceUpdateMessage> captor = ArgumentCaptor.forClass(PresenceUpdateMessage.class);
-        verify(messagingTemplate, times(2)).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort, times(2)).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         PresenceUpdateMessage lastMessage = captor.getAllValues().get(1);
         assertThat(lastMessage.participants()).containsExactly(new ParticipantPresenceMessage(1L, "이*연", false));
     }
@@ -115,7 +165,7 @@ class ChatPresenceTrackerTest {
 
         // then: 구독 2회 + 연결 해제 1회, 총 3번 브로드캐스트되며 순서대로 상태가 반영된다
         ArgumentCaptor<PresenceUpdateMessage> captor = ArgumentCaptor.forClass(PresenceUpdateMessage.class);
-        verify(messagingTemplate, times(3)).convertAndSend(eq("/sub/chat-rooms/45"), captor.capture());
+        verify(chatBroadcastPort, times(3)).broadcast(eq("/sub/chat-rooms/45"), captor.capture());
         List<PresenceUpdateMessage> broadcasts = captor.getAllValues();
 
         // 1L 구독 시점: 1L만 온라인
@@ -141,7 +191,7 @@ class ChatPresenceTrackerTest {
         tracker.handleDisconnect(new SessionDisconnectEvent(this, disconnectMessage(), "unknown-session", CloseStatus.NORMAL, new ChatPrincipal(1L)));
 
         // then
-        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+        verify(chatBroadcastPort, never()).broadcast(anyString(), any(Object.class));
     }
 
     private Message<byte[]> subscribeMessage(String destination, String sessionId, ChatPrincipal principal) {

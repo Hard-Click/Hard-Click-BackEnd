@@ -1,11 +1,12 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.PresenceUpdateMessage;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -16,28 +17,35 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+// ASG로 여러 인스턴스가 뜨면 "누가 접속 중인지"도 인스턴스 로컬 메모리에만 있으면 안 되므로,
+// StringRedisTemplate으로 온라인 상태 자체를 인스턴스 간에 공유한다.
+// 참고로 크래시 등으로 정상 disconnect 이벤트 없이 프로세스가 죽으면 room set에 유령 온라인
+// 상태가 남을 수 있다(TTL/heartbeat 미적용) — cross-instance 브로드캐스트 수정이 우선이라
+// 이번 스코프에는 넣지 않았고, 별도 후속 작업으로 남겨둔다.
 @Component
 public class ChatPresenceTracker {
 
     private static final Pattern CHAT_ROOM_DESTINATION_PATTERN = Pattern.compile("^/sub/chat-rooms/(\\d+)$");
-
-    private final Map<Long, Set<Long>> onlineMembersByChatRoomId = new ConcurrentHashMap<>();
-    private final Map<String, Long> chatRoomIdBySessionId = new ConcurrentHashMap<>();
+    private static final String ROOM_KEY_PREFIX = "chat:presence:room:";
+    private static final String SESSION_KEY_PREFIX = "chat:presence:session:";
 
     private final ChatRoomParticipantRepository chatRoomParticipantRepository;
     private final MemberNamePort memberNamePort;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatBroadcastPort chatBroadcastPort;
+    private final StringRedisTemplate redisTemplate;
 
     public ChatPresenceTracker(ChatRoomParticipantRepository chatRoomParticipantRepository,
                                MemberNamePort memberNamePort,
-                               SimpMessagingTemplate messagingTemplate) {
+                               ChatBroadcastPort chatBroadcastPort,
+                               StringRedisTemplate redisTemplate) {
         this.chatRoomParticipantRepository = chatRoomParticipantRepository;
         this.memberNamePort = memberNamePort;
-        this.messagingTemplate = messagingTemplate;
+        this.chatBroadcastPort = chatBroadcastPort;
+        this.redisTemplate = redisTemplate;
     }
 
     @EventListener
@@ -52,38 +60,43 @@ public class ChatPresenceTracker {
             return;
         }
 
-        onlineMembersByChatRoomId.computeIfAbsent(chatRoomId, id -> ConcurrentHashMap.newKeySet()).add(memberId);
-        chatRoomIdBySessionId.put(accessor.getSessionId(), chatRoomId);
+        redisTemplate.opsForSet().add(roomKey(chatRoomId), memberId.toString());
+        redisTemplate.opsForValue().set(sessionKey(accessor.getSessionId()), chatRoomId.toString());
 
         broadcastPresence(chatRoomId);
     }
 
     @EventListener
     public void handleDisconnect(SessionDisconnectEvent event) {
-        Long chatRoomId = chatRoomIdBySessionId.remove(event.getSessionId());
-        if (chatRoomId == null) {
+        String sessionKey = sessionKey(event.getSessionId());
+        String chatRoomIdValue = redisTemplate.opsForValue().get(sessionKey);
+        if (chatRoomIdValue == null) {
             return;
         }
+        redisTemplate.delete(sessionKey);
+
         Long memberId = extractMemberId(event.getUser());
         if (memberId == null) {
             return;
         }
 
-        Set<Long> onlineMembers = onlineMembersByChatRoomId.get(chatRoomId);
-        if (onlineMembers != null) {
-            onlineMembers.remove(memberId);
-        }
+        Long chatRoomId = Long.valueOf(chatRoomIdValue);
+        redisTemplate.opsForSet().remove(roomKey(chatRoomId), memberId.toString());
 
         broadcastPresence(chatRoomId);
     }
 
     public Set<Long> getOnlineMemberIds(Long chatRoomId) {
-        return Set.copyOf(onlineMembersByChatRoomId.getOrDefault(chatRoomId, Set.of()));
+        Set<String> members = redisTemplate.opsForSet().members(roomKey(chatRoomId));
+        if (members == null || members.isEmpty()) {
+            return Set.of();
+        }
+        return members.stream().map(Long::valueOf).collect(Collectors.toSet());
     }
 
     private void broadcastPresence(Long chatRoomId) {
         List<Long> participantIds = chatRoomParticipantRepository.findMemberIdsByChatRoomId(chatRoomId);
-        Set<Long> onlineMembers = onlineMembersByChatRoomId.getOrDefault(chatRoomId, Set.of());
+        Set<Long> onlineMembers = getOnlineMemberIds(chatRoomId);
         Map<Long, String> nameMap = resolveNameMap(participantIds);
 
         List<ParticipantPresenceMessage> participants = participantIds.stream()
@@ -91,7 +104,7 @@ public class ChatPresenceTracker {
                         memberId, maskName(nameMap.get(memberId)), onlineMembers.contains(memberId)))
                 .toList();
 
-        messagingTemplate.convertAndSend(
+        chatBroadcastPort.broadcast(
                 "/sub/chat-rooms/" + chatRoomId,
                 PresenceUpdateMessage.of(participants));
     }
@@ -121,5 +134,13 @@ public class ChatPresenceTracker {
 
     private Long extractMemberId(Principal principal) {
         return principal instanceof ChatPrincipal chatPrincipal ? chatPrincipal.getMemberId() : null;
+    }
+
+    private String roomKey(Long chatRoomId) {
+        return ROOM_KEY_PREFIX + chatRoomId;
+    }
+
+    private String sessionKey(String sessionId) {
+        return SESSION_KEY_PREFIX + sessionId;
     }
 }
