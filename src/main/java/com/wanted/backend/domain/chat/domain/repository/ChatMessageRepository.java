@@ -11,4 +11,6 @@ public interface ChatMessageRepository {
     List<ChatMessage> findByChatRoomIdBeforeCursor(Long chatRoomId, Long cursorId, int limit);
 
     Optional<ChatMessage> findLatestByChatRoomId(Long chatRoomId);
+
+    long countUnreadByChatRoomIdAndMemberId(Long chatRoomId, Long memberId);
 }

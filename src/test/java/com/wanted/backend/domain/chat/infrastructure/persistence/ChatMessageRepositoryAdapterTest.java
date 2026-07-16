@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.chat.infrastructure.persistence;
 
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
+import com.wanted.backend.domain.chat.domain.model.ChatRoomParticipant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,11 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.flyway.enabled=false"
 })
 @ActiveProfiles("test")
-@Import(ChatMessageRepositoryAdapter.class)
+@Import({ChatMessageRepositoryAdapter.class, ChatRoomParticipantRepositoryAdapter.class})
 class ChatMessageRepositoryAdapterTest {
 
     @Autowired
     private ChatMessageRepositoryAdapter adapter;
+
+    @Autowired
+    private ChatRoomParticipantRepositoryAdapter participantAdapter;
 
     @Autowired
     private TestEntityManager em;
@@ -79,6 +83,65 @@ class ChatMessageRepositoryAdapterTest {
 
         // then
         assertThat(page).extracting(ChatMessage::getContent).containsExactly("room100");
+    }
+
+    @Test
+    @DisplayName("한 번도 안 읽었으면 방의 전체 메시지 수가 unreadCount다")
+    void countUnread_neverRead_countsAll() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        saveFiveMessages();
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("마지막으로 읽은 메시지 이후 것만 unreadCount로 잡힌다")
+    void countUnread_afterLastRead_countsOnlyNewer() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        List<ChatMessage> saved = saveFiveMessages();
+        em.flush();
+        Long thirdMessageId = saved.get(2).getId(); // msg3
+        participantAdapter.updateLastReadMessageId(100L, 1L, thirdMessageId);
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isEqualTo(2); // msg4, msg5
+    }
+
+    @Test
+    @DisplayName("최신 메시지까지 다 읽으면 unreadCount는 0이다")
+    void countUnread_fullyRead_zero() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        List<ChatMessage> saved = saveFiveMessages();
+        em.flush();
+        Long lastMessageId = saved.get(4).getId(); // msg5
+        participantAdapter.updateLastReadMessageId(100L, 1L, lastMessageId);
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isZero();
+    }
+
+    @Test
+    @DisplayName("다른 방의 메시지는 unreadCount에 섞이지 않는다")
+    void countUnread_scopedToChatRoom() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        adapter.save(ChatMessage.create(100L, 2L, "room100"));
+        adapter.save(ChatMessage.create(200L, 2L, "room200"));
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isEqualTo(1);
     }
 
     private List<ChatMessage> saveFiveMessages() {

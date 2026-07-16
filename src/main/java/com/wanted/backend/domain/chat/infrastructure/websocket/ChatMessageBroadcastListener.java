@@ -2,8 +2,8 @@ package com.wanted.backend.domain.chat.infrastructure.websocket;
 
 import com.wanted.backend.domain.chat.application.event.ChatMessageEvent;
 import com.wanted.backend.domain.chat.application.event.ChatMessagePersistedEvent;
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -14,18 +14,18 @@ import java.util.Set;
 public class ChatMessageBroadcastListener {
 
     private final MemberNamePort memberNamePort;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatBroadcastPort chatBroadcastPort;
 
-    public ChatMessageBroadcastListener(MemberNamePort memberNamePort, SimpMessagingTemplate messagingTemplate) {
+    public ChatMessageBroadcastListener(MemberNamePort memberNamePort, ChatBroadcastPort chatBroadcastPort) {
         this.memberNamePort = memberNamePort;
-        this.messagingTemplate = messagingTemplate;
+        this.chatBroadcastPort = chatBroadcastPort;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(ChatMessagePersistedEvent event) {
         String senderName = maskName(resolveName(event.senderId()));
 
-        messagingTemplate.convertAndSend(
+        chatBroadcastPort.broadcast(
                 "/sub/chat-rooms/" + event.chatRoomId(),
                 ChatMessageEvent.of(event, senderName));
     }

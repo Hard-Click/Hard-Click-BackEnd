@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.infrastructure.websocket;
 
+import com.wanted.backend.domain.chat.application.port.ChatBroadcastPort;
 import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.model.ChatMessageType;
@@ -14,7 +15,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ class StudyJoinedBroadcastListenerTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ChatBroadcastPort chatBroadcastPort;
 
     @Test
     @DisplayName("참여 이벤트를 받으면 입장 메시지와 참여자 목록을 함께 브로드캐스트한다")
@@ -59,7 +59,7 @@ class StudyJoinedBroadcastListenerTest {
 
         // then
         ArgumentCaptor<SystemJoinMessage> captor = ArgumentCaptor.forClass(SystemJoinMessage.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/12"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/12"), captor.capture());
         SystemJoinMessage message = captor.getValue();
         assertThat(message.type()).isEqualTo("SYSTEM_JOIN");
         assertThat(message.message()).isEqualTo("김*수님이 입장했습니다");
@@ -87,7 +87,7 @@ class StudyJoinedBroadcastListenerTest {
 
         // then
         ArgumentCaptor<SystemJoinMessage> captor = ArgumentCaptor.forClass(SystemJoinMessage.class);
-        verify(messagingTemplate).convertAndSend(eq("/sub/chat-rooms/12"), captor.capture());
+        verify(chatBroadcastPort).broadcast(eq("/sub/chat-rooms/12"), captor.capture());
         assertThat(captor.getValue().message()).isEqualTo("알 수 없음님이 입장했습니다");
     }
 }

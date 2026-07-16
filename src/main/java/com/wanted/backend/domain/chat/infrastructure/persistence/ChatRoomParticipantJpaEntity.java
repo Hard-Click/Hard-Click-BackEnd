@@ -24,11 +24,16 @@ public class ChatRoomParticipantJpaEntity {
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
 
+    @Column(name = "last_read_message_id")
+    private Long lastReadMessageId;
+
     protected ChatRoomParticipantJpaEntity() {}
 
-    public ChatRoomParticipantJpaEntity(Long chatRoomId, Long memberId, LocalDateTime joinedAt) {
+    public ChatRoomParticipantJpaEntity(Long id, Long chatRoomId, Long memberId, LocalDateTime joinedAt, Long lastReadMessageId) {
+        this.id = id;
         this.chatRoomId = chatRoomId;
         this.memberId = memberId;
         this.joinedAt = joinedAt;
+        this.lastReadMessageId = lastReadMessageId;
     }
 }

@@ -45,6 +45,8 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    // 아키텍처 규칙 검증 (Gate 1 · 결정론) — 클린아키텍처 레이어 의존성 강제
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
     runtimeOnly 'com.h2database:h2'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -62,8 +64,47 @@ dependencies {
     implementation platform('software.amazon.awssdk:bom:2.26.12')
     implementation 'software.amazon.awssdk:s3'
     implementation 'software.amazon.awssdk:sts'
+
+    // AI 코드 리뷰 루프 · Gate 2 — LLM Judge (선택 어댑터: Claude)
+    implementation 'com.anthropic:anthropic-java:2.34.0'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// AI 코드 리뷰 루프 · 사람 검토 게이트 CLI 데모 (./gradlew reviewCli)
+tasks.register('reviewCli', JavaExec) {
+    group = 'review-loop'
+    description = '사람 검토 게이트를 터미널에 표시(개발자 도구 표면)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopCli'
+}
+
+// AI 코드 리뷰 루프 · 범용 러너 — 도메인 owner가 자기 경로로 실행
+//   ./gradlew reviewLoop --args="--path src/main/java/com/wanted/backend/domain/cart --domain cart --max 3"
+//   (-Ppath는 Gradle 예약 프로퍼티 project.path와 충돌하므로 --args 사용)
+tasks.register('reviewLoop', JavaExec) {
+    group = 'review-loop'
+    description = '지정 경로/변경파일에 리뷰 루프 실행 (--args="--path <dir> | --files-from <list> [--gate]")'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopRunner'
+}
+
+// AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정
+tasks.register('installReviewHooks', Exec) {
+    group = 'review-loop'
+    description = 'pre-push 훅 활성화(git config core.hooksPath .githooks)'
+    commandLine 'git', 'config', 'core.hooksPath', '.githooks'
+    doLast { println 'pre-push 훅 활성화됨(.githooks). 우회 필요 시: git push --no-verify' }
+}
+
+// AI 코드 리뷰 루프 · Minor 수정 요청서 생성 (판정=Gemini) — Claude Code 드라이버가 읽어 수정
+//   ./gradlew reviewFix -Pargs="--path src/main/java/com/wanted/backend/domain/cart --domain cart"
+tasks.register('reviewFix', Exec) {
+    group = 'review-loop'
+    description = 'Minor 수정 요청서 생성: Gemini 판정 → 방안 포함 요청서 (Claude Code가 처리) (-Pargs="--path ... | --files-from ...")'
+    commandLine 'bash', 'scripts/review-fix.sh'
+    def a = (project.findProperty('args') ?: '').toString().trim()
+    if (a) { args(a.split(' ')) }
 }

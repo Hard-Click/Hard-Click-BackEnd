@@ -39,6 +39,15 @@ out/
 ### .yaml ###
 application-secret.yaml
 
+### Secrets / API Keys — 절대 커밋 금지 (CI는 GitHub Actions Secret로 런타임 주입) ###
+.env
+.env.*
+*.env
+*.pem
+*.key
+*-api-key.txt
+**/secrets/
+
 ### Logs ###
 logs/
 *.log

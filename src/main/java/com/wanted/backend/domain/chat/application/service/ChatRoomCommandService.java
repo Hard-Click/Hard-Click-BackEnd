@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.application.service;
 
+import com.wanted.backend.domain.chat.application.command.MarkChatRoomReadCommand;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomCommandUseCase;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.model.ChatRoomParticipant;
@@ -50,5 +51,17 @@ public class ChatRoomCommandService implements ChatRoomCommandUseCase {
     @Override
     public void removeParticipant(Long chatRoomId, Long memberId) {
         chatRoomParticipantRepository.deleteByChatRoomIdAndMemberId(chatRoomId, memberId);
+    }
+
+    @Override
+    public void markRead(MarkChatRoomReadCommand command) {
+        if (!chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(command.chatRoomId(), command.memberId())) {
+            throw new BusinessException(ErrorCode.CHAT_FORBIDDEN);
+        }
+        if (command.lastReadMessageId() == null) {
+            return;
+        }
+        chatRoomParticipantRepository.updateLastReadMessageId(
+                command.chatRoomId(), command.memberId(), command.lastReadMessageId());
     }
 }

@@ -39,7 +39,8 @@ public class ChatRoomController {
             description = """
                 내가 참여 중인 채팅방 목록을 조회합니다.
                 - 마지막 메시지(lastMessage)의 전송 시각(lastMessageAt) 최신순으로 정렬되며, 메시지가 없는 채팅방은 뒤로 밀립니다.
-                - unreadCount는 현재 항상 0으로 반환됩니다 (추후 실계산 예정).
+                - unreadCount는 참여자별 마지막으로 읽은 메시지 ID(last_read_message_id) 이후의 메시지 수입니다.
+                  해당 채팅방을 WebSocket으로 구독하는 시점에 자동으로 최신 메시지까지 읽음 처리됩니다.
                 """
     )
     @GetMapping("/me")

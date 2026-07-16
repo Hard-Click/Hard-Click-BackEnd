@@ -12,4 +12,8 @@ public interface SpringDataChatMessageRepository extends JpaRepository<ChatMessa
     List<ChatMessageJpaEntity> findByChatRoomIdAndIdLessThanOrderByIdDesc(Long chatRoomId, Long cursorId, Pageable pageable);
 
     Optional<ChatMessageJpaEntity> findFirstByChatRoomIdOrderByIdDesc(Long chatRoomId);
+
+    long countByChatRoomId(Long chatRoomId);
+
+    long countByChatRoomIdAndIdGreaterThan(Long chatRoomId, Long id);
 }

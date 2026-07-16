@@ -7,6 +7,7 @@ import com.wanted.backend.domain.notice.application.usecase.NoticeCommandUseCase
 import com.wanted.backend.domain.notice.application.usecase.NoticeQueryUseCase;
 import com.wanted.backend.domain.notice.presentation.request.CreateGlobalNoticeRequest;
 import com.wanted.backend.domain.notice.presentation.request.CreateNoticeRequest;
+import com.wanted.backend.domain.notice.presentation.request.GetNoticeListRequest;
 import com.wanted.backend.domain.notice.presentation.request.UpdateNoticeRequest;
 import com.wanted.backend.domain.notice.presentation.response.CreateNoticeResponse;
 import com.wanted.backend.domain.notice.presentation.response.NoticeDetailResponse;
@@ -108,11 +109,11 @@ public class NoticeController {
     @Operation(
             summary = "공지사항 목록 조회",
             description = """
-                공지사항 목록을 조회합니다.
-                - 로그인한 회원만 조회 가능합니다.
+                공지사항 목록을 조회합니다. 강의 상세(GET /api/courses/{id})와 동일하게 공개 API입니다.
                 - type으로 조회 범위를 구분합니다. (GLOBAL: 전체 공지, COURSE: 강의 공지)
-                - COURSE 타입 조회 시 courseId를 함께 전달해야 합니다.
-                - COURSE 타입은 ADMIN/INSTRUCTOR는 강의 소유 여부와 무관하게 조회 가능하며, 학생은 수강 중인 강의만 조회 가능합니다.
+                - COURSE 타입 + courseId 지정 시: 로그인/수강 여부와 무관하게 누구나 조회 가능합니다.
+                - COURSE 타입 + courseId 미지정 시: "내가 속한 강의 공지 모아보기"이므로 로그인이 필요합니다.
+                  (ADMIN은 전체 강의, INSTRUCTOR는 본인 담당 강의, STUDENT는 수강 중인 강의 기준)
                 - keyword로 제목 검색이 가능합니다. (선택사항)
                 - 페이지 기본값: 0, 사이즈 기본값: 10
                 - 상단 고정 공지사항이 우선 노출됩니다.
@@ -121,25 +122,18 @@ public class NoticeController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공지사항 목록 조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "COURSE 타입인데 courseId 미전달"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "수강 중이지 않은 강의 공지 접근")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "비로그인 상태로 courseId 없이 COURSE 목록 조회")
     })
     public ResponseEntity<ApiResponse<NoticeListResponse>> getNotices(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "공지사항 타입 (GLOBAL: 전체 공지, COURSE: 강의 공지)", example = "GLOBAL")
-            @RequestParam String type,
-            @Parameter(description = "강의 공지 조회 시 강의 ID (COURSE 타입일 때 필수)", example = "5")
-            @RequestParam(required = false) Long courseId,
-            @Parameter(description = "제목 검색 키워드", example = "업로드")
-            @RequestParam(required = false) String keyword,
-            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
-            @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "페이지당 조회 수", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
+            @Valid @ModelAttribute GetNoticeListRequest request) {
+
+        Long memberId = userDetails != null ? userDetails.getMemberId() : null;
+        String role = userDetails != null ? userDetails.getRole() : null;
 
         NoticeListResult result = noticeQueryUseCase.getList(
-                new GetNoticeListCommand(type, courseId, keyword, page, size,
-                        userDetails.getMemberId(), userDetails.getRole()));
+                new GetNoticeListCommand(request.getType(), request.getCourseId(), request.getKeyword(),
+                        request.getPage(), request.getSize(), memberId, role));
 
         return ApiResponse.success("공지사항 목록 조회 성공", NoticeListResponse.from(result));
     }
@@ -148,15 +142,12 @@ public class NoticeController {
     @Operation(
             summary = "공지사항 상세 조회",
             description = """
-        공지사항 상세 내용을 조회합니다.
-        - 로그인한 회원만 조회 가능합니다.
+        공지사항 상세 내용을 조회합니다. 강의 상세와 동일하게 공개 API이며, 로그인/수강 여부와 무관하게 누구나 조회 가능합니다.
         - 이전 공지사항 ID와 제목을 함께 반환합니다.
         """
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공지사항 상세 조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "접근 권한 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항을 찾을 수 없음")
     })
     public ResponseEntity<ApiResponse<NoticeDetailResponse>> getNotice(
@@ -164,7 +155,10 @@ public class NoticeController {
             @Parameter(description = "조회할 공지사항 ID", example = "5")
             @PathVariable Long noticeId) {
 
-        NoticeDetailResult result = noticeQueryUseCase.getDetail(noticeId, userDetails.getMemberId(), userDetails.getRole());
+        Long memberId = userDetails != null ? userDetails.getMemberId() : null;
+        String role = userDetails != null ? userDetails.getRole() : null;
+
+        NoticeDetailResult result = noticeQueryUseCase.getDetail(noticeId, memberId, role);
 
         return ApiResponse.success("공지사항 상세 조회 성공", NoticeDetailResponse.from(result));
     }

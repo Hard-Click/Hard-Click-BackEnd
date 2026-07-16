@@ -13,9 +13,12 @@ import java.util.Optional;
 public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
 
     private final SpringDataChatMessageRepository repository;
+    private final SpringDataChatRoomParticipantRepository participantRepository;
 
-    public ChatMessageRepositoryAdapter(SpringDataChatMessageRepository repository) {
+    public ChatMessageRepositoryAdapter(SpringDataChatMessageRepository repository,
+                                         SpringDataChatRoomParticipantRepository participantRepository) {
         this.repository = repository;
+        this.participantRepository = participantRepository;
     }
 
     @Override
@@ -40,6 +43,21 @@ public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
     @Override
     public Optional<ChatMessage> findLatestByChatRoomId(Long chatRoomId) {
         return repository.findFirstByChatRoomIdOrderByIdDesc(chatRoomId).map(this::toDomain);
+    }
+
+    // native @Query JOIN 대신, 참여자의 last_read_message_id 포인터를 먼저 조회한 뒤
+    // 파생 쿼리(countByChatRoomId / countByChatRoomIdAndIdGreaterThan)로 나눠서 센다.
+    // chat_room_participant는 uk_chat_room_participant_room_member 유니크 인덱스로 즉시 찾고,
+    // chat_message 쪽은 idx_chat_message_room_id(chat_room_id, chat_message_id) 복합 인덱스를 탄다.
+    @Override
+    public long countUnreadByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
+        Long lastReadMessageId = participantRepository.findByChatRoomIdAndMemberId(chatRoomId, memberId)
+                .map(ChatRoomParticipantJpaEntity::getLastReadMessageId)
+                .orElse(null);
+
+        return lastReadMessageId == null
+                ? repository.countByChatRoomId(chatRoomId)
+                : repository.countByChatRoomIdAndIdGreaterThan(chatRoomId, lastReadMessageId);
     }
 
     private ChatMessage toDomain(ChatMessageJpaEntity entity) {

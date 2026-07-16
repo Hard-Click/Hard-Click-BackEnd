@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.chat.application;
 
+import com.wanted.backend.domain.chat.application.command.MarkChatRoomReadCommand;
 import com.wanted.backend.domain.chat.application.service.ChatRoomCommandService;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
 import com.wanted.backend.domain.chat.domain.model.ChatRoomParticipant;
@@ -145,5 +146,45 @@ class ChatRoomCommandServiceTest {
 
         // then
         verify(chatRoomParticipantRepository).deleteByChatRoomIdAndMemberId(200L, 3L);
+    }
+
+    @Test
+    @DisplayName("참여자가 읽음 처리하면 lastReadMessageId가 갱신된다")
+    void markRead_success() {
+        // given
+        given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(200L, 3L)).willReturn(true);
+
+        // when
+        chatRoomCommandService.markRead(new MarkChatRoomReadCommand(200L, 3L, 50L));
+
+        // then
+        verify(chatRoomParticipantRepository).updateLastReadMessageId(200L, 3L, 50L);
+    }
+
+    @Test
+    @DisplayName("참여자가 아니면 읽음 처리가 거부된다")
+    void markRead_fail_notParticipant() {
+        // given
+        given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(200L, 999L)).willReturn(false);
+
+        // when & then
+        assertThatThrownBy(() -> chatRoomCommandService.markRead(new MarkChatRoomReadCommand(200L, 999L, 50L)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.CHAT_FORBIDDEN.getMessage());
+
+        verify(chatRoomParticipantRepository, never()).updateLastReadMessageId(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("읽을 메시지 ID가 없으면(빈 방) 아무 갱신도 시도하지 않는다")
+    void markRead_noop_whenMessageIdNull() {
+        // given
+        given(chatRoomParticipantRepository.existsByChatRoomIdAndMemberId(200L, 3L)).willReturn(true);
+
+        // when
+        chatRoomCommandService.markRead(new MarkChatRoomReadCommand(200L, 3L, null));
+
+        // then
+        verify(chatRoomParticipantRepository, never()).updateLastReadMessageId(any(), any(), any());
     }
 }

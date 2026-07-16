@@ -242,7 +242,30 @@ import org.springframework.http.HttpStatus;
     CHAT_FORBIDDEN(HttpStatus.FORBIDDEN, "CH002", "채팅방 참여자만 이용할 수 있습니다."),
     CHAT_ROOM_CLOSED(HttpStatus.CONFLICT, "CH003", "이미 종료된 채팅방입니다."),
     CHAT_MESSAGE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CH004", "메시지 내용은 필수입니다."),
-    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다.");
+    CHAT_MESSAGE_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "CH005", "메시지 내용은 1000자를 초과할 수 없습니다."),
+
+    /* =========================================================================
+       학습 스케줄 온보딩 관련 예외 (OB000)
+       ========================================================================= */
+    ONBOARDING_INVALID_DAY_OF_WEEK(HttpStatus.BAD_REQUEST, "OB001", "요일은 0(일)~6(토) 범위여야 합니다."),
+    ONBOARDING_INVALID_TIME_SLOT(HttpStatus.BAD_REQUEST, "OB002", "시간 슬롯은 0~47(30분 단위) 범위여야 합니다."),
+    ONBOARDING_NO_AVAILABLE_TIME(HttpStatus.BAD_REQUEST, "OB003", "모든 요일이 불가능하면 학습 일정을 만들 수 없습니다."),
+    ONBOARDING_DUPLICATE_SUBJECT_AREA(HttpStatus.BAD_REQUEST, "OB004", "같은 응시영역의 성적이 중복 입력되었습니다."),
+    ONBOARDING_INVALID_RAW_SCORE(HttpStatus.BAD_REQUEST, "OB005", "원점수가 해당 응시영역의 만점 범위를 벗어났습니다."),
+    ONBOARDING_EXAM_DATE_IN_FUTURE(HttpStatus.BAD_REQUEST, "OB006", "응시일은 미래일 수 없습니다."),
+
+    /* =========================================================================
+       이탈관리(churn) 관련 예외 (CN000)
+       ========================================================================= */
+    CHURN_RISK_NOT_FOUND(HttpStatus.NOT_FOUND, "CN001", "해당 수강생의 이탈 위험 산출 기록이 없습니다."),
+
+    /* =========================================================================
+       학습 스케줄(schedule) 관련 예외 (SC000)
+       ========================================================================= */
+    SCHEDULE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "SC001", "본인의 스케줄 항목만 처리할 수 있습니다."),
+    TODO_NOT_FOUND(HttpStatus.NOT_FOUND, "SC002", "본인의 할 일만 처리할 수 있습니다."),
+    TODO_TIME_RANGE_INCOMPLETE(HttpStatus.BAD_REQUEST, "SC003", "시작 시각과 종료 시각은 함께 입력해야 합니다."),
+    TODO_TIME_RANGE_INVALID(HttpStatus.BAD_REQUEST, "SC004", "종료 시각은 시작 시각보다 뒤여야 합니다.");
 
 
     private final HttpStatus status;
