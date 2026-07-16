@@ -5,6 +5,8 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.PresenceUpdateMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 @Component
 public class ChatPresenceTracker {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatPresenceTracker.class);
     private static final Pattern CHAT_ROOM_DESTINATION_PATTERN = Pattern.compile("^/sub/chat-rooms/(\\d+)$");
     private static final String ROOM_KEY_PREFIX = "chat:presence:room:";
     private static final String SESSION_KEY_PREFIX = "chat:presence:session:";
@@ -48,42 +51,52 @@ public class ChatPresenceTracker {
         this.redisTemplate = redisTemplate;
     }
 
+    // Redis 읽기/쓰기가 STOMP 인바운드 채널 스레드에서 동기 실행되므로, Redis 장애가
+    // 이 스레드 풀 전체로 전파되지 않도록 다른 브로드캐스트 리스너들과 동일하게 통째로 감싼다.
     @EventListener
     public void handleSubscribe(SessionSubscribeEvent event) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
-        Long chatRoomId = extractChatRoomId(accessor.getDestination());
-        if (chatRoomId == null) {
-            return;
-        }
-        Long memberId = extractMemberId(accessor.getUser());
-        if (memberId == null) {
-            return;
-        }
+        try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+            Long chatRoomId = extractChatRoomId(accessor.getDestination());
+            if (chatRoomId == null) {
+                return;
+            }
+            Long memberId = extractMemberId(accessor.getUser());
+            if (memberId == null) {
+                return;
+            }
 
-        redisTemplate.opsForSet().add(roomKey(chatRoomId), memberId.toString());
-        redisTemplate.opsForValue().set(sessionKey(accessor.getSessionId()), chatRoomId.toString());
+            redisTemplate.opsForSet().add(roomKey(chatRoomId), memberId.toString());
+            redisTemplate.opsForValue().set(sessionKey(accessor.getSessionId()), chatRoomId.toString());
 
-        broadcastPresence(chatRoomId);
+            broadcastPresence(chatRoomId);
+        } catch (Exception e) {
+            log.error("구독 시 온라인 상태 갱신 실패.", e);
+        }
     }
 
     @EventListener
     public void handleDisconnect(SessionDisconnectEvent event) {
-        String sessionKey = sessionKey(event.getSessionId());
-        String chatRoomIdValue = redisTemplate.opsForValue().get(sessionKey);
-        if (chatRoomIdValue == null) {
-            return;
+        try {
+            String sessionKey = sessionKey(event.getSessionId());
+            String chatRoomIdValue = redisTemplate.opsForValue().get(sessionKey);
+            if (chatRoomIdValue == null) {
+                return;
+            }
+            redisTemplate.delete(sessionKey);
+
+            Long memberId = extractMemberId(event.getUser());
+            if (memberId == null) {
+                return;
+            }
+
+            Long chatRoomId = Long.valueOf(chatRoomIdValue);
+            redisTemplate.opsForSet().remove(roomKey(chatRoomId), memberId.toString());
+
+            broadcastPresence(chatRoomId);
+        } catch (Exception e) {
+            log.error("연결 해제 시 온라인 상태 갱신 실패. sessionId={}", event.getSessionId(), e);
         }
-        redisTemplate.delete(sessionKey);
-
-        Long memberId = extractMemberId(event.getUser());
-        if (memberId == null) {
-            return;
-        }
-
-        Long chatRoomId = Long.valueOf(chatRoomIdValue);
-        redisTemplate.opsForSet().remove(roomKey(chatRoomId), memberId.toString());
-
-        broadcastPresence(chatRoomId);
     }
 
     public Set<Long> getOnlineMemberIds(Long chatRoomId) {

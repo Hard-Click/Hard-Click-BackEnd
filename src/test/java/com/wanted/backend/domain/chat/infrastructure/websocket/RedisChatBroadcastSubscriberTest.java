@@ -57,4 +57,16 @@ class RedisChatBroadcastSubscriberTest {
 
         verify(messagingTemplate, never()).convertAndSend(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Object.class));
     }
+
+    @Test
+    @DisplayName("chat 패키지 밖의 클래스를 payloadType으로 지정하면 로딩을 거부한다")
+    void handleRawMessage_payloadTypeOutsideChatPackage_rejectsWithoutLoading() throws Exception {
+        RedisChatBroadcastSubscriber subscriber = new RedisChatBroadcastSubscriber(messagingTemplate, objectMapper);
+        String envelopeJson = objectMapper.writeValueAsString(
+                new ChatBroadcastEnvelope("/sub/chat-rooms/45", "java.util.HashMap", "{}"));
+
+        subscriber.handleRawMessage(envelopeJson);
+
+        verify(messagingTemplate, never()).convertAndSend(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Object.class));
+    }
 }

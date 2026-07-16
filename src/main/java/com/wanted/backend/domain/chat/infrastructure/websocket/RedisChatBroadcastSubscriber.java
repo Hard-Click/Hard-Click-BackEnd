@@ -16,6 +16,9 @@ import java.nio.charset.StandardCharsets;
 public class RedisChatBroadcastSubscriber implements MessageListener {
 
     private static final Logger log = LoggerFactory.getLogger(RedisChatBroadcastSubscriber.class);
+    // Redis 채널로 들어온 payloadType을 검증 없이 Class.forName으로 로딩하면 임의 클래스의 정적
+    // 초기화가 실행될 수 있다(CWE-470). 채팅 브로드캐스트 payload가 위치하는 패키지로만 제한한다.
+    private static final String ALLOWED_PAYLOAD_PACKAGE_PREFIX = "com.wanted.backend.domain.chat.";
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
@@ -34,8 +37,11 @@ public class RedisChatBroadcastSubscriber implements MessageListener {
     void handleRawMessage(String rawJson) {
         try {
             ChatBroadcastEnvelope envelope = objectMapper.readValue(rawJson, ChatBroadcastEnvelope.class);
-            Class<?> payloadType = Class.forName(envelope.payloadType());
-            Object payload = objectMapper.readValue(envelope.payloadJson(), payloadType);
+            String payloadType = envelope.payloadType();
+            if (!payloadType.startsWith(ALLOWED_PAYLOAD_PACKAGE_PREFIX)) {
+                throw new IllegalArgumentException("허용되지 않은 payloadType: " + payloadType);
+            }
+            Object payload = objectMapper.readValue(envelope.payloadJson(), Class.forName(payloadType));
             messagingTemplate.convertAndSend(envelope.destination(), payload);
         } catch (Exception e) {
             log.error("Redis 채팅 브로드캐스트 메시지 처리 실패. raw={}", rawJson, e);

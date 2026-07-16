@@ -30,10 +30,12 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -182,6 +184,33 @@ class ChatPresenceTrackerTest {
         assertThat(broadcasts.get(2).participants()).containsExactlyInAnyOrder(
                 new ParticipantPresenceMessage(1L, "이*연", false),
                 new ParticipantPresenceMessage(2L, "김*수", true));
+    }
+
+    @Test
+    @DisplayName("구독 처리 중 Redis 장애가 나도 예외를 삼키고 전파하지 않는다")
+    void handleSubscribe_redisFails_doesNotPropagate() {
+        // given
+        willThrow(new RuntimeException("redis timeout")).given(setOperations).add(anyString(), anyString());
+
+        // when & then
+        assertThatCode(() -> tracker.handleSubscribe(
+                new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-1", new ChatPrincipal(1L)))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("연결 해제 처리 중 Redis 장애가 나도 예외를 삼키고 전파하지 않는다")
+    void handleDisconnect_redisFails_doesNotPropagate() {
+        // given
+        given(chatRoomParticipantRepository.findMemberIdsByChatRoomId(45L)).willReturn(List.of(1L));
+        given(memberNamePort.getNamesByMemberIds(any())).willReturn(Map.of(1L, "이지연"));
+        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-1", new ChatPrincipal(1L))));
+        willThrow(new RuntimeException("redis timeout")).given(setOperations).remove(anyString(), any());
+
+        // when & then
+        assertThatCode(() -> tracker.handleDisconnect(
+                new SessionDisconnectEvent(this, disconnectMessage(), "session-1", CloseStatus.NORMAL, new ChatPrincipal(1L))))
+                .doesNotThrowAnyException();
     }
 
     @Test

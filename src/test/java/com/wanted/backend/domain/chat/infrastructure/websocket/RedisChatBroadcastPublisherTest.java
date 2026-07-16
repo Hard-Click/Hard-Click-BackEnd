@@ -8,11 +8,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,5 +48,16 @@ class RedisChatBroadcastPublisherTest {
 
         ChatMessageEvent decoded = objectMapper.readValue(envelope.payloadJson(), ChatMessageEvent.class);
         assertThat(decoded).isEqualTo(payload);
+    }
+
+    @Test
+    @DisplayName("Redis 연결 장애가 나도 예외를 삼키고 호출자에게 전파하지 않는다")
+    void broadcast_redisConnectionFails_doesNotPropagate() {
+        RedisChatBroadcastPublisher publisher = new RedisChatBroadcastPublisher(redisTemplate, objectMapper);
+        willThrow(new RedisConnectionFailureException("connection refused"))
+                .given(redisTemplate).convertAndSend(anyString(), any());
+
+        assertThatCode(() -> publisher.broadcast("/sub/chat-rooms/45", "payload"))
+                .doesNotThrowAnyException();
     }
 }
