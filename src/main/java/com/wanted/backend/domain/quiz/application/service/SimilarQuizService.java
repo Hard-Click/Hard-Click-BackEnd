@@ -10,7 +10,6 @@ import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
 import com.wanted.backend.domain.quiz.domain.repository.QuizSubmissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,6 +26,10 @@ import java.util.Set;
  *
  * ⚠️ 현재는 **같은 코스 내 유사 문항만** 조립한다(추천 결과가 코스 밖 문항이면 스킵). 데모 시드는 단일 코스라
  * 문제 없으며, 교차-코스 조립은 문항 by-id 조회 추가와 함께 후속으로 확장한다.
+ *
+ * 트랜잭션 경계: 메서드에 `@Transactional`을 걸지 않는다. 각 조회(findAllByCourseId /
+ * findByMemberIdAndQuizIdIn)는 도메인 객체(완전 매핑된 POJO)를 반환하므로 이후 접근에 지연로딩이
+ * 없고, 느린 외부 추천 HTTP 호출을 DB 커넥션을 점유한 채 수행하지 않는다(커넥션 고갈 방지).
  */
 @Service
 @RequiredArgsConstructor
@@ -39,7 +42,6 @@ public class SimilarQuizService implements SimilarQuizUseCase {
     private final SimilarProblemRecommenderPort recommender;
 
     @Override
-    @Transactional(readOnly = true)
     public SimilarQuizResult generateForCourse(Long memberId, Long courseId) {
         List<Quiz> quizzes = quizRepository.findAllByCourseId(courseId);
         if (quizzes.isEmpty()) {
