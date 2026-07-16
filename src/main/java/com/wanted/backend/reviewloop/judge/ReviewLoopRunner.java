@@ -32,6 +32,7 @@ public final class ReviewLoopRunner {
         String rulesPath = argVal(args, "--rules", "review-loop/rules.yaml");
         int max = Integer.parseInt(argVal(args, "--max", "5"));
         boolean gate = hasFlag(args, "--gate");
+        String findingsOut = argVal(args, "--findings-out", null);   // Minor findings를 파일로(자동수정기 입력)
 
         List<Path> targets = resolveTargets(filesFrom, path, max);
         if (targets == null) {
@@ -72,6 +73,7 @@ public final class ReviewLoopRunner {
 
         int round = 0;
         boolean blocked = false;
+        List<String> minorFindings = new ArrayList<>();   // 자동수정 대상(Minor만) — Claude Code에 넘김
         for (Path f : targets) {
             String code = Files.readString(f);
             Path parent = f.getParent() == null ? Path.of(".") : f.getParent();
@@ -87,11 +89,20 @@ public final class ReviewLoopRunner {
             for (Finding fd : v.findings()) {
                 out.append("    - ").append(fd.ruleId()).append(" (").append(fd.severity()).append("): ")
                    .append(fd.description()).append(" [").append(fd.file()).append(':').append(fd.line()).append("]\n");
+                if (fd.severity() == Severity.MINOR) {   // 자동수정 대상 — Critical은 제외(사람)
+                    minorFindings.add(f + ":" + fd.line() + " [" + fd.ruleId() + "] " + fd.description());
+                }
             }
             audit.append(new AuditRecord(LocalDateTime.now().toString(), ++round, "gemini",
                     v.score(), v.hasCritical(), v.decision(), v.findings().size(), false));
         }
         out.append("\n감사 로그: review-loop/logs/error_log.jsonl (누적)\n");
+
+        if (findingsOut != null) {   // 자동수정기(Claude Code) 입력 — Minor findings만
+            Files.writeString(Path.of(findingsOut),
+                    minorFindings.isEmpty() ? "" : String.join("\n", minorFindings) + "\n");
+            out.append("자동수정 대상(Minor) ").append(minorFindings.size()).append("건 → ").append(findingsOut).append('\n');
+        }
 
         String report = out.toString();
         System.out.println(report);
