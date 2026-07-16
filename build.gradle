@@ -64,8 +64,29 @@ dependencies {
     implementation platform('software.amazon.awssdk:bom:2.26.12')
     implementation 'software.amazon.awssdk:s3'
     implementation 'software.amazon.awssdk:sts'
+
+    // AI 코드 리뷰 루프 · Gate 2 — LLM Judge (선택 어댑터: Claude)
+    implementation 'com.anthropic:anthropic-java:2.34.0'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// AI 코드 리뷰 루프 · 사람 검토 게이트 CLI 데모 (./gradlew reviewCli)
+tasks.register('reviewCli', JavaExec) {
+    group = 'review-loop'
+    description = '사람 검토 게이트를 터미널에 표시(개발자 도구 표면)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopCli'
+}
+
+// AI 코드 리뷰 루프 · 범용 러너 — 도메인 owner가 자기 경로로 실행
+//   ./gradlew reviewLoop --args="--path src/main/java/com/wanted/backend/domain/cart --domain cart --max 3"
+//   (-Ppath는 Gradle 예약 프로퍼티 project.path와 충돌하므로 --args 사용)
+tasks.register('reviewLoop', JavaExec) {
+    group = 'review-loop'
+    description = '지정 경로의 파일에 리뷰 루프 실행 (--args="--path <dir> --domain X --max N")'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopRunner'
 }
