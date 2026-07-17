@@ -44,9 +44,17 @@ class GeminiJudgeAdapterRequestTest {
     @Test
     @DisplayName("고정 모델은 '-latest' 별칭이 아니다")
     void pinnedModelIsNotAnAlias() {
-        assertThat(GeminiJudgeAdapter.PINNED_MODEL)
+        assertThat(GeminiModels.PINNED)
                 .as("별칭은 Google이 모델을 교체하면 같은 코드에 판정이 바뀐다")
                 .doesNotEndWith("-latest")
                 .isNotBlank();
+    }
+
+    @Test
+    @DisplayName("어댑터들이 모델 문자열을 각자 갖지 않는다 (SSOT)")
+    void allAdaptersResolveFromOneSource() {
+        // 어댑터마다 문자열을 따로 두면 모델 교체 시 일부만 고쳐져 서로 다른 모델을 쓰게 된다.
+        assertThat(GeminiModels.resolve())
+                .isEqualTo(System.getenv().getOrDefault("GEMINI_MODEL", GeminiModels.PINNED));
     }
 }

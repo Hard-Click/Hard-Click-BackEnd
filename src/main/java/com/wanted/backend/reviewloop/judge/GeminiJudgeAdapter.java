@@ -25,15 +25,7 @@ import java.util.List;
  */
 public class GeminiJudgeAdapter implements LlmJudgePort {
 
-    /**
-     * 판정 모델 — 구체 버전으로 고정한다. "-latest" 별칭은 Google이 실제 모델을 교체하는 순간
-     * 우리 코드가 그대로인데도 판정이 바뀌어(재현 불가) 게이트를 신뢰할 수 없게 만든다.
-     * 모델 교체는 GEMINI_MODEL 환경변수로 명시적으로만 한다.
-     */
-    static final String PINNED_MODEL = "gemini-3.5-flash";
-
-    private static final String DEFAULT_MODEL =
-            System.getenv().getOrDefault("GEMINI_MODEL", PINNED_MODEL);
+    private static final String DEFAULT_MODEL = GeminiModels.resolve();
     private static final String ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 

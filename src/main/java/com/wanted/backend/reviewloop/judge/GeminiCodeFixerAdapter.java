@@ -19,9 +19,7 @@ import java.util.stream.Collectors;
  */
 public class GeminiCodeFixerAdapter implements CodeFixerPort {
 
-    // 별칭(-latest) 금지 — 모델이 바뀌면 재현이 깨진다. 교체는 GEMINI_MODEL로 명시적으로만.
-    private static final String DEFAULT_MODEL =
-            System.getenv().getOrDefault("GEMINI_MODEL", "gemini-3.5-flash");
+    private static final String DEFAULT_MODEL = GeminiModels.resolve();
     private static final String ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
