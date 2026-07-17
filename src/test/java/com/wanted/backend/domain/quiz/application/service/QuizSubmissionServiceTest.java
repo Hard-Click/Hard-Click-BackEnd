@@ -93,7 +93,7 @@ class QuizSubmissionServiceTest {
         stubSavePassthrough();
 
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
-                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L, null)));
 
         QuizSubmissionResult result = service.submit(command);
 
@@ -122,7 +122,7 @@ class QuizSubmissionServiceTest {
 
         // 2문항 중 Q1만 정답 제출, Q2는 미응답
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
-                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L, null)));
 
         QuizSubmissionResult result = service.submit(command);
 
@@ -137,6 +137,31 @@ class QuizSubmissionServiceTest {
                 .filter(a -> a.questionId().equals(20L)).findFirst().orElseThrow();
         assertThat(unanswered.selectedOptionId()).isNull();
         assertThat(unanswered.correct()).isFalse();
+    }
+
+    @Test
+    void submitCarriesTimeSpentSecondsIntoSavedAnswers() {
+        when(quizRepository.findById(QUIZ_ID)).thenReturn(Optional.of(twoQuestionQuiz()));
+        when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(true);
+        when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(false);
+        stubSavePassthrough();
+
+        // Q1은 70초 측정, Q2는 시간 미전송(null)
+        SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L, 70),
+                        new SubmitQuizCommand.AnswerCommand(20L, 201L, null)));
+
+        service.submit(command);
+
+        ArgumentCaptor<QuizSubmission> submissionCaptor = ArgumentCaptor.forClass(QuizSubmission.class);
+        verify(quizSubmissionRepository).save(submissionCaptor.capture());
+        QuizSubmission saved = submissionCaptor.getValue();
+        assertThat(saved.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(10L)).findFirst().orElseThrow()
+                .getTimeSpentSeconds()).isEqualTo(70);
+        assertThat(saved.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(20L)).findFirst().orElseThrow()
+                .getTimeSpentSeconds()).isNull();
     }
 
     @Test
@@ -159,7 +184,7 @@ class QuizSubmissionServiceTest {
         when(quizSubmissionRepository.existsByQuizIdAndMemberId(QUIZ_ID, MEMBER_ID)).thenReturn(true);
 
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
-                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L, null)));
 
         assertThatThrownBy(() -> service.submit(command))
                 .isInstanceOf(BusinessException.class)
@@ -174,7 +199,7 @@ class QuizSubmissionServiceTest {
         when(enrollmentAccessPort.hasActiveEnrollment(eq(MEMBER_ID), anyLong())).thenReturn(false);
 
         SubmitQuizCommand command = new SubmitQuizCommand(QUIZ_ID, MEMBER_ID,
-                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L)));
+                List.of(new SubmitQuizCommand.AnswerCommand(10L, 102L, null)));
 
         assertThatThrownBy(() -> service.submit(command))
                 .isInstanceOf(BusinessException.class)

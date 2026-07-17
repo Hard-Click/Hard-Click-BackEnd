@@ -19,8 +19,7 @@ import java.util.stream.Collectors;
  */
 public class GeminiCodeFixerAdapter implements CodeFixerPort {
 
-    private static final String DEFAULT_MODEL =
-            System.getenv().getOrDefault("GEMINI_MODEL", "gemini-flash-latest");
+    private static final String DEFAULT_MODEL = GeminiModels.resolve();
     private static final String ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 

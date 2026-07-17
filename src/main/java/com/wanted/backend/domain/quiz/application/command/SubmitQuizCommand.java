@@ -7,5 +7,5 @@ public record SubmitQuizCommand(
         Long memberId,
         List<AnswerCommand> answers
 ) {
-    public record AnswerCommand(Long questionId, Long selectedOptionId) {}
+    public record AnswerCommand(Long questionId, Long selectedOptionId, Integer timeSpentSeconds) {}
 }

@@ -66,7 +66,11 @@ dependencies {
     implementation 'software.amazon.awssdk:sts'
 
     // AI 코드 리뷰 루프 · Gate 2 — LLM Judge (선택 어댑터: Claude)
-    implementation 'com.anthropic:anthropic-java:2.34.0'
+    // swagger-annotations 제외: springdoc의 swagger-annotations-jakarta와 패키지가 겹쳐
+    // 구버전(2.2.31) Schema가 먼저 로드되면 /v3/api-docs가 NoSuchMethodError로 죽는다.
+    implementation('com.anthropic:anthropic-java:2.34.0') {
+        exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
+    }
 }
 
 tasks.named('test') {
@@ -89,6 +93,11 @@ tasks.register('reviewLoop', JavaExec) {
     description = '지정 경로/변경파일에 리뷰 루프 실행 (--args="--path <dir> | --files-from <list> [--gate]")'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopRunner'
+    // 콘솔 한글 깨짐 방지 — Windows 콘솔 기본(cp949)과 어긋나면 게이트 차단 사유를 사람이 못 읽는다.
+    // Java 17은 sun.stdout.encoding, 19+는 stdout.encoding — 둘 다 주어 버전 무관하게 고정.
+    jvmArgs '-Dfile.encoding=UTF-8',
+            '-Dsun.stdout.encoding=UTF-8', '-Dsun.stderr.encoding=UTF-8',
+            '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
 }
 
 // AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정
