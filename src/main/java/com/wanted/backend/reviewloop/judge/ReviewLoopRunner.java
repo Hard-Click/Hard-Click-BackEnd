@@ -62,11 +62,11 @@ public final class ReviewLoopRunner {
                 Map.of(Severity.MINOR, 10, Severity.CRITICAL, 40),
                 JudgeScorer.DEFAULT_PASS_THRESHOLD);
 
-        Files.createDirectories(Path.of("review-loop/logs"));
-        AuditLogWriter audit = new AuditLogWriter(Path.of("review-loop/logs/error_log.jsonl"));
+        Files.createDirectories(ReviewLoopPaths.AUDIT_LOG.getParent());
+        AuditLogWriter audit = new AuditLogWriter(ReviewLoopPaths.AUDIT_LOG);
 
         // Learning Loop 읽기 끝 — 축적된 사람 교훈을 판정 프롬프트에 반영(없으면 빈 리스트).
-        List<Lesson> lessons = new KnowledgeStore(Path.of("review-loop/logs/lessons.jsonl")).lessons();
+        List<Lesson> lessons = new KnowledgeStore(ReviewLoopPaths.LESSONS).lessons();
 
         StringBuilder out = new StringBuilder();
         out.append("== 리뷰 루프 실행 ==\n");
@@ -105,7 +105,7 @@ public final class ReviewLoopRunner {
             audit.append(new AuditRecord(LocalDateTime.now().toString(), ++round, "gemini",
                     v.score(), v.hasCritical(), v.decision(), v.findings().size(), false));
         }
-        out.append("\n감사 로그: review-loop/logs/error_log.jsonl (누적)\n");
+        out.append("\n감사 로그: ").append(ReviewLoopPaths.AUDIT_LOG).append(" (누적)\n");
 
         if (findingsOut != null) {   // 자동수정기(Claude Code) 입력 — Minor findings만
             writeFindings(findingsOut, minorFindings);
