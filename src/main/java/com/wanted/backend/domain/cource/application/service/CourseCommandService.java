@@ -140,7 +140,7 @@ public class CourseCommandService implements CourseCommandUseCase {
                 .filter(id -> !keptSectionIds.contains(id))
                 .toList();
 
-        course.update(command.title(), command.subject(), command.description(),
+        course.update(command.title(), command.subject(),
                 command.thumbnailUrl(), command.priceType(), command.price(), newSections,
                 command.learningObjectives(), command.targetAudience(),
                 command.techTags(), command.level());

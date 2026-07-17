@@ -77,8 +77,8 @@ public class Course {
         return course;
     }
 
-    // 강의 기본 정보 + 커리큘럼 수정
-    public void update(String title, String subject, String description,
+    // 강의 기본 정보 + 커리큘럼 수정. description은 입력받지 않으므로 기존 값을 그대로 둔다.
+    public void update(String title, String subject,
                        String thumbnailUrl, PriceType priceType, int price,
                        List<CourseSection> sections,
                        List<String> learningObjectives, List<String> targetAudience,
@@ -87,7 +87,6 @@ public class Course {
         validatePrice(priceType, price);
         this.title = title;
         this.subject = subject;
-        this.description = description;
         this.thumbnailUrl = thumbnailUrl;
         this.priceType = priceType;
         this.price = price;

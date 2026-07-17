@@ -9,7 +9,6 @@ public record UpdateCourseCommand(
         Long requesterId,
         String title,
         String subject,
-        String description,
         String thumbnailUrl,
         PriceType priceType,
         int price,
