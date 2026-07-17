@@ -17,6 +17,9 @@
 ## 드라이버 루프 (예산 통제)
 1. `<git-dir>/review-fix-request.md` 를 읽어 findings + 방안을 **사용자에게 채팅으로 제시**한다.
 2. 사용자가 항목별 방안을 고른다(기본 1=추천, s=건너뛰기).
+   - **s=건너뛰기(오탐)로 판정되면** → 교훈으로 기록해 다음 판정이 같은 오탐을 반복하지 않게 한다(Learning Loop):
+     `./gradlew reviewLesson --args="--rule <RULE> --kind FALSE_POSITIVE --note '<한 줄 근거>'"`
+   - 방안을 골라 수정하면(=Judge가 옳았음) 기록하지 않는다.
 3. 확정된 방안대로 **Edit 도구로만** 수정한다. 나열된 항목 외 리팩터·무관 변경 금지.
 4. `git diff` 를 사용자에게 보여주고 **커밋 승인**을 받는다(승인 없이 commit/push 금지).
 5. 커밋 → `git push` 재시도(훅 재진입).
