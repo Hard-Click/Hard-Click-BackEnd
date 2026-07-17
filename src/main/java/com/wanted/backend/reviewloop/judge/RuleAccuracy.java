@@ -1,7 +1,6 @@
 package com.wanted.backend.reviewloop.judge;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -60,7 +59,7 @@ public final class RuleAccuracy {
     }
 
     public static void main(String[] args) throws IOException {
-        List<Lesson> lessons = new KnowledgeStore(Path.of("review-loop/logs/lessons.jsonl")).lessons();
+        List<Lesson> lessons = new KnowledgeStore(ReviewLoopPaths.LESSONS).lessons();
         System.out.print(render(summarize(lessons)));
     }
 

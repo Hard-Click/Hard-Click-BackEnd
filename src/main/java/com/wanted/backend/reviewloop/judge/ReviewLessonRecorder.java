@@ -2,7 +2,6 @@ package com.wanted.backend.reviewloop.judge;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
 
 /**
@@ -20,8 +19,6 @@ import java.time.LocalDateTime;
  */
 public final class ReviewLessonRecorder {
 
-    private static final Path LESSONS = Path.of("review-loop/logs/lessons.jsonl");
-
     public static void main(String[] args) throws IOException {
         Lesson lesson;
         try {
@@ -32,10 +29,10 @@ public final class ReviewLessonRecorder {
             return;
         }
 
-        Files.createDirectories(LESSONS.getParent());
-        new KnowledgeStore(LESSONS).record(lesson);
+        Files.createDirectories(ReviewLoopPaths.LESSONS.getParent());
+        new KnowledgeStore(ReviewLoopPaths.LESSONS).record(lesson);
 
-        System.out.println("[reviewLesson] 교훈 기록 → " + LESSONS);
+        System.out.println("[reviewLesson] 교훈 기록 → " + ReviewLoopPaths.LESSONS);
         System.out.println("  [" + lesson.kind() + "] " + lesson.ruleId() + " — " + lesson.humanNote());
         System.out.println("  다음 판정부터 프롬프트에 반영됩니다.");
     }
