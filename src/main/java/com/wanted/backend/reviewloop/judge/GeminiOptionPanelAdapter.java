@@ -19,8 +19,9 @@ import java.util.List;
  */
 public class GeminiOptionPanelAdapter implements OptionPanelPort {
 
+    // 별칭(-latest) 금지 — 모델이 바뀌면 재현이 깨진다. 교체는 GEMINI_MODEL로 명시적으로만.
     private static final String DEFAULT_MODEL =
-            System.getenv().getOrDefault("GEMINI_MODEL", "gemini-flash-latest");
+            System.getenv().getOrDefault("GEMINI_MODEL", "gemini-3.5-flash");
     private static final String ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
@@ -116,6 +117,8 @@ public class GeminiOptionPanelAdapter implements OptionPanelPort {
         content.put("role", "user");
         content.putArray("parts").addObject().put("text", user);
         ObjectNode gen = root.putObject("generationConfig");
+        // 같은 finding엔 같은 방안 — 사람이 고를 선택지가 실행마다 바뀌면 선택 자체를 신뢰할 수 없다.
+        gen.put("temperature", 0);
         gen.put("responseMimeType", "application/json");
         gen.set("responseSchema", mapper.readTree(RESPONSE_SCHEMA));
         return mapper.writeValueAsString(root);
