@@ -43,15 +43,23 @@ public class StudyController {
         this.studyQueryUseCase = studyQueryUseCase;
     }
 
-    @Operation(summary = "스터디 목록 조회", description = "스터디 목록을 조회합니다. subject로 과목 필터링 가능 (SubjectType enum 값)")
+    @Operation(
+            summary = "스터디 목록 조회",
+            description = """
+                스터디 목록을 조회합니다. subject로 과목 필터링 가능 (SubjectType enum 값)
+                - 각 항목에 조회자 기준 isMine(내가 만든 스터디), isJoined(참여 중) 여부가 포함됩니다.
+                """
+    )
     @GetMapping
     public ResponseEntity<ApiResponse<StudyListResponse>> getStudyList(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @ModelAttribute StudyListRequest request) {
 
         StudyListResult result = studyQueryUseCase.getList(
                 request.subject() != null ? request.subject().name() : null,
                 request.page(),
-                request.size());
+                request.size(),
+                userDetails.getMemberId());
 
         return ApiResponse.success("스터디 목록 조회 완료", StudyListResponse.from(result));
     }

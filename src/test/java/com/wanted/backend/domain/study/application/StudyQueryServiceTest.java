@@ -26,7 +26,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class StudyQueryServiceTest {
@@ -146,9 +151,11 @@ class StudyQueryServiceTest {
         given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(study));
         given(studyRepository.countAll(null)).willReturn(1);
         given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(1L, "최지훈"));
+        lenient().when(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(999L), anyCollection()))
+                .thenReturn(List.of());
 
         // when
-        StudyListResult result = studyQueryService.getList(null, 0, 10);
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 999L);
 
         // then
         assertThat(result.items()).hasSize(1);
@@ -158,18 +165,103 @@ class StudyQueryServiceTest {
     }
 
     @Test
-    @DisplayName("결과가 없으면 빈 목록과 0페이지를 반환한다")
+    @DisplayName("내가 만든 스터디는 isMine과 isJoined가 모두 true다")
+    void getList_success_mineStudy() {
+        // given: 1L이 방장인 스터디 — 생성 시 방장이 첫 참여자로 등록되므로 참여자 조회에도 포함된다
+        Study mine = Study.restore(101L, 1L, "내가 만든 스터디", "MATH_1", "내용",
+                6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+
+        given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(mine));
+        given(studyRepository.countAll(null)).willReturn(1);
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(1L, "이지연"));
+        given(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection()))
+                .willReturn(List.of(101L));
+
+        // when
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 1L);
+
+        // then
+        assertThat(result.items().get(0).isMine()).isTrue();
+        assertThat(result.items().get(0).isJoined()).isTrue();
+    }
+
+    @Test
+    @DisplayName("참여만 한 스터디는 isMine=false, isJoined=true다")
+    void getList_success_joinedButNotMine() {
+        // given: 방장은 2L, 조회자는 1L(참여자)
+        Study joined = Study.restore(101L, 2L, "참여한 스터디", "MATH_1", "내용",
+                6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+
+        given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(joined));
+        given(studyRepository.countAll(null)).willReturn(1);
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(2L, "김민수"));
+        given(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection()))
+                .willReturn(List.of(101L));
+
+        // when
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 1L);
+
+        // then
+        assertThat(result.items().get(0).isMine()).isFalse();
+        assertThat(result.items().get(0).isJoined()).isTrue();
+    }
+
+    @Test
+    @DisplayName("무관한 스터디는 isMine과 isJoined가 모두 false다")
+    void getList_success_unrelatedStudy() {
+        // given
+        Study unrelated = Study.restore(101L, 2L, "남의 스터디", "MATH_1", "내용",
+                6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+
+        given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(unrelated));
+        given(studyRepository.countAll(null)).willReturn(1);
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(2L, "김민수"));
+        given(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection()))
+                .willReturn(List.of());
+
+        // when
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 1L);
+
+        // then
+        assertThat(result.items().get(0).isMine()).isFalse();
+        assertThat(result.items().get(0).isJoined()).isFalse();
+    }
+
+    @Test
+    @DisplayName("참여 여부 조회는 페이지당 IN 쿼리 1번으로만 수행된다 (N+1 방지)")
+    void getList_success_participantQueryCalledOnce() {
+        // given: 스터디 3개가 조회돼도 참여자 조회는 1번이어야 한다
+        Study s1 = Study.restore(101L, 2L, "스터디1", "MATH_1", "내용", 6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        Study s2 = Study.restore(102L, 3L, "스터디2", "MATH_1", "내용", 6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        Study s3 = Study.restore(103L, 4L, "스터디3", "MATH_1", "내용", 6, 3, StudyStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+
+        given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(s1, s2, s3));
+        given(studyRepository.countAll(null)).willReturn(3);
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of());
+        given(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection()))
+                .willReturn(List.of(102L));
+
+        // when
+        studyQueryService.getList(null, 0, 10, 1L);
+
+        // then
+        verify(studyParticipantRepository, times(1)).findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection());
+    }
+
+    @Test
+    @DisplayName("결과가 없으면 빈 목록과 0페이지를 반환하고, 참여 여부 조회도 하지 않는다")
     void getList_success_empty() {
         // given
         given(studyRepository.findAll("MATH_1", 0, 10)).willReturn(List.of());
         given(studyRepository.countAll("MATH_1")).willReturn(0);
 
         // when
-        StudyListResult result = studyQueryService.getList("MATH_1", 0, 10);
+        StudyListResult result = studyQueryService.getList("MATH_1", 0, 10, 1L);
 
         // then
         assertThat(result.items()).isEmpty();
         assertThat(result.totalPages()).isEqualTo(0);
+        verify(studyParticipantRepository, never()).findStudyIdsByMemberIdAndStudyIdIn(eq(1L), anyCollection());
     }
 
     @Test
@@ -182,9 +274,11 @@ class StudyQueryServiceTest {
         given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(study));
         given(studyRepository.countAll(null)).willReturn(1);
         given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of());
+        lenient().when(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(999L), anyCollection()))
+                .thenReturn(List.of());
 
         // when
-        StudyListResult result = studyQueryService.getList(null, 0, 10);
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 999L);
 
         // then
         assertThat(result.items().get(0).authorName()).isEqualTo("알 수 없음");
@@ -200,9 +294,11 @@ class StudyQueryServiceTest {
         given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(study));
         given(studyRepository.countAll(null)).willReturn(1);
         given(memberNamePort.getNamesByMemberIds(anyCollection())).willThrow(new RuntimeException("member service down"));
+        lenient().when(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(999L), anyCollection()))
+                .thenReturn(List.of());
 
         // when
-        StudyListResult result = studyQueryService.getList(null, 0, 10);
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 999L);
 
         // then
         assertThat(result.items().get(0).authorName()).isEqualTo("알 수 없음");
@@ -216,7 +312,7 @@ class StudyQueryServiceTest {
         given(studyRepository.countAll("MATH_1")).willReturn(25);
 
         // when
-        StudyListResult result = studyQueryService.getList("MATH_1", 0, 10);
+        StudyListResult result = studyQueryService.getList("MATH_1", 0, 10, 1L);
 
         // then
         assertThat(result.totalPages()).isEqualTo(3);
@@ -232,9 +328,11 @@ class StudyQueryServiceTest {
         given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(study));
         given(studyRepository.countAll(null)).willReturn(1);
         given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(1L, "지훈"));
+        lenient().when(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(999L), anyCollection()))
+                .thenReturn(List.of());
 
         // when
-        StudyListResult result = studyQueryService.getList(null, 0, 10);
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 999L);
 
         // then
         assertThat(result.items().get(0).authorName()).isEqualTo("지*");

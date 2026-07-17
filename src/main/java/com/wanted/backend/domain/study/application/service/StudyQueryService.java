@@ -45,7 +45,7 @@ public class StudyQueryService implements StudyQueryUseCase {
     }
 
     @Override
-    public StudyListResult getList(String subject, int page, int size) {
+    public StudyListResult getList(String subject, int page, int size, Long memberId) {
         List<Study> studies = studyRepository.findAll(subject, page, size);
         int totalCount = studyRepository.countAll(subject);
         int totalPages = (int) Math.ceil((double) totalCount / size);
@@ -53,11 +53,23 @@ public class StudyQueryService implements StudyQueryUseCase {
         Set<Long> hostIds = studies.stream().map(Study::getHostId).collect(Collectors.toSet());
         Map<Long, String> nameMap = resolveNameMap(hostIds);
 
+        // isMine은 이미 로드한 hostId 비교라 추가 쿼리 0회, isJoined는 페이지의 스터디 ID들로
+        // IN 조회 1회만 수행한다 (스터디마다 existsBy를 반복하는 N+1 방지).
+        Set<Long> joinedStudyIds = resolveJoinedStudyIds(studies, memberId);
+
         List<StudyItemResult> items = studies.stream()
-                .map(study -> toItemResult(study, nameMap))
+                .map(study -> toItemResult(study, nameMap, memberId, joinedStudyIds))
                 .toList();
 
         return new StudyListResult(items, totalPages);
+    }
+
+    private Set<Long> resolveJoinedStudyIds(List<Study> studies, Long memberId) {
+        if (studies.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> studyIds = studies.stream().map(Study::getId).toList();
+        return Set.copyOf(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(memberId, studyIds));
     }
 
     @Override
@@ -93,12 +105,14 @@ public class StudyQueryService implements StudyQueryUseCase {
         }
     }
 
-    private StudyItemResult toItemResult(Study study, Map<Long, String> nameMap) {
+    private StudyItemResult toItemResult(Study study, Map<Long, String> nameMap, Long memberId, Set<Long> joinedStudyIds) {
         String name = maskName(nameMap.getOrDefault(study.getHostId(), ""));
         return new StudyItemResult(
                 study.getId(), study.getTitle(), study.getContent(), name, study.getSubject(),
                 study.getCurrentCount(), study.getMaxCount(),
-                study.getStatus() == StudyStatus.CLOSED, study.getCreatedAt());
+                study.getStatus() == StudyStatus.CLOSED,
+                study.isOwner(memberId), joinedStudyIds.contains(study.getId()),
+                study.getCreatedAt());
     }
 
     private String maskName(String name) {

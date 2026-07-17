@@ -2,6 +2,7 @@ package com.wanted.backend.domain.study.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface SpringDataStudyParticipantRepository extends JpaRepository<StudyParticipantJpaEntity, Long> {
@@ -10,4 +11,6 @@ public interface SpringDataStudyParticipantRepository extends JpaRepository<Stud
     boolean existsByStudyIdAndMemberId(Long studyId, Long memberId);
 
     void deleteByStudyIdAndMemberId(Long studyId, Long memberId);
+
+    List<StudyParticipantJpaEntity> findByMemberIdAndStudyIdIn(Long memberId, Collection<Long> studyIds);
 }
