@@ -263,7 +263,7 @@ class CourseCommandServiceTest {
         List<UpdateCourseCommand.SectionCommand> sections = java.util.Arrays.stream(keptSectionIds)
                 .map(id -> new UpdateCourseCommand.SectionCommand(id, id + "주차", id.intValue() - 1, List.of()))
                 .toList();
-        return new UpdateCourseCommand(courseId, authorId, "제목", "과목", "설명", null,
+        return new UpdateCourseCommand(courseId, authorId, "제목", "과목", null,
                 PriceType.FREE, 0, sections, List.of(), List.of(), List.of(), "BEGINNER");
     }
 }
