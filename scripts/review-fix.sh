@@ -11,6 +11,9 @@
 # 필요: GEMINI_API_KEY(판정용)
 set -u
 
+# Gradle 런처 JVM을 UTF-8로 — 훅과 동일(Windows 콘솔 cp949에서 한글 깨짐 방지).
+export GRADLE_OPTS="${GRADLE_OPTS:-} -Dfile.encoding=UTF-8"
+
 DIR="$(cd "$(dirname "$0")" && pwd)"
 TARGET_ARGS="$*"
 FINDINGS="$(git rev-parse --git-dir)/review-minor-findings.txt"

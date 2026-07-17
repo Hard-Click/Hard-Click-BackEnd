@@ -89,6 +89,11 @@ tasks.register('reviewLoop', JavaExec) {
     description = '지정 경로/변경파일에 리뷰 루프 실행 (--args="--path <dir> | --files-from <list> [--gate]")'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.wanted.backend.reviewloop.judge.ReviewLoopRunner'
+    // 콘솔 한글 깨짐 방지 — Windows 콘솔 기본(cp949)과 어긋나면 게이트 차단 사유를 사람이 못 읽는다.
+    // Java 17은 sun.stdout.encoding, 19+는 stdout.encoding — 둘 다 주어 버전 무관하게 고정.
+    jvmArgs '-Dfile.encoding=UTF-8',
+            '-Dsun.stdout.encoding=UTF-8', '-Dsun.stderr.encoding=UTF-8',
+            '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
 }
 
 // AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정

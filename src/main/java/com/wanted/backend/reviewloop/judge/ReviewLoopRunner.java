@@ -1,5 +1,6 @@
 package com.wanted.backend.reviewloop.judge;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -90,7 +91,8 @@ public final class ReviewLoopRunner {
                 out.append("    - ").append(fd.ruleId()).append(" (").append(fd.severity()).append("): ")
                    .append(fd.description()).append(" [").append(fd.file()).append(':').append(fd.line()).append("]\n");
                 if (fd.severity() == Severity.MINOR) {   // 자동수정 대상 — Critical은 제외(사람)
-                    minorFindings.add(f + ":" + fd.line() + " [" + fd.ruleId() + "] " + fd.description());
+                    minorFindings.add(toPosixPath(f) + ":" + fd.line()
+                            + " [" + fd.ruleId() + "] " + fd.description());
                 }
             }
             audit.append(new AuditRecord(LocalDateTime.now().toString(), ++round, "gemini",
@@ -99,8 +101,7 @@ public final class ReviewLoopRunner {
         out.append("\n감사 로그: review-loop/logs/error_log.jsonl (누적)\n");
 
         if (findingsOut != null) {   // 자동수정기(Claude Code) 입력 — Minor findings만
-            Files.writeString(Path.of(findingsOut),
-                    minorFindings.isEmpty() ? "" : String.join("\n", minorFindings) + "\n");
+            writeFindings(findingsOut, minorFindings);
             out.append("자동수정 대상(Minor) ").append(minorFindings.size()).append("건 → ").append(findingsOut).append('\n');
         }
 
@@ -152,6 +153,26 @@ public final class ReviewLoopRunner {
             }
         }
         return null;
+    }
+
+    /**
+     * Minor findings를 파일로 — 부모 디렉터리가 없으면 만들고 쓴다.
+     * --findings-out은 외부에서 임의 경로로 주어지므로, 게이트가 자기 IO 오류(NoSuchFileException)로
+     * push를 막지 않도록 방어한다. findings 0건이어도 빈 파일을 남긴다(소비자가 존재를 가정).
+     */
+    static void writeFindings(String findingsOut, List<String> minorFindings) throws IOException {
+        Path findingsFile = Path.of(findingsOut);
+        Path findingsDir = findingsFile.getParent();   // 파일명만 준 경우 null → createDirectories(null)은 NPE
+        if (findingsDir != null) {
+            Files.createDirectories(findingsDir);
+        }
+        Files.writeString(findingsFile,
+                minorFindings.isEmpty() ? "" : String.join("\n", minorFindings) + "\n");
+    }
+
+    /** findings 경로는 OS 무관하게 '/' — Windows의 '\'가 Linux CI 출력·마크다운 요청서와 갈리는 것 방지. */
+    static String toPosixPath(Path p) {
+        return p.toString().replace('\\', '/');
     }
 
     private static String mark(JudgeDecision d) {
