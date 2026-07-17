@@ -143,7 +143,8 @@ public class ChurnQueryAdapter implements ChurnQueryPort {
                        r.computed_at,
                        json_unquote(json_extract(r.features, '$.top_reason')) as top_reason,
                        (select max(da.achieved_date) from daily_achievement da
-                        where da.enrollment_id = r.enrollment_id) as last_activity
+                        where da.enrollment_id = r.enrollment_id
+                          and da.actual_min > 0) as last_activity
                 from dropout_risk r
                 join enrollment e on e.enrollment_id = r.enrollment_id
                 join members m on m.member_id = e.member_id
@@ -252,11 +253,18 @@ public class ChurnQueryAdapter implements ChurnQueryPort {
         return total == 0 ? null : (double) done / total;
     }
 
+    /**
+     * 최근 활동일 = 실제로 학습한 마지막 날.
+     * daily_achievement 는 계획만 있고 안 한 날도 행을 남기므로(planned_min>0, actual_min=0 —
+     * miss_streak/slip 계산에 필요) 필터 없이 max(achieved_date) 를 쓰면 '어제'가 나온다.
+     * 실학습 여부는 actual_min>0 로 판별한다(목표 미달이어도 학습은 학습이므로 achieved=1 아님).
+     */
     private LocalDate findLastAccessDate(Long enrollmentId) {
         Query query = entityManager.createNativeQuery("""
                 select max(da.achieved_date)
                 from daily_achievement da
                 where da.enrollment_id = :enrollmentId
+                  and da.actual_min > 0
                 """)
                 .setParameter("enrollmentId", enrollmentId);
         return toLocalDate(query.getSingleResult());
