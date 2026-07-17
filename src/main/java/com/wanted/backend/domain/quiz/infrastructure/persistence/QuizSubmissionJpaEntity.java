@@ -69,7 +69,7 @@ public class QuizSubmissionJpaEntity {
         return entity;
     }
 
-    public void addAnswer(Long questionId, Long selectedOptionId, boolean correct) {
-        answers.add(QuizSubmissionAnswerJpaEntity.of(this, questionId, selectedOptionId, correct));
+    public void addAnswer(Long questionId, Long selectedOptionId, boolean correct, Integer timeSpentSeconds) {
+        answers.add(QuizSubmissionAnswerJpaEntity.of(this, questionId, selectedOptionId, correct, timeSpentSeconds));
     }
 }

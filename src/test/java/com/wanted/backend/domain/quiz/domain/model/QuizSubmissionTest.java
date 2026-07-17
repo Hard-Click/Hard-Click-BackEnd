@@ -125,4 +125,35 @@ class QuizSubmissionTest {
         assertThat(submission.getScore()).isZero();
         assertThat(submission.getAnswers()).hasSize(2);
     }
+
+    @Test
+    void gradeCarriesTimeSpentSecondsPerQuestion() {
+        Quiz quiz = twoQuestionQuiz();
+
+        // Q1은 70초 측정, Q2는 미측정(맵에 없음) → null
+        QuizSubmission submission = QuizSubmission.grade(7L, quiz,
+                Map.of(10L, 102L, 20L, 201L), Map.of(10L, 70));
+
+        assertThat(answerOf(submission, 10L).getTimeSpentSeconds()).isEqualTo(70);
+        assertThat(answerOf(submission, 20L).getTimeSpentSeconds()).isNull();
+    }
+
+    @Test
+    void gradeNullifiesOutOfRangeTimeSpentSeconds() {
+        Quiz quiz = threeQuestionQuiz();
+
+        // 음수·상한 초과는 신뢰 불가 → null(미측정), 경계값 3600은 유지
+        QuizSubmission submission = QuizSubmission.grade(7L, quiz,
+                Map.of(10L, 102L, 20L, 201L, 30L, 301L),
+                Map.of(10L, -5, 20L, 3601, 30L, 3600));
+
+        assertThat(answerOf(submission, 10L).getTimeSpentSeconds()).isNull();
+        assertThat(answerOf(submission, 20L).getTimeSpentSeconds()).isNull();
+        assertThat(answerOf(submission, 30L).getTimeSpentSeconds()).isEqualTo(3600);
+    }
+
+    private QuizSubmissionAnswer answerOf(QuizSubmission submission, Long questionId) {
+        return submission.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(questionId)).findFirst().orElseThrow();
+    }
 }
