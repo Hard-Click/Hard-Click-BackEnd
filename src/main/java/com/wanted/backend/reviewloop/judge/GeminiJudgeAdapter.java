@@ -25,8 +25,7 @@ import java.util.List;
  */
 public class GeminiJudgeAdapter implements LlmJudgePort {
 
-    private static final String DEFAULT_MODEL =
-            System.getenv().getOrDefault("GEMINI_MODEL", "gemini-flash-latest");
+    private static final String DEFAULT_MODEL = GeminiModels.resolve();
     private static final String ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
@@ -98,7 +97,7 @@ public class GeminiJudgeAdapter implements LlmJudgePort {
         }
     }
 
-    private String buildRequest(String filePath, String code, String policy) throws IOException {
+    String buildRequest(String filePath, String code, String policy) throws IOException {
         String system = """
                 당신은 코드 리뷰 채점자다. 아래 정책(의미규칙)만 기준으로 검토한다.
                 점수는 매기지 말고 findings만 반환한다. file/line은 실제 코드에 존재하는 근거여야 한다.
@@ -114,6 +113,9 @@ public class GeminiJudgeAdapter implements LlmJudgePort {
         content.put("role", "user");
         content.putArray("parts").addObject().put("text", user);
         ObjectNode genConfig = root.putObject("generationConfig");
+        // 판정에 필요한 건 창의성이 아니라 재현성 — 같은 코드는 같은 findings여야 게이트가 성립한다.
+        // 미설정 시 모델 기본값(≈1.0)이라 같은 파일에 score가 85↔100으로 흔들렸다.
+        genConfig.put("temperature", 0);
         genConfig.put("responseMimeType", "application/json");
         genConfig.set("responseSchema", mapper.readTree(RESPONSE_SCHEMA));
 
