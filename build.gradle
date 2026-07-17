@@ -126,6 +126,16 @@ tasks.register('reviewLesson', JavaExec) {
     jvmArgs reviewLoopUtf8Args
 }
 
+// AI 코드 리뷰 루프 · 규칙 정확도 조회 — 규칙별 오탐/누락 지목 횟수(프롬프트 개선 후보)
+//   ./gradlew reviewAccuracy
+tasks.register('reviewAccuracy', JavaExec) {
+    group = 'review-loop'
+    description = '규칙별 오탐/누락 지목 횟수 집계 (교훈 기반 · 프롬프트 개선 후보 식별)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.RuleAccuracy'
+    jvmArgs reviewLoopUtf8Args
+}
+
 // AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정
 tasks.register('installReviewHooks', Exec) {
     group = 'review-loop'
