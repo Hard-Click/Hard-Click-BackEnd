@@ -23,9 +23,9 @@ public final class ReviewLessonRecorder {
     private static final Path LESSONS = Path.of("review-loop/logs/lessons.jsonl");
 
     public static void main(String[] args) throws IOException {
-        String rule = argVal(args, "--rule", null);
-        String kindArg = argVal(args, "--kind", null);
-        String note = argVal(args, "--note", null);
+        String rule = CliArgs.value(args, "--rule", null);
+        String kindArg = CliArgs.value(args, "--kind", null);
+        String note = CliArgs.value(args, "--note", null);
 
         if (rule == null || kindArg == null || note == null || note.isBlank()) {
             System.out.println("사용법: --args=\"--rule <RULE_ID> --kind <FALSE_POSITIVE|MISSED> --note <한 줄 근거>\"");
@@ -49,15 +49,6 @@ public final class ReviewLessonRecorder {
         System.out.println("[reviewLesson] 교훈 기록 → " + LESSONS);
         System.out.println("  [" + kind + "] " + rule + " — " + lesson.humanNote());
         System.out.println("  다음 판정부터 프롬프트에 반영됩니다.");
-    }
-
-    private static String argVal(String[] args, String key, String def) {
-        for (int i = 0; i < args.length - 1; i++) {
-            if (args[i].equals(key)) {
-                return args[i + 1];
-            }
-        }
-        return def;
     }
 
     private ReviewLessonRecorder() {

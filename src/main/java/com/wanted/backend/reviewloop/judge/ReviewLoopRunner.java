@@ -27,13 +27,13 @@ import java.util.stream.Stream;
 public final class ReviewLoopRunner {
 
     public static void main(String[] args) throws Exception {
-        String filesFrom = argVal(args, "--files-from", null);
-        String path = argVal(args, "--path", null);
-        String domain = argVal(args, "--domain", null);
-        String rulesPath = argVal(args, "--rules", "review-loop/rules.yaml");
-        int max = Integer.parseInt(argVal(args, "--max", "5"));
-        boolean gate = hasFlag(args, "--gate");
-        String findingsOut = argVal(args, "--findings-out", null);   // Minor findings를 파일로(자동수정기 입력)
+        String filesFrom = CliArgs.value(args, "--files-from", null);
+        String path = CliArgs.value(args, "--path", null);
+        String domain = CliArgs.value(args, "--domain", null);
+        String rulesPath = CliArgs.value(args, "--rules", "review-loop/rules.yaml");
+        int max = Integer.parseInt(CliArgs.value(args, "--max", "5"));
+        boolean gate = CliArgs.flag(args, "--gate");
+        String findingsOut = CliArgs.value(args, "--findings-out", null);   // Minor findings를 파일로(자동수정기 입력)
 
         List<Path> targets = resolveTargets(filesFrom, path, max);
         if (targets == null) {
@@ -191,23 +191,6 @@ public final class ReviewLoopRunner {
         };
     }
 
-    private static boolean hasFlag(String[] args, String key) {
-        for (String a : args) {
-            if (a.equals(key)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String argVal(String[] args, String key, String def) {
-        for (int i = 0; i < args.length - 1; i++) {
-            if (args[i].equals(key)) {
-                return args[i + 1];
-            }
-        }
-        return def;
-    }
 
     private ReviewLoopRunner() {
     }
