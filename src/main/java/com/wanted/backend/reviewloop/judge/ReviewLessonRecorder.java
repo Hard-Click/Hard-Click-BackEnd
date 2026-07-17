@@ -23,32 +23,43 @@ public final class ReviewLessonRecorder {
     private static final Path LESSONS = Path.of("review-loop/logs/lessons.jsonl");
 
     public static void main(String[] args) throws IOException {
-        String rule = CliArgs.value(args, "--rule", null);
-        String kindArg = CliArgs.value(args, "--kind", null);
-        String note = CliArgs.value(args, "--note", null);
-
-        if (rule == null || kindArg == null || note == null || note.isBlank()) {
-            System.out.println("사용법: --args=\"--rule <RULE_ID> --kind <FALSE_POSITIVE|MISSED> --note <한 줄 근거>\"");
-            System.exit(2);
-            return;
-        }
-
-        LessonKind kind;
+        Lesson lesson;
         try {
-            kind = LessonKind.valueOf(kindArg);
+            lesson = parse(args);
         } catch (IllegalArgumentException e) {
-            System.out.println("--kind 는 FALSE_POSITIVE 또는 MISSED 여야 합니다: " + kindArg);
+            System.out.println(e.getMessage());
             System.exit(2);
             return;
         }
 
         Files.createDirectories(LESSONS.getParent());
-        Lesson lesson = new Lesson(LocalDateTime.now().toString(), rule, kind, note.strip());
         new KnowledgeStore(LESSONS).record(lesson);
 
         System.out.println("[reviewLesson] 교훈 기록 → " + LESSONS);
-        System.out.println("  [" + kind + "] " + rule + " — " + lesson.humanNote());
+        System.out.println("  [" + lesson.kind() + "] " + lesson.ruleId() + " — " + lesson.humanNote());
         System.out.println("  다음 판정부터 프롬프트에 반영됩니다.");
+    }
+
+    /**
+     * 인자를 교훈으로 파싱·검증한다. 잘못된 입력은 {@link IllegalArgumentException}(사용법 메시지).
+     * rule·note는 빈/공백을 거른다 — 빈 ruleId가 lessons.jsonl·집계(RuleAccuracy)를 오염시키지 않게.
+     */
+    static Lesson parse(String[] args) {
+        String rule = CliArgs.value(args, "--rule", null);
+        String kindArg = CliArgs.value(args, "--kind", null);
+        String note = CliArgs.value(args, "--note", null);
+
+        if (rule == null || rule.isBlank() || note == null || note.isBlank()) {
+            throw new IllegalArgumentException(
+                    "사용법: --args=\"--rule <RULE_ID> --kind <FALSE_POSITIVE|MISSED> --note <한 줄 근거>\"");
+        }
+        LessonKind kind;
+        try {
+            kind = LessonKind.valueOf(kindArg == null ? "" : kindArg);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("--kind 는 FALSE_POSITIVE 또는 MISSED 여야 합니다: " + kindArg);
+        }
+        return new Lesson(LocalDateTime.now().toString(), rule.strip(), kind, note.strip());
     }
 
     private ReviewLessonRecorder() {
