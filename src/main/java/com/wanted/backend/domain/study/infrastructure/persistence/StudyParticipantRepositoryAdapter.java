@@ -4,6 +4,7 @@ import com.wanted.backend.domain.study.domain.model.StudyParticipant;
 import com.wanted.backend.domain.study.domain.repository.StudyParticipantRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -39,5 +40,12 @@ public class StudyParticipantRepositoryAdapter implements StudyParticipantReposi
     @Override
     public void deleteByStudyIdAndMemberId(Long studyId, Long memberId) {
         repository.deleteByStudyIdAndMemberId(studyId, memberId);
+    }
+
+    @Override
+    public List<Long> findStudyIdsByMemberIdAndStudyIdIn(Long memberId, Collection<Long> studyIds) {
+        return repository.findByMemberIdAndStudyIdIn(memberId, studyIds).stream()
+                .map(StudyParticipantJpaEntity::getStudyId)
+                .toList();
     }
 }

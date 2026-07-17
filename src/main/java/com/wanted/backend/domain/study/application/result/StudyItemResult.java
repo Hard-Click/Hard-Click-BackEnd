@@ -11,5 +11,7 @@ public record StudyItemResult(
         int currentCount,
         int maxCount,
         boolean isClosed,
+        boolean isMine,
+        boolean isJoined,
         LocalDateTime createdAt
 ) {}
