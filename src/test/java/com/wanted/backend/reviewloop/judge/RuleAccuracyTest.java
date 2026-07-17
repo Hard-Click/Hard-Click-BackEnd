@@ -6,30 +6,62 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
-/** 규칙 정확도 집계 — 규칙별 오탐/누락 카운트와 정렬(오탐 많은 순). */
+/** 규칙 정확도 집계 — 오탐률 = 오탐 ÷ (오탐+CONFIRMED), MISSED는 분모에서 제외. */
 class RuleAccuracyTest {
 
     private Lesson lesson(String rule, LessonKind kind) {
         return new Lesson("2026-07-18T00:00:00", rule, kind, "note");
     }
 
+    private RuleAccuracy.Stat stat(List<RuleAccuracy.Stat> stats, String rule) {
+        return stats.stream().filter(s -> s.ruleId().equals(rule)).findFirst().orElseThrow();
+    }
+
     @Test
-    @DisplayName("규칙별로 FALSE_POSITIVE·MISSED를 센다")
-    void countsByRuleAndKind() {
+    @DisplayName("오탐률 = 오탐 ÷ (오탐+CONFIRMED) — CONFIRMED가 분모를 채운다")
+    void computesFalsePositiveRateFromReviewedDecisions() {
+        // CONV_001: 오탐 3, 확정 1 → 3/4 = 75%
         List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
                 lesson("CONV_001", LessonKind.FALSE_POSITIVE),
                 lesson("CONV_001", LessonKind.FALSE_POSITIVE),
+                lesson("CONV_001", LessonKind.FALSE_POSITIVE),
+                lesson("CONV_001", LessonKind.CONFIRMED)));
+
+        RuleAccuracy.Stat conv = stat(stats, "CONV_001");
+        assertThat(conv.falsePositives()).isEqualTo(3);
+        assertThat(conv.confirmed()).isEqualTo(1);
+        assertThat(conv.reviewed()).isEqualTo(4);
+        assertThat(conv.falsePositiveRate()).isCloseTo(0.75, within(1e-9));
+    }
+
+    @Test
+    @DisplayName("MISSED는 오탐률 분모에서 제외된다(recall 지표라 별개)")
+    void missedDoesNotAffectRate() {
+        // 오탐 1, 확정 1, 놓침 5 → 오탐률 = 1/2 = 50% (MISSED 무관)
+        List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
+                lesson("PERF_001", LessonKind.FALSE_POSITIVE),
+                lesson("PERF_001", LessonKind.CONFIRMED),
+                lesson("PERF_001", LessonKind.MISSED),
+                lesson("PERF_001", LessonKind.MISSED),
+                lesson("PERF_001", LessonKind.MISSED),
+                lesson("PERF_001", LessonKind.MISSED),
                 lesson("PERF_001", LessonKind.MISSED)));
 
-        RuleAccuracy.Stat conv = stats.stream().filter(s -> s.ruleId().equals("CONV_001")).findFirst().orElseThrow();
-        RuleAccuracy.Stat perf = stats.stream().filter(s -> s.ruleId().equals("PERF_001")).findFirst().orElseThrow();
+        RuleAccuracy.Stat perf = stat(stats, "PERF_001");
+        assertThat(perf.missed()).isEqualTo(5);
+        assertThat(perf.reviewed()).isEqualTo(2);
+        assertThat(perf.falsePositiveRate()).isCloseTo(0.5, within(1e-9));
+    }
 
-        assertThat(conv.falsePositives()).isEqualTo(2);
-        assertThat(conv.missed()).isZero();
-        assertThat(perf.falsePositives()).isZero();
-        assertThat(perf.missed()).isEqualTo(1);
-        assertThat(perf.total()).isEqualTo(1);
+    @Test
+    @DisplayName("판정(오탐/확정)이 없으면 오탐률은 정의되지 않는다(-1)")
+    void rateUndefinedWhenNoDecisions() {
+        List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
+                lesson("ARCH_003a", LessonKind.MISSED)));
+
+        assertThat(stat(stats, "ARCH_003a").falsePositiveRate()).isEqualTo(-1);
     }
 
     @Test
@@ -44,7 +76,7 @@ class RuleAccuracyTest {
     }
 
     @Test
-    @DisplayName("교훈이 없으면 빈 신호 메시지")
+    @DisplayName("판정이 없으면 빈 신호 메시지")
     void emptyWhenNoLessons() {
         assertThat(RuleAccuracy.summarize(List.of())).isEmpty();
         assertThat(RuleAccuracy.render(List.of())).contains("아직 신호 없음");
