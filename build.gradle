@@ -66,7 +66,11 @@ dependencies {
     implementation 'software.amazon.awssdk:sts'
 
     // AI 코드 리뷰 루프 · Gate 2 — LLM Judge (선택 어댑터: Claude)
-    implementation 'com.anthropic:anthropic-java:2.34.0'
+    // swagger-annotations 제외: springdoc의 swagger-annotations-jakarta와 패키지가 겹쳐
+    // 구버전(2.2.31) Schema가 먼저 로드되면 /v3/api-docs가 NoSuchMethodError로 죽는다.
+    implementation('com.anthropic:anthropic-java:2.34.0') {
+        exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
+    }
 }
 
 tasks.named('test') {
