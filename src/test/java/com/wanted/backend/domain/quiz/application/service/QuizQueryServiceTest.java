@@ -431,8 +431,8 @@ class QuizQueryServiceTest {
         QuizSubmission currentSub = QuizSubmission.restore(55L, 90L, MEMBER_ID, 60, 2, 1,
                 LocalDateTime.of(2026, 5, 12, 0, 0),
                 List.of(
-                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
-                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false)));
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true, null),
+                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false, null)));
         // 이전 주차(quiz91): score 75
         QuizSubmission prevSub = QuizSubmission.restore(56L, 91L, MEMBER_ID, 75, 2, 2,
                 LocalDateTime.of(2026, 5, 5, 0, 0), List.of());
@@ -472,8 +472,8 @@ class QuizQueryServiceTest {
         QuizSubmission currentSub = QuizSubmission.restore(55L, 90L, MEMBER_ID, 60, 2, 1,
                 LocalDateTime.of(2026, 5, 12, 0, 0),
                 List.of(
-                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
-                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false)));
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true, null),
+                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false, null)));
         when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
                 .thenReturn(List.of(currentSub));
 
@@ -552,8 +552,8 @@ class QuizQueryServiceTest {
         QuizSubmission submission = QuizSubmission.restore(55L, 90L, MEMBER_ID, 50, 2, 1,
                 LocalDateTime.of(2026, 5, 12, 0, 0),
                 List.of(
-                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true),
-                        QuizSubmissionAnswer.restore(2L, 20L, null, false)));
+                        QuizSubmissionAnswer.restore(1L, 10L, 102L, true, null),
+                        QuizSubmissionAnswer.restore(2L, 20L, null, false, null)));
         when(quizRepository.findById(90L)).thenReturn(Optional.of(studentQuiz()));
         when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(courseTitlePort.findTitlesByCourseIds(anyCollection()))

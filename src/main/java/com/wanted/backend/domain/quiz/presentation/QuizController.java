@@ -129,7 +129,8 @@ public class QuizController {
         List<SubmitQuizCommand.AnswerCommand> answers =
                 request == null || request.answers() == null ? List.of()
                         : request.answers().stream()
-                                .map(a -> new SubmitQuizCommand.AnswerCommand(a.questionId(), a.selectedOptionId()))
+                                .map(a -> new SubmitQuizCommand.AnswerCommand(
+                                        a.questionId(), a.selectedOptionId(), a.timeSpentSeconds()))
                                 .toList();
 
         QuizSubmissionResult result = quizSubmissionUseCase.submit(

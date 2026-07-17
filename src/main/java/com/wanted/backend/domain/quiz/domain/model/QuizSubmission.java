@@ -24,6 +24,14 @@ public class QuizSubmission {
      * @param answersByQuestionId 문항 id → 학생이 선택한 보기 id (미응답 문항은 값이 없거나 null)
      */
     public static QuizSubmission grade(Long memberId, Quiz quiz, Map<Long, Long> answersByQuestionId) {
+        return grade(memberId, quiz, answersByQuestionId, null);
+    }
+
+    /**
+     * @param timeSpentByQuestionId 문항 id → 풀이 체류 시간(초, 재방문 누적). 미측정 문항은 값이 없거나 null
+     */
+    public static QuizSubmission grade(Long memberId, Quiz quiz, Map<Long, Long> answersByQuestionId,
+                                       Map<Long, Integer> timeSpentByQuestionId) {
         if (memberId == null) {
             throw new IllegalArgumentException("회원 식별자는 필수입니다.");
         }
@@ -36,11 +44,12 @@ public class QuizSubmission {
         for (QuizQuestion question : quiz.getQuestions()) {
             Long correctOptionId = correctOptionId(question);
             Long selectedOptionId = answersByQuestionId == null ? null : answersByQuestionId.get(question.getId());
+            Integer timeSpentSeconds = timeSpentByQuestionId == null ? null : timeSpentByQuestionId.get(question.getId());
             boolean isCorrect = selectedOptionId != null && selectedOptionId.equals(correctOptionId);
             if (isCorrect) {
                 correct++;
             }
-            gradedAnswers.add(QuizSubmissionAnswer.create(question.getId(), selectedOptionId, isCorrect));
+            gradedAnswers.add(QuizSubmissionAnswer.create(question.getId(), selectedOptionId, isCorrect, timeSpentSeconds));
         }
 
         int total = gradedAnswers.size();

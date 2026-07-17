@@ -46,11 +46,16 @@ public class QuizSubmissionService implements QuizSubmissionUseCase {
         }
 
         Map<Long, Long> answersByQuestionId = new HashMap<>();
+        Map<Long, Integer> timeSpentByQuestionId = new HashMap<>();
         if (command.answers() != null) {
-            command.answers().forEach(a -> answersByQuestionId.put(a.questionId(), a.selectedOptionId()));
+            command.answers().forEach(a -> {
+                answersByQuestionId.put(a.questionId(), a.selectedOptionId());
+                timeSpentByQuestionId.put(a.questionId(), a.timeSpentSeconds());
+            });
         }
 
-        QuizSubmission submission = QuizSubmission.grade(command.memberId(), quiz, answersByQuestionId);
+        QuizSubmission submission = QuizSubmission.grade(
+                command.memberId(), quiz, answersByQuestionId, timeSpentByQuestionId);
 
         QuizSubmission saved;
         try {

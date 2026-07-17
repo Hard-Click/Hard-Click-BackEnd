@@ -23,7 +23,8 @@ public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository
                 submission.getTotalQuestionCount(), submission.getCorrectCount(), submission.getSubmittedAt());
 
         for (QuizSubmissionAnswer answer : submission.getAnswers()) {
-            entity.addAnswer(answer.getQuestionId(), answer.getSelectedOptionId(), answer.isCorrect());
+            entity.addAnswer(answer.getQuestionId(), answer.getSelectedOptionId(), answer.isCorrect(),
+                    answer.getTimeSpentSeconds());
         }
 
         // saveAndFlush로 즉시 INSERT를 실행해, UNIQUE(quiz_id, member_id) 위반이
@@ -60,7 +61,8 @@ public class QuizSubmissionRepositoryAdapter implements QuizSubmissionRepository
     private QuizSubmission toDomain(QuizSubmissionJpaEntity entity) {
         var answers = entity.getAnswers().stream()
                 .map(a -> QuizSubmissionAnswer.restore(
-                        a.getId(), a.getQuestionId(), a.getSelectedOptionId(), a.isCorrect()))
+                        a.getId(), a.getQuestionId(), a.getSelectedOptionId(), a.isCorrect(),
+                        a.getTimeSpentSeconds()))
                 .toList();
 
         return QuizSubmission.restore(entity.getId(), entity.getQuizId(), entity.getMemberId(),

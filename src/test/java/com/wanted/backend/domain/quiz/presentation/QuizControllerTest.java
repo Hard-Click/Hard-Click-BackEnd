@@ -152,7 +152,7 @@ class QuizControllerTest {
                         java.time.LocalDateTime.of(2026, 5, 10, 15, 30)));
 
         QuizSubmissionRequest request = new QuizSubmissionRequest(
-                List.of(new QuizSubmissionRequest.Answer(11L, 22L)));
+                List.of(new QuizSubmissionRequest.Answer(11L, 22L, null)));
 
         ResponseEntity<com.wanted.backend.global.common.ApiResponse<QuizSubmissionResponse>> result =
                 controller.submitQuiz(userDetails, 90L, request);
@@ -197,7 +197,7 @@ class QuizControllerTest {
                 .thenThrow(new BusinessException(ErrorCode.QUIZ_ALREADY_SUBMITTED));
 
         QuizSubmissionRequest request = new QuizSubmissionRequest(
-                List.of(new QuizSubmissionRequest.Answer(11L, 22L)));
+                List.of(new QuizSubmissionRequest.Answer(11L, 22L, null)));
 
         assertThatThrownBy(() -> controller.submitQuiz(userDetails, 90L, request))
                 .isInstanceOf(BusinessException.class)

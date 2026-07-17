@@ -37,13 +37,17 @@ public class QuizSubmissionAnswerJpaEntity {
     @Column(name = "is_correct", nullable = false)
     private boolean correct;
 
+    @Column(name = "time_spent_seconds")
+    private Integer timeSpentSeconds;
+
     static QuizSubmissionAnswerJpaEntity of(QuizSubmissionJpaEntity submission, Long questionId,
-                                             Long selectedOptionId, boolean correct) {
+                                             Long selectedOptionId, boolean correct, Integer timeSpentSeconds) {
         QuizSubmissionAnswerJpaEntity entity = new QuizSubmissionAnswerJpaEntity();
         entity.submission = submission;
         entity.questionId = questionId;
         entity.selectedOptionId = selectedOptionId;
         entity.correct = correct;
+        entity.timeSpentSeconds = timeSpentSeconds;
         return entity;
     }
 }
