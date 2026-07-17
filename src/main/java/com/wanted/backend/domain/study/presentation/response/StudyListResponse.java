@@ -40,6 +40,10 @@ public record StudyListResponse(
             int maxCount,
             @Schema(description = "모집 마감 여부", example = "false")
             boolean isClosed,
+            @Schema(description = "내가 만든 스터디 여부", example = "false")
+            boolean isMine,
+            @Schema(description = "내가 참여 중인 스터디 여부 (방장 포함)", example = "true")
+            boolean isJoined,
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss+09:00")
             @Schema(description = "작성일시", example = "2025-03-15T14:30:00")
             LocalDateTime createdAt
@@ -47,7 +51,7 @@ public record StudyListResponse(
         public static StudyItem from(StudyItemResult r) {
             return new StudyItem(
                     r.studyId(), r.title(), r.content(), r.authorName(), r.subjectName(),
-                    r.currentCount(), r.maxCount(), r.isClosed(), r.createdAt()
+                    r.currentCount(), r.maxCount(), r.isClosed(), r.isMine(), r.isJoined(), r.createdAt()
             );
         }
     }

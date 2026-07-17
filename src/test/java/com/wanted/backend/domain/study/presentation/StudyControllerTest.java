@@ -440,7 +440,7 @@ class StudyControllerTest {
     @Test
     @DisplayName("목록 조회 시 조회 결과를 그대로 반환한다")
     void getStudyList_success() throws Exception {
-        given(studyQueryUseCase.getList(isNull(), eq(0), eq(10)))
+        given(studyQueryUseCase.getList(isNull(), eq(0), eq(10), eq(1L)))
                 .willReturn(new StudyListResult(List.of(), 0));
 
         mockMvc.perform(get("/api/study"))
@@ -472,7 +472,7 @@ class StudyControllerTest {
     @Test
     @DisplayName("subject 필터가 전달되면 use case에 반영된다")
     void getStudyList_success_withSubjectFilter() throws Exception {
-        given(studyQueryUseCase.getList(eq("MATH_1"), eq(0), eq(10)))
+        given(studyQueryUseCase.getList(eq("MATH_1"), eq(0), eq(10), eq(1L)))
                 .willReturn(new StudyListResult(List.of(), 0));
 
         mockMvc.perform(get("/api/study").param("subject", "MATH_1"))
