@@ -12,6 +12,10 @@
 # 활성화(클론 후 1회): ./gradlew installReviewHooks   (= git config core.hooksPath .githooks)
 set -u
 
+# Gradle 런처 JVM을 UTF-8로 — Windows 콘솔 기본(cp949)이면 게이트 메시지 한글이 깨져
+# 차단 사유를 사람이 못 읽는다(자식 JVM은 build.gradle의 jvmArgs가 담당).
+export GRADLE_OPTS="${GRADLE_OPTS:-} -Dfile.encoding=UTF-8"
+
 ZERO="0000000000000000000000000000000000000000"
 BASE_DEFAULT="origin/develop"
 CHANGED="$(git rev-parse --git-dir)/reviewloop-changed.txt"
