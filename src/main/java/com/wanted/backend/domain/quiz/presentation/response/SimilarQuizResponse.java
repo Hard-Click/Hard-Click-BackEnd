@@ -5,11 +5,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "유사퀴즈(오답 기반) 응답")
+@Schema(description = "유사퀴즈(오답 기반) 응답 — 응시용(정답/해설 제외)")
 public record SimilarQuizResponse(
-        @Schema(description = "유사퀴즈 ID(무상태 생성 시 courseId placeholder)", example = "500") Long similarQuizId,
-        @Schema(description = "강의 ID", example = "500") Long courseId,
-        @Schema(description = "제목", example = "수능 국어 유사문제") String title,
+        @Schema(description = "유사퀴즈 ID(제출 시 사용)", example = "123") Long similarQuizId,
+        @Schema(description = "강의 ID", example = "9001") Long courseId,
+        @Schema(description = "주차(선택)", example = "3") Integer week,
+        @Schema(description = "제목", example = "3주차 오답 유사 퀴즈") String title,
         @Schema(description = "문항 목록") List<QuestionResponse> questions
 ) {
     @Schema(description = "유사 문항")
@@ -23,6 +24,7 @@ public record SimilarQuizResponse(
         return new SimilarQuizResponse(
                 result.similarQuizId(),
                 result.courseId(),
+                result.week(),
                 result.title(),
                 result.questions().stream()
                         .map(question -> new QuestionResponse(
