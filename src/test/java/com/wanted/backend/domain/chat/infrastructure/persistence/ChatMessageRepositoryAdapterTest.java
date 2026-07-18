@@ -99,6 +99,18 @@ class ChatMessageRepositoryAdapterTest {
     }
 
     @Test
+    @DisplayName("채팅방 참여자가 아니면 unreadCount는 0이다")
+    void countUnread_notParticipant_zero() {
+        adapter.save(ChatMessage.create(100L, 2L, "남이 보낸 것"));
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isZero();
+    }
+
+    @Test
     @DisplayName("내가 보낸 메시지는 unreadCount에 잡히지 않는다")
     void countUnread_ownMessages_notCounted() {
         participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
