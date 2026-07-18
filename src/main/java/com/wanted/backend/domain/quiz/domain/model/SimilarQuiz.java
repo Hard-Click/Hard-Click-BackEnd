@@ -3,6 +3,7 @@ package com.wanted.backend.domain.quiz.domain.model;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 오답 기반 유사퀴즈 생성 세트(영속 애그리거트).
@@ -56,9 +57,9 @@ public class SimilarQuiz {
         return quiz;
     }
 
-    /** 제출(②) 시 본인 생성 세트만 채점하도록 소유자를 확인한다. */
+    /** 제출(②) 시 본인 생성 세트만 채점하도록 소유자를 확인한다. 양쪽 null에 안전하다. */
     public boolean isOwnedBy(Long memberId) {
-        return this.memberId.equals(memberId);
+        return Objects.equals(this.memberId, memberId);
     }
 
     public Long getId() { return id; }

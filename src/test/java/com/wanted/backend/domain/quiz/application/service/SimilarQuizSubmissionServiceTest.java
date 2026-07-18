@@ -3,7 +3,6 @@ package com.wanted.backend.domain.quiz.application.service;
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
-import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.model.SimilarQuiz;
@@ -43,8 +42,8 @@ class SimilarQuizSubmissionServiceTest {
         service = new SimilarQuizSubmissionService(similarQuizRepository, quizRepository, subscriptionAccessPort);
     }
 
-    // 문항 10(정답=보기2, answerIndex 1)·20(정답=보기1, answerIndex 0)을 가진 코스 퀴즈.
-    private Quiz courseQuiz() {
+    // 문항 10(정답=보기2, answerIndex 1)·20(정답=보기1, answerIndex 0) — 유사퀴즈가 참조하는 원문항.
+    private List<QuizQuestion> courseQuestions() {
         QuizQuestion q10 = QuizQuestion.restore(10L, 1, "질문10", "해설10", List.of(
                 QuizOption.restore(101L, 1, "오답", false),
                 QuizOption.restore(102L, 2, "정답", true),
@@ -55,8 +54,7 @@ class SimilarQuizSubmissionServiceTest {
                 QuizOption.restore(202L, 2, "오답", false),
                 QuizOption.restore(203L, 3, "오답", false),
                 QuizOption.restore(204L, 4, "오답", false)));
-        return Quiz.restore(90L, 1L, COURSE_ID, 100L, "국어", List.of(q10, q20),
-                LocalDateTime.of(2026, 5, 10, 15, 30));
+        return List.of(q10, q20);
     }
 
     private SimilarQuiz similarQuiz(Long ownerId) {
@@ -68,7 +66,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitGradesWithAnswersExplanationsAndScore() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
-        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(courseQuiz()));
+        when(quizRepository.findQuestionsByIds(List.of(10L, 20L))).thenReturn(courseQuestions());
 
         // 10번은 정답(index 1), 20번은 오답(index 2, 정답 index 0)
         SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
@@ -99,7 +97,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitTreatsUnansweredQuestionAsIncorrectWithNullSelectedIndex() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
-        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(courseQuiz()));
+        when(quizRepository.findQuestionsByIds(List.of(10L, 20L))).thenReturn(courseQuestions());
 
         // 10번만 정답 제출, 20번 미응답
         SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(

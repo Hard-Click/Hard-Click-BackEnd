@@ -14,21 +14,24 @@ import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 유사퀴즈 제출·채점 서비스.
  *
- * 유사퀴즈 문항은 기존 quiz_question 행을 참조하므로, 저장된 문항 id 순서대로 원문항을 조회해 채점한다.
- * 정답 보기 순서(answerIndex)는 optionNumber ASC로 정렬된 보기 목록에서 정답 보기의 위치(0-based)다 —
- * 생성(①) 응답이 노출한 보기 순서와 동일하므로 selectedIndex와 직접 비교할 수 있다.
+ * 유사퀴즈 문항은 기존 quiz_question 행을 참조하므로, 저장된 문항 id로 원문항만 직접 조회해 채점한다
+ * (코스 전체 로딩 회피). 정답 보기 순서(answerIndex)는 optionNumber ASC로 정렬된 보기 목록에서 정답 보기의
+ * 위치(0-based)다 — 생성(①) 응답이 노출한 보기 순서와 동일하므로 selectedIndex와 직접 비교할 수 있다.
  *
- * 트랜잭션 경계: findById/findAllByCourseId 모두 완전 매핑 POJO를 반환하므로 서비스에 @Transactional을 걸지 않는다.
+ * 트랜잭션 경계: 외부 호출이 없는 순수 조회 채점이므로 두 조회(findById·findQuestionsByIds)를 하나의
+ * 읽기 전용 트랜잭션으로 묶어 Read Skew를 막는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
     private final SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
 
     @Override
+    @Transactional(readOnly = true)
     public SimilarQuizSubmissionResult submit(SubmitSimilarQuizCommand command) {
         if (!subscriptionAccessPort.hasActiveSubscription(command.memberId())) {
             throw new BusinessException(ErrorCode.SIMILAR_QUIZ_SUBSCRIPTION_REQUIRED);
@@ -49,12 +53,8 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
                 .filter(sq -> sq.isOwnedBy(command.memberId()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.SIMILAR_QUIZ_NOT_FOUND));
 
-        Map<Long, QuizQuestion> questionById = new LinkedHashMap<>();
-        for (Quiz quiz : quizRepository.findAllByCourseId(similarQuiz.getCourseId())) {
-            for (QuizQuestion question : quiz.getQuestions()) {
-                questionById.put(question.getId(), question);
-            }
-        }
+        Map<Long, QuizQuestion> questionById = quizRepository.findQuestionsByIds(similarQuiz.getQuestionIds())
+                .stream().collect(Collectors.toMap(QuizQuestion::getId, Function.identity()));
 
         Map<Long, Integer> selectedByQuestion = new HashMap<>();
         if (command.answers() != null) {

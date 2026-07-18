@@ -32,7 +32,7 @@ public class SimilarQuizRepositoryAdapter implements SimilarQuizRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<SimilarQuiz> findById(Long id) {
-        return similarQuizJpaRepository.findById(id).map(this::toDomain);
+        return similarQuizJpaRepository.findWithQuestionsById(id).map(this::toDomain);
     }
 
     private SimilarQuiz toDomain(SimilarQuizJpaEntity entity) {
