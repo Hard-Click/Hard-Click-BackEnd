@@ -63,6 +63,24 @@ class DriverBudgetTest {
     }
 
     @Test
+    @DisplayName("--status·알 수 없는 명령어는 카운트를 바꾸지 않는다 (상태 불변)")
+    void statusAndUnknownOpsLeaveCountsUnchanged() {
+        // 같은 브랜치에서 autofix=2, total=1 을 만들어 둔다
+        DriverBudget.State base = DriverBudget.applied(
+                new DriverBudget.State("b", 2, 1), "b", "--status");
+        assertThat(base.autofix()).isEqualTo(2);
+        assertThat(base.total()).isEqualTo(1);
+
+        // --status: 그대로
+        DriverBudget.State afterStatus = DriverBudget.applied(base, "b", "--status");
+        assertThat(afterStatus).isEqualTo(base);
+
+        // 지원하지 않는 명령어: 그대로(default -> s)
+        DriverBudget.State afterUnknown = DriverBudget.applied(base, "b", "--bogus");
+        assertThat(afterUnknown).isEqualTo(base);
+    }
+
+    @Test
     @DisplayName("--reset은 카운트를 0으로")
     void resetZeroesCounts() {
         DriverBudget.State s = DriverBudget.applied(fresh("b"), "b", "--inc-autofix");
