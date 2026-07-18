@@ -2,6 +2,7 @@ package com.wanted.backend.domain.identity.presentation.api;
 
 import com.wanted.backend.domain.identity.application.command.SignupCommand;
 import com.wanted.backend.domain.identity.application.usecase.AuthCommandUseCase;
+import com.wanted.backend.domain.identity.application.usecase.PreSignupImageUploadUseCase;
 import com.wanted.backend.domain.identity.application.usecase.SignupCommandUseCase;
 import com.wanted.backend.domain.identity.domain.model.AuthToken;
 import com.wanted.backend.domain.identity.presentation.api.request.LoginRequest;
@@ -11,6 +12,7 @@ import com.wanted.backend.domain.identity.presentation.api.request.SignupRequest
 import com.wanted.backend.domain.identity.presentation.api.response.DuplicateCheckResponse;
 import com.wanted.backend.domain.identity.presentation.api.response.EmptyResponse;
 import com.wanted.backend.domain.identity.presentation.api.response.LoginResponse;
+import com.wanted.backend.domain.identity.presentation.api.response.PreSignupProfileImageResponse;
 import com.wanted.backend.domain.identity.presentation.api.response.RefreshTokenResponse;
 import com.wanted.backend.domain.identity.presentation.api.response.SignupResponse;
 import com.wanted.backend.global.common.ApiResponse;
@@ -20,13 +22,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Identity", description = "인증 및 회원가입 API")
 @RestController
@@ -36,6 +41,7 @@ public class IdentityController {
 
     private final AuthCommandUseCase authCommandUseCase;
     private final SignupCommandUseCase signupCommandUseCase;
+    private final PreSignupImageUploadUseCase preSignupImageUploadUseCase;
 
     @Operation(
             summary = "로그인",
@@ -146,6 +152,28 @@ public class IdentityController {
         return ApiResponse.created(
                 "회원가입이 완료되었습니다",
                 new SignupResponse(memberId)
+        );
+    }
+
+    @Operation(
+            summary = "가입 전 프로필 이미지 업로드",
+            description = "로그인 없이 프로필 이미지를 업로드하고, 가입 API의 profileImageUrl에 그대로 넣을 저장 key와 "
+                    + "미리보기용 URL을 반환합니다. 프론트는 응답의 key(URL 아님)를 signup 요청의 profileImageUrl로 전달합니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "업로드 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "파일이 없거나 형식·크기 오류")
+    })
+    @PostMapping(value = "/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<PreSignupProfileImageResponse>> uploadSignupProfileImage(
+            @RequestPart("profileImage") MultipartFile profileImage
+    ) {
+        PreSignupImageUploadUseCase.UploadedImageView uploaded =
+                preSignupImageUploadUseCase.upload(profileImage);
+
+        return ApiResponse.success(
+                "프로필 이미지가 업로드되었습니다",
+                new PreSignupProfileImageResponse(uploaded.key(), uploaded.previewUrl())
         );
     }
 
