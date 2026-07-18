@@ -65,6 +65,18 @@ class KnowledgeLoopWiringTest {
     }
 
     @Test
+    @DisplayName("CONFIRMED는 프롬프트에 안 들어간다 (Judge의 실수가 아니라 정확도 집계용)")
+    void confirmedIsNotInjectedIntoPrompt() {
+        AtomicReference<String> policy = new AtomicReference<>();
+        loopWith(List.of(new Lesson("t", "CONV_001", LessonKind.CONFIRMED, "실제 중복이라 확정")), policy)
+                .review("Svc.java", "the code");
+
+        // CONFIRMED만 있으면 "같은 실수를 반복하지 마라" 섹션 자체가 없어야 한다
+        assertThat(policy.get()).doesNotContain("과거 사람 검토에서 나온 교훈");
+        assertThat(policy.get()).doesNotContain("실제 중복이라 확정");
+    }
+
+    @Test
     @DisplayName("교훈이 없으면 프롬프트에 교훈 섹션이 없다 (첫 라운드 회귀 방지)")
     void noLessonsMeansNoLessonSection() {
         AtomicReference<String> policy = new AtomicReference<>();

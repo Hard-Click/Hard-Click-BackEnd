@@ -33,10 +33,16 @@ public class JudgePromptBuilder {
         }
 
         if (lessons != null && !lessons.isEmpty()) {
-            sb.append("\n과거 사람 검토에서 나온 교훈(같은 실수를 반복하지 마라):\n");
+            StringBuilder mistakes = new StringBuilder();
             for (Lesson lesson : lessons) {
-                sb.append("- [").append(lesson.kind()).append("] ")
-                  .append(lesson.ruleId()).append(": ").append(lesson.humanNote()).append('\n');
+                if (lesson.kind() == LessonKind.CONFIRMED) {
+                    continue;   // CONFIRMED는 Judge의 실수가 아님 — 정확도 집계용이라 프롬프트에서 제외
+                }
+                mistakes.append("- [").append(lesson.kind()).append("] ")
+                        .append(lesson.ruleId()).append(": ").append(lesson.humanNote()).append('\n');
+            }
+            if (mistakes.length() > 0) {
+                sb.append("\n과거 사람 검토에서 나온 교훈(같은 실수를 반복하지 마라):\n").append(mistakes);
             }
         }
 
