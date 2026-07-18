@@ -1,6 +1,7 @@
 package com.wanted.backend.reviewloop.judge;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -71,7 +72,7 @@ public final class ReviewLessonRecorder {
     private static String resolveNote(String[] args) throws IOException {
         String noteFile = CliArgs.value(args, "--note-file", null);
         if (noteFile != null && !noteFile.isBlank()) {
-            return Files.readString(Path.of(noteFile.strip()));
+            return Files.readString(Path.of(noteFile.strip()), StandardCharsets.UTF_8);
         }
         return CliArgs.value(args, "--note", null);
     }

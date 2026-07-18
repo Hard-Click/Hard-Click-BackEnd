@@ -56,7 +56,7 @@ public final class RuleAccuracy {
             return "규칙 정확도: 축적된 판정 없음 — 아직 신호 없음.\n";
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("규칙 정확도 (사람 판정 기반 · 오탐률 높은 순)\n");
+        sb.append("규칙 정확도 (사람 판정 기반 · 오탐 많은 순)\n");
         sb.append(String.format("%-14s %6s %9s %7s %9s%n", "RULE", "오탐", "CONFIRMED", "MISSED", "오탐률"));
         for (Stat s : stats) {
             String rate = s.falsePositiveRate() < 0

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -32,7 +33,7 @@ class ReviewLessonRecorderTest {
     @DisplayName("--note-file은 UTF-8로 읽어 특수문자(—)를 보존한다 (argv 인코딩 우회)")
     void noteFilePreservesSpecialChars() throws IOException {
         Path noteFile = dir.resolve("note.txt");
-        Files.writeString(noteFile, "toPosixPath — 단일 사용 헬퍼");
+        Files.writeString(noteFile, "toPosixPath — 단일 사용 헬퍼", StandardCharsets.UTF_8);
 
         Lesson lesson = ReviewLessonRecorder.parse(new String[]{
                 "--rule", "CONV_001", "--kind", "FALSE_POSITIVE", "--note-file", noteFile.toString()});

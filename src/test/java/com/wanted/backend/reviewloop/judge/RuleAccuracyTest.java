@@ -56,6 +56,26 @@ class RuleAccuracyTest {
     }
 
     @Test
+    @DisplayName("경계값: 전부 오탐이면 오탐률 100%")
+    void rateIsOneWhenAllFalsePositive() {
+        List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
+                lesson("CONV_001", LessonKind.FALSE_POSITIVE),
+                lesson("CONV_001", LessonKind.FALSE_POSITIVE)));
+
+        assertThat(stat(stats, "CONV_001").falsePositiveRate()).isCloseTo(1.0, within(1e-9));
+    }
+
+    @Test
+    @DisplayName("경계값: 전부 확정이면 오탐률 0%")
+    void rateIsZeroWhenAllConfirmed() {
+        List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
+                lesson("PERF_001", LessonKind.CONFIRMED),
+                lesson("PERF_001", LessonKind.CONFIRMED)));
+
+        assertThat(stat(stats, "PERF_001").falsePositiveRate()).isCloseTo(0.0, within(1e-9));
+    }
+
+    @Test
     @DisplayName("판정(오탐/확정)이 없으면 오탐률은 정의되지 않는다(-1)")
     void rateUndefinedWhenNoDecisions() {
         List<RuleAccuracy.Stat> stats = RuleAccuracy.summarize(List.of(
