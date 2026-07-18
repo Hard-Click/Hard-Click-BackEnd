@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.infrastructure.persistence;
 
 import com.wanted.backend.domain.study.domain.model.Study;
+import com.wanted.backend.domain.study.domain.model.StudyStatus;
 import com.wanted.backend.domain.study.domain.repository.StudyRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,18 +40,21 @@ public class StudyRepositoryAdapter implements StudyRepository {
         return repository.findByIdForUpdate(id).map(this::toDomain);
     }
 
+    // 모집 목록/카운트는 해산(DISSOLVED)된 스터디를 제외한다(#586).
     @Override
     public List<Study> findAll(String subject, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
         List<StudyJpaEntity> entities = subject != null
-                ? repository.findBySubject(subject, pageable)
-                : repository.findAll(pageable).getContent();
+                ? repository.findBySubjectAndStatusNot(subject, StudyStatus.DISSOLVED, pageable)
+                : repository.findByStatusNot(StudyStatus.DISSOLVED, pageable);
         return entities.stream().map(this::toDomain).toList();
     }
 
     @Override
     public int countAll(String subject) {
-        return subject != null ? repository.countBySubject(subject) : (int) repository.count();
+        return subject != null
+                ? repository.countBySubjectAndStatusNot(subject, StudyStatus.DISSOLVED)
+                : repository.countByStatusNot(StudyStatus.DISSOLVED);
     }
 
     private Study toDomain(StudyJpaEntity entity) {

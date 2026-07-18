@@ -165,6 +165,26 @@ class StudyQueryServiceTest {
     }
 
     @Test
+    @DisplayName("정원 마감(FULL) 스터디는 목록에서 isClosed=true로 표시된다")
+    void getList_success_fullStudyMarkedClosed() {
+        // given
+        Study full = Study.restore(101L, 1L, "정원 마감 스터디", "MATH_1", "내용",
+                3, 3, StudyStatus.FULL, LocalDateTime.now(), LocalDateTime.now());
+
+        given(studyRepository.findAll(null, 0, 10)).willReturn(List.of(full));
+        given(studyRepository.countAll(null)).willReturn(1);
+        given(memberNamePort.getNamesByMemberIds(anyCollection())).willReturn(Map.of(1L, "이지연"));
+        lenient().when(studyParticipantRepository.findStudyIdsByMemberIdAndStudyIdIn(eq(999L), anyCollection()))
+                .thenReturn(List.of());
+
+        // when
+        StudyListResult result = studyQueryService.getList(null, 0, 10, 999L);
+
+        // then
+        assertThat(result.items().get(0).isClosed()).isTrue();
+    }
+
+    @Test
     @DisplayName("내가 만든 스터디는 isMine과 isJoined가 모두 true다")
     void getList_success_mineStudy() {
         // given: 1L이 방장인 스터디 — 생성 시 방장이 첫 참여자로 등록되므로 참여자 조회에도 포함된다

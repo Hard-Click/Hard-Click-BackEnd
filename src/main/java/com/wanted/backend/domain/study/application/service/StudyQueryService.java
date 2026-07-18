@@ -93,7 +93,7 @@ public class StudyQueryService implements StudyQueryUseCase {
         return new StudyDetailResult(
                 study.getId(), study.getTitle(), study.getContent(), study.getSubject(), authorName,
                 study.getCurrentCount(), study.getMaxCount(), isMine, isJoined,
-                study.getStatus() == StudyStatus.CLOSED, members, chatRoomId, study.getCreatedAt());
+                study.getStatus() != StudyStatus.ACTIVE, members, chatRoomId, study.getCreatedAt());
     }
 
     private Map<Long, String> resolveNameMap(Collection<Long> memberIds) {
@@ -110,7 +110,7 @@ public class StudyQueryService implements StudyQueryUseCase {
         return new StudyItemResult(
                 study.getId(), study.getTitle(), study.getContent(), name, study.getSubject(),
                 study.getCurrentCount(), study.getMaxCount(),
-                study.getStatus() == StudyStatus.CLOSED,
+                study.getStatus() != StudyStatus.ACTIVE,
                 study.isOwner(memberId), joinedStudyIds.contains(study.getId()),
                 study.getCreatedAt());
     }

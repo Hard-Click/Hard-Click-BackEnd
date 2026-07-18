@@ -123,7 +123,7 @@ class StudyJoinConcurrencyTest {
 
         Study finalStudy = studyRepository.findById(studyId).orElseThrow();
         assertThat(finalStudy.getCurrentCount()).isEqualTo(THREAD_COUNT);
-        assertThat(finalStudy.getStatus()).isEqualTo(StudyStatus.CLOSED);
+        assertThat(finalStudy.getStatus()).isEqualTo(StudyStatus.FULL);
 
         Integer participantCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM study_participant WHERE study_id = ?", Integer.class, studyId);

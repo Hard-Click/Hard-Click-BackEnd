@@ -7,6 +7,7 @@ import com.wanted.backend.domain.study.application.command.KickStudyMemberComman
 import com.wanted.backend.domain.study.application.command.LeaveStudyCommand;
 import com.wanted.backend.domain.study.application.command.UpdateStudyCommand;
 import com.wanted.backend.domain.study.application.event.StudyClosedEvent;
+import com.wanted.backend.domain.study.domain.model.StudyStatus;
 import com.wanted.backend.domain.study.application.event.StudyJoinedEvent;
 import com.wanted.backend.domain.study.application.event.StudyKickedEvent;
 import com.wanted.backend.domain.study.application.event.StudyLeftEvent;
@@ -137,6 +138,14 @@ public class StudyCommandService implements StudyCommandUseCase {
         Long chatRoomId = chatRoomQueryPort.findChatRoomIdByStudyId(command.groupId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         chatRoomCommandPort.removeParticipant(chatRoomId, command.memberId());
+
+        // 방장이 혼자 남은 방에서 퇴장하면 사실상 해산 — delete(방폭)와 동일하게 채팅방을 닫고
+        // 해산 이벤트를 발행한다. 아무도 없는 닫힌 방에 퇴장 브로드캐스트는 보내지 않는다(#586).
+        if (saved.getStatus() == StudyStatus.DISSOLVED) {
+            chatRoomCommandPort.closeRoom(chatRoomId);
+            eventPublisher.publishEvent(new StudyClosedEvent(chatRoomId, saved.getId()));
+            return;
+        }
 
         eventPublisher.publishEvent(new StudyLeftEvent(chatRoomId, saved.getId(), command.memberId(), saved.getCurrentCount()));
     }

@@ -260,7 +260,7 @@ class StudyCommandServiceTest {
         ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
         verify(studyRepository).save(captor.capture());
         assertThat(captor.getValue().getCurrentCount()).isEqualTo(5);
-        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.FULL);
     }
 
     @Test
@@ -352,12 +352,12 @@ class StudyCommandServiceTest {
 
     private Study closedFullStudy() {
         return Study.restore(45L, 1L, "수학 1등급 목표 스터디", "MATH_1",
-                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 5, StudyStatus.CLOSED,
+                "매주 일요일 밤 10시에 모여서 질문 받습니다.", 5, 5, StudyStatus.FULL,
                 LocalDateTime.now(), LocalDateTime.now());
     }
 
     @Test
-    @DisplayName("혼자 남은 방장이 삭제(해산)하면 스터디와 채팅방이 모두 CLOSED되고 이벤트가 발행된다")
+    @DisplayName("혼자 남은 방장이 삭제(해산)하면 스터디는 DISSOLVED, 채팅방은 CLOSED되고 이벤트가 발행된다")
     void delete_success() {
         // given
         given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
@@ -370,7 +370,7 @@ class StudyCommandServiceTest {
         // then
         ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
         verify(studyRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.DISSOLVED);
 
         verify(chatRoomCommandPort).closeRoom(12L);
 
@@ -489,7 +489,7 @@ class StudyCommandServiceTest {
     }
 
     @Test
-    @DisplayName("혼자 남은 방장은 퇴장할 수 있다")
+    @DisplayName("혼자 남은 방장이 퇴장하면 해산 처리되고, 채팅방도 닫히며 해산 이벤트가 발행된다")
     void leave_success_soloHostLeaves() {
         // given
         given(studyRepository.findByIdForUpdate(45L)).willReturn(Optional.of(soloHostStudy()));
@@ -504,7 +504,17 @@ class StudyCommandServiceTest {
         ArgumentCaptor<Study> captor = ArgumentCaptor.forClass(Study.class);
         verify(studyRepository).save(captor.capture());
         assertThat(captor.getValue().getCurrentCount()).isEqualTo(0);
-        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.CLOSED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(StudyStatus.DISSOLVED);
+
+        // 사실상 해산이므로 delete(방폭)와 동일하게 채팅방을 닫고 해산 이벤트를 발행한다
+        verify(chatRoomCommandPort).closeRoom(12L);
+        ArgumentCaptor<StudyClosedEvent> closedCaptor = ArgumentCaptor.forClass(StudyClosedEvent.class);
+        verify(eventPublisher).publishEvent(closedCaptor.capture());
+        assertThat(closedCaptor.getValue().chatRoomId()).isEqualTo(12L);
+        assertThat(closedCaptor.getValue().studyId()).isEqualTo(45L);
+
+        // 아무도 없는 닫힌 방에 퇴장 브로드캐스트를 보낼 필요는 없다
+        verify(eventPublisher, never()).publishEvent(any(StudyLeftEvent.class));
     }
 
     @Test
