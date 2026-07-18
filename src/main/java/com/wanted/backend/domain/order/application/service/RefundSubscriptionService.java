@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.order.application.service;
 
+import com.wanted.backend.domain.order.application.port.OrderSubscriptionPlanPort;
 import com.wanted.backend.domain.order.application.usecase.RefundSubscriptionUseCase;
 import com.wanted.backend.domain.order.domain.model.Order;
 import com.wanted.backend.domain.order.domain.model.OrderStatus;
@@ -34,6 +35,7 @@ public class RefundSubscriptionService implements RefundSubscriptionUseCase {
     private final OrderRepository orderRepository;
     private final PgClient pgClient;
     private final CancelSubscriptionUseCase cancelSubscriptionUseCase;
+    private final OrderSubscriptionPlanPort subscriptionPlanPort;
     private final StringRedisTemplate redisTemplate;
 
     @Override
@@ -61,8 +63,12 @@ public class RefundSubscriptionService implements RefundSubscriptionUseCase {
                 throw new BusinessException(ErrorCode.ORDER_NOT_REFUNDABLE);
             }
 
+            // 환불 신청일 기준 일할 계산: 남은 D-day(수능까지) × 일일 단가 = 미사용분.
+            // 결제 원금을 넘지 않도록 상한을 둔다(가격 정책 변동 대비).
+            int refundAmount = Math.min(subscriptionPlanPort.getAnnualPass().price(), order.getFinalAmount());
+
             try {
-                pgClient.cancel(order.getPaymentKey(), order.getFinalAmount(), CANCEL_REASON);
+                pgClient.cancel(order.getPaymentKey(), refundAmount, CANCEL_REASON);
             } catch (RuntimeException e) {
                 throw new BusinessException(ErrorCode.PG_TIMEOUT, e);
             }
