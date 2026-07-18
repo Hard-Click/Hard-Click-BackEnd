@@ -136,6 +136,17 @@ tasks.register('reviewAccuracy', JavaExec) {
     jvmArgs reviewLoopUtf8Args
 }
 
+// AI 코드 리뷰 루프 · 드라이버 예산 카운터 — 무한 루프 방지(AutoFix ≤3·Total ≤6, .git/reviewloop-budget)
+//   ./gradlew reviewBudget --args="--inc-autofix|--inc-total|--reset"   (기본: 현황)
+tasks.register('reviewBudget', JavaExec) {
+    group = 'review-loop'
+    description = '드라이버 루프 예산 증가·검사 (--args="--inc-autofix | --inc-total | --reset") · 초과 시 exit 1'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wanted.backend.reviewloop.judge.DriverBudget'
+    jvmArgs reviewLoopUtf8Args
+    ignoreExitValue = true   // 예산 초과(exit 1)는 정상 신호 — gradle이 BUILD FAILED로 만들지 않게
+}
+
 // AI 코드 리뷰 루프 · pre-push 훅 활성화 (클론 후 1회) — core.hooksPath를 .githooks로 지정
 tasks.register('installReviewHooks', Exec) {
     group = 'review-loop'
