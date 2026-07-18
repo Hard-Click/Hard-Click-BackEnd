@@ -86,7 +86,7 @@ class ChatMessageRepositoryAdapterTest {
     }
 
     @Test
-    @DisplayName("한 번도 안 읽었으면 방의 전체 메시지 수가 unreadCount다")
+    @DisplayName("한 번도 안 읽었으면 남이 보낸 전체 메시지 수가 unreadCount다")
     void countUnread_neverRead_countsAll() {
         participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
         saveFiveMessages();
@@ -96,6 +96,49 @@ class ChatMessageRepositoryAdapterTest {
         long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
 
         assertThat(unread).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("내가 보낸 메시지는 unreadCount에 잡히지 않는다")
+    void countUnread_ownMessages_notCounted() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        adapter.save(ChatMessage.create(100L, 1L, "내가 보낸 것1"));
+        adapter.save(ChatMessage.create(100L, 1L, "내가 보낸 것2"));
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isZero();
+    }
+
+    @Test
+    @DisplayName("내 메시지와 남의 메시지가 섞여 있으면 남이 보낸 것만 카운팅된다")
+    void countUnread_mixedSenders_countsOnlyOthers() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        adapter.save(ChatMessage.create(100L, 2L, "남이 보낸 것"));
+        adapter.save(ChatMessage.create(100L, 1L, "내가 보낸 것"));
+        adapter.save(ChatMessage.create(100L, 2L, "남이 보낸 것2"));
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("시스템 메시지(sender 없음)는 unreadCount에 잡히지 않는다")
+    void countUnread_systemMessages_notCounted() {
+        participantAdapter.save(ChatRoomParticipant.create(100L, 1L));
+        adapter.save(ChatMessage.createSystemJoin(100L, "김*수님이 입장했습니다"));
+        adapter.save(ChatMessage.create(100L, 2L, "남이 보낸 것"));
+        em.flush();
+        em.clear();
+
+        long unread = adapter.countUnreadByChatRoomIdAndMemberId(100L, 1L);
+
+        assertThat(unread).isEqualTo(1);
     }
 
     @Test
@@ -144,13 +187,14 @@ class ChatMessageRepositoryAdapterTest {
         assertThat(unread).isEqualTo(1);
     }
 
+    // unreadCount 테스트의 조회자는 1L — 카운팅 대상이 되도록 다른 참여자(2L)가 보낸 메시지로 채운다.
     private List<ChatMessage> saveFiveMessages() {
         return List.of(
-                adapter.save(ChatMessage.create(100L, 1L, "msg1")),
-                adapter.save(ChatMessage.create(100L, 1L, "msg2")),
-                adapter.save(ChatMessage.create(100L, 1L, "msg3")),
-                adapter.save(ChatMessage.create(100L, 1L, "msg4")),
-                adapter.save(ChatMessage.create(100L, 1L, "msg5"))
+                adapter.save(ChatMessage.create(100L, 2L, "msg1")),
+                adapter.save(ChatMessage.create(100L, 2L, "msg2")),
+                adapter.save(ChatMessage.create(100L, 2L, "msg3")),
+                adapter.save(ChatMessage.create(100L, 2L, "msg4")),
+                adapter.save(ChatMessage.create(100L, 2L, "msg5"))
         );
     }
 }
