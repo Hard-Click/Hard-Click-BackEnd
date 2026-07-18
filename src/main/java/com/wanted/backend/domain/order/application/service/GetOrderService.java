@@ -79,6 +79,12 @@ public class GetOrderService implements GetOrderUseCase {
                 : orderCourseProgressPort.findProgressPercents(memberId, courseIds);
         LocalDateTime now = LocalDateTime.now(clock);
 
+        // 구독 예상 환불액 = 실제 환불식(RefundSubscriptionService)과 동일해야 함.
+        // 신청일 기준 남은 일수 × 일일 단가(=현재가)와 결제액 중 작은 값.
+        int subscriptionRefundAmount = order.getType() == OrderType.SUBSCRIPTION
+                ? Math.min(orderSubscriptionPlanPort.getAnnualPass().price(), order.getFinalAmount())
+                : 0;
+
         List<OrderDetailResult.Item> items = rawItems.stream()
                 .map(item -> {
 
@@ -92,8 +98,15 @@ public class GetOrderService implements GetOrderUseCase {
                                 && OrderRefundPolicy.isCourseItemRefundable(order.getPaidAt(), now, progressPercent);
                     }
 
-                    int refundAmount =
-                            item.isRefunded() ? 0 : item.getPrice();
+                    int refundAmount;
+                    if (item.isRefunded()) {
+                        refundAmount = 0;
+                    } else if (order.getType() == OrderType.SUBSCRIPTION && item.getCourseId() == null) {
+                        // 구독 항목: 전액(price)이 아니라 실제 환불되는 비례액을 노출
+                        refundAmount = subscriptionRefundAmount;
+                    } else {
+                        refundAmount = item.getPrice();
+                    }
 
                     String enrollStatus =
                             item.getCourseId() == null
