@@ -19,6 +19,7 @@ import java.util.Optional;
 public class QuizRepositoryAdapter implements QuizRepository {
 
     private final QuizJpaRepository quizJpaRepository;
+    private final QuizQuestionJpaRepository quizQuestionJpaRepository;
 
     @Override
     @Transactional
@@ -73,6 +74,16 @@ public class QuizRepositoryAdapter implements QuizRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<QuizQuestion> findQuestionsByIds(List<Long> questionIds) {
+        if (questionIds.isEmpty()) {
+            return List.of();
+        }
+        return quizQuestionJpaRepository.findByIdIn(questionIds).stream()
+                .map(QuizRepositoryAdapter::toQuestionDomain).toList();
+    }
+
+    @Override
     @Transactional
     public Quiz update(Quiz quiz) {
         QuizJpaEntity entity = quizJpaRepository.findWithQuestionsByIdAndDeletedAtIsNull(quiz.getId())
@@ -120,15 +131,19 @@ public class QuizRepositoryAdapter implements QuizRepository {
 
     private Quiz toDomain(QuizJpaEntity entity) {
         var questions = entity.getQuestions().stream()
-                .map(q -> QuizQuestion.restore(
-                        q.getId(), q.getQuestionNumber(), q.getQuestionText(), q.getExplanation(),
-                        q.getDifficulty(),
-                        q.getOptions().stream()
-                                .map(o -> QuizOption.restore(o.getId(), o.getOptionNumber(), o.getOptionText(), o.isCorrect()))
-                                .toList()))
+                .map(QuizRepositoryAdapter::toQuestionDomain)
                 .toList();
 
         return Quiz.restore(entity.getId(), entity.getInstructorId(), entity.getCourseId(),
                 entity.getSectionId(), entity.getTitle(), questions, entity.getCreatedAt());
+    }
+
+    private static QuizQuestion toQuestionDomain(QuizQuestionJpaEntity q) {
+        return QuizQuestion.restore(
+                q.getId(), q.getQuestionNumber(), q.getQuestionText(), q.getExplanation(),
+                q.getDifficulty(),
+                q.getOptions().stream()
+                        .map(o -> QuizOption.restore(o.getId(), o.getOptionNumber(), o.getOptionText(), o.isCorrect()))
+                        .toList());
     }
 }

@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.domain.repository;
 
 import com.wanted.backend.domain.quiz.domain.model.Quiz;
+import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,9 @@ public interface QuizRepository {
     List<Quiz> findAllByInstructor(Long instructorId, Long courseId, Long sectionId);
 
     List<Quiz> findAllByCourseId(Long courseId);
+
+    // 문항 id 목록으로 직접 조회 — 유사퀴즈 채점(②)에서 저장된 문항만 로딩한다(코스 전체 로딩 회피).
+    List<QuizQuestion> findQuestionsByIds(List<Long> questionIds);
 
     // 활성(soft-delete 안 된) 퀴즈만 조회 — 응시/수정/상세 경로에서 사용.
     Optional<Quiz> findById(Long id);
