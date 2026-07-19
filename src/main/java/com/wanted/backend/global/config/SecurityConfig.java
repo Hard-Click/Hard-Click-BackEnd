@@ -81,6 +81,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/prometheus").access(
                                 new WebExpressionAuthorizationManager(
                                         "hasIpAddress('127.0.0.1') or hasIpAddress('::1') or hasIpAddress('172.16.0.0/12')"))
+                        // 가입 전(무인증) 프로필 이미지 업로드 — POST만 공개해 표면을 최소화
+                        .requestMatchers(HttpMethod.POST, "/api/auth/profile-image").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/*","/api/courses/*/reviews").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/courses").hasRole("INSTRUCTOR")

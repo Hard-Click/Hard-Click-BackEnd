@@ -82,7 +82,7 @@ public class Study {
         }
         currentCount++;
         if (isFull()) {
-            status = StudyStatus.CLOSED;
+            status = StudyStatus.FULL;
         }
         updatedAt = LocalDateTime.now();
     }
@@ -97,7 +97,7 @@ public class Study {
     }
 
     public void close() {
-        status = StudyStatus.CLOSED;
+        status = StudyStatus.DISSOLVED;
         updatedAt = LocalDateTime.now();
     }
 
@@ -108,11 +108,13 @@ public class Study {
         decreaseCount();
     }
 
+    // DISSOLVED는 최종 상태 — 해산된 스터디에서 퇴장/강퇴가 일어나도 절대 재오픈하지 않는다.
+    // 재오픈(→ACTIVE)은 "정원이 찼다가 자리가 난" FULL에서만 허용.
     private void decreaseCount() {
         currentCount--;
         if (currentCount <= 0) {
-            status = StudyStatus.CLOSED;
-        } else if (status == StudyStatus.CLOSED) {
+            status = StudyStatus.DISSOLVED;
+        } else if (status == StudyStatus.FULL) {
             status = StudyStatus.ACTIVE;
         }
         updatedAt = LocalDateTime.now();

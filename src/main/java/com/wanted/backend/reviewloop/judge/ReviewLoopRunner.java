@@ -27,13 +27,13 @@ import java.util.stream.Stream;
 public final class ReviewLoopRunner {
 
     public static void main(String[] args) throws Exception {
-        String filesFrom = argVal(args, "--files-from", null);
-        String path = argVal(args, "--path", null);
-        String domain = argVal(args, "--domain", null);
-        String rulesPath = argVal(args, "--rules", "review-loop/rules.yaml");
-        int max = Integer.parseInt(argVal(args, "--max", "5"));
-        boolean gate = hasFlag(args, "--gate");
-        String findingsOut = argVal(args, "--findings-out", null);   // Minor findings를 파일로(자동수정기 입력)
+        String filesFrom = CliArgs.value(args, "--files-from", null);
+        String path = CliArgs.value(args, "--path", null);
+        String domain = CliArgs.value(args, "--domain", null);
+        String rulesPath = CliArgs.value(args, "--rules", "review-loop/rules.yaml");
+        int max = Integer.parseInt(CliArgs.value(args, "--max", "5"));
+        boolean gate = CliArgs.flag(args, "--gate");
+        String findingsOut = CliArgs.value(args, "--findings-out", null);   // Minor findings를 파일로(자동수정기 입력)
 
         List<Path> targets = resolveTargets(filesFrom, path, max);
         if (targets == null) {
@@ -62,15 +62,22 @@ public final class ReviewLoopRunner {
                 Map.of(Severity.MINOR, 10, Severity.CRITICAL, 40),
                 JudgeScorer.DEFAULT_PASS_THRESHOLD);
 
-        Files.createDirectories(Path.of("review-loop/logs"));
-        AuditLogWriter audit = new AuditLogWriter(Path.of("review-loop/logs/error_log.jsonl"));
+        Files.createDirectories(ReviewLoopPaths.AUDIT_LOG.getParent());
+        AuditLogWriter audit = new AuditLogWriter(ReviewLoopPaths.AUDIT_LOG);
+
+        // Learning Loop 읽기 끝 — 축적된 사람 교훈을 판정 프롬프트에 반영(없으면 빈 리스트).
+        List<Lesson> lessons = new KnowledgeStore(ReviewLoopPaths.LESSONS).lessons();
 
         StringBuilder out = new StringBuilder();
         out.append("== 리뷰 루프 실행 ==\n");
         out.append("대상  : ").append(targets.size()).append("개 파일")
            .append(gate ? " · 게이트 모드(차단 결정 시 exit 1)" : "").append('\n');
         out.append("도메인: ").append(domain == null ? "(전체 규칙)" : domain).append('\n');
-        out.append("규칙  : judge 규칙 ").append(catalog.judgeRules().size()).append("개\n\n");
+        out.append("규칙  : judge 규칙 ").append(catalog.judgeRules().size()).append("개\n");
+        if (!lessons.isEmpty()) {
+            out.append("교훈  : 축적 ").append(lessons.size()).append("건 반영\n");
+        }
+        out.append('\n');
 
         int round = 0;
         boolean blocked = false;
@@ -78,7 +85,7 @@ public final class ReviewLoopRunner {
         for (Path f : targets) {
             String code = Files.readString(f);
             Path parent = f.getParent() == null ? Path.of(".") : f.getParent();
-            ReviewLoop loop = new ReviewLoop(judge, catalog, new EvidenceValidator(parent), scorer);
+            ReviewLoop loop = new ReviewLoop(judge, catalog, new EvidenceValidator(parent), scorer, lessons);
             JudgeVerdict v = loop.review(f.getFileName().toString(), code);
 
             if (isBlocking(v.decision())) {
@@ -98,7 +105,7 @@ public final class ReviewLoopRunner {
             audit.append(new AuditRecord(LocalDateTime.now().toString(), ++round, "gemini",
                     v.score(), v.hasCritical(), v.decision(), v.findings().size(), false));
         }
-        out.append("\n감사 로그: review-loop/logs/error_log.jsonl (누적)\n");
+        out.append("\n감사 로그: ").append(ReviewLoopPaths.AUDIT_LOG).append(" (누적)\n");
 
         if (findingsOut != null) {   // 자동수정기(Claude Code) 입력 — Minor findings만
             writeFindings(findingsOut, minorFindings);
@@ -184,23 +191,6 @@ public final class ReviewLoopRunner {
         };
     }
 
-    private static boolean hasFlag(String[] args, String key) {
-        for (String a : args) {
-            if (a.equals(key)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String argVal(String[] args, String key, String def) {
-        for (int i = 0; i < args.length - 1; i++) {
-            if (args[i].equals(key)) {
-                return args[i + 1];
-            }
-        }
-        return def;
-    }
 
     private ReviewLoopRunner() {
     }

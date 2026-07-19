@@ -46,11 +46,15 @@ public class GetOrderService implements GetOrderUseCase {
             throw new BusinessException(ErrorCode.ORDER_ACCESS_DENIED);
         }
 
-        // SUBSCRIPTION 주문은 order_items에 행이 없으므로 플랜 정보로 합성
+        // SUBSCRIPTION 주문은 order_items에 행이 없으므로 플랜 정보로 합성.
+        // 플랜 조회는 구독 1건당 한 번만 하고 아래 환불액 계산에서 재사용한다.
         List<OrderItem> rawItems = order.getItems();
-        if (order.getType() == OrderType.SUBSCRIPTION && rawItems.isEmpty()) {
-            OrderSubscriptionPlanPort.PlanInfo plan = orderSubscriptionPlanPort.getAnnualPass();
-            rawItems = List.of(OrderItem.create(null, plan.name(), order.getTotalAmount()));
+        OrderSubscriptionPlanPort.PlanInfo annualPassPlan = null;
+        if (order.getType() == OrderType.SUBSCRIPTION) {
+            annualPassPlan = orderSubscriptionPlanPort.getAnnualPass();
+            if (rawItems.isEmpty()) {
+                rawItems = List.of(OrderItem.create(null, annualPassPlan.name(), order.getTotalAmount()));
+            }
         }
 
         List<Long> courseIds = rawItems.stream()
@@ -79,6 +83,12 @@ public class GetOrderService implements GetOrderUseCase {
                 : orderCourseProgressPort.findProgressPercents(memberId, courseIds);
         LocalDateTime now = LocalDateTime.now(clock);
 
+        // 구독 예상 환불액 = 실제 환불식(RefundSubscriptionService)과 동일해야 함.
+        // 신청일 기준 남은 일수 × 일일 단가(=현재가)와 결제액 중 작은 값.
+        int subscriptionRefundAmount = annualPassPlan != null
+                ? Math.min(annualPassPlan.price(), order.getFinalAmount())
+                : 0;
+
         List<OrderDetailResult.Item> items = rawItems.stream()
                 .map(item -> {
 
@@ -92,8 +102,15 @@ public class GetOrderService implements GetOrderUseCase {
                                 && OrderRefundPolicy.isCourseItemRefundable(order.getPaidAt(), now, progressPercent);
                     }
 
-                    int refundAmount =
-                            item.isRefunded() ? 0 : item.getPrice();
+                    int refundAmount;
+                    if (item.isRefunded()) {
+                        refundAmount = 0;
+                    } else if (order.getType() == OrderType.SUBSCRIPTION && item.getCourseId() == null) {
+                        // 구독 항목: 전액(price)이 아니라 실제 환불되는 비례액을 노출
+                        refundAmount = subscriptionRefundAmount;
+                    } else {
+                        refundAmount = item.getPrice();
+                    }
 
                     String enrollStatus =
                             item.getCourseId() == null

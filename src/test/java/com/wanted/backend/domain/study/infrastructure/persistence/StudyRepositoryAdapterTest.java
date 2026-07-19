@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study.infrastructure.persistence;
 
 import com.wanted.backend.domain.study.domain.model.Study;
+import com.wanted.backend.domain.study.domain.model.StudyStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,5 +59,59 @@ class StudyRepositoryAdapterTest {
 
         Study reloaded = adapter.findById(saved.getId()).orElseThrow();
         assertThat(reloaded.getTitle()).isEqualTo("수정된 제목");
+    }
+
+    @Test
+    @DisplayName("해산(DISSOLVED)된 스터디는 목록 조회에서 제외되고, 정원 마감(FULL)은 노출된다")
+    void findAll_excludesDissolved_includesFull() {
+        // given
+        saveWithStatus("활성 스터디", StudyStatus.ACTIVE);
+        saveWithStatus("정원 마감 스터디", StudyStatus.FULL);
+        saveWithStatus("해산된 스터디", StudyStatus.DISSOLVED);
+        em.flush();
+        em.clear();
+
+        // when
+        List<Study> studies = adapter.findAll(null, 0, 10);
+
+        // then
+        assertThat(studies).extracting(Study::getTitle)
+                .containsExactlyInAnyOrder("활성 스터디", "정원 마감 스터디");
+    }
+
+    @Test
+    @DisplayName("과목 필터가 있어도 해산된 스터디는 목록에서 제외된다")
+    void findAll_withSubject_excludesDissolved() {
+        // given
+        saveWithStatus("활성 스터디", StudyStatus.ACTIVE);
+        saveWithStatus("해산된 스터디", StudyStatus.DISSOLVED);
+        em.flush();
+        em.clear();
+
+        // when
+        List<Study> studies = adapter.findAll("MATH_1", 0, 10);
+
+        // then
+        assertThat(studies).extracting(Study::getTitle).containsExactly("활성 스터디");
+    }
+
+    @Test
+    @DisplayName("전체 카운트에서도 해산된 스터디는 제외된다")
+    void countAll_excludesDissolved() {
+        // given
+        saveWithStatus("활성 스터디", StudyStatus.ACTIVE);
+        saveWithStatus("정원 마감 스터디", StudyStatus.FULL);
+        saveWithStatus("해산된 스터디", StudyStatus.DISSOLVED);
+        em.flush();
+        em.clear();
+
+        // when & then
+        assertThat(adapter.countAll(null)).isEqualTo(2);
+        assertThat(adapter.countAll("MATH_1")).isEqualTo(2);
+    }
+
+    private void saveWithStatus(String title, StudyStatus status) {
+        adapter.save(Study.restore(null, 1L, title, "MATH_1", "내용",
+                5, 1, status, LocalDateTime.now(), LocalDateTime.now()));
     }
 }

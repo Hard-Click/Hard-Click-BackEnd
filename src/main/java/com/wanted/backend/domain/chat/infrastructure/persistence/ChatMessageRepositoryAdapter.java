@@ -46,18 +46,20 @@ public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
     }
 
     // native @Query JOIN 대신, 참여자의 last_read_message_id 포인터를 먼저 조회한 뒤
-    // 파생 쿼리(countByChatRoomId / countByChatRoomIdAndIdGreaterThan)로 나눠서 센다.
+    // 파생 쿼리로 나눠서 센다. 조회자 본인이 보낸 메시지는 미읽음이 아니므로 제외하고(#583),
+    // 참여자가 아니면 0을 반환한다("참여자 없음"과 "참여자인데 안 읽음"을 구분 — 원래 JOIN 쿼리의 계약).
     // chat_room_participant는 uk_chat_room_participant_room_member 유니크 인덱스로 즉시 찾고,
     // chat_message 쪽은 idx_chat_message_room_id(chat_room_id, chat_message_id) 복합 인덱스를 탄다.
     @Override
     public long countUnreadByChatRoomIdAndMemberId(Long chatRoomId, Long memberId) {
-        Long lastReadMessageId = participantRepository.findByChatRoomIdAndMemberId(chatRoomId, memberId)
-                .map(ChatRoomParticipantJpaEntity::getLastReadMessageId)
-                .orElse(null);
-
-        return lastReadMessageId == null
-                ? repository.countByChatRoomId(chatRoomId)
-                : repository.countByChatRoomIdAndIdGreaterThan(chatRoomId, lastReadMessageId);
+        return participantRepository.findByChatRoomIdAndMemberId(chatRoomId, memberId)
+                .map(participant -> {
+                    Long lastReadMessageId = participant.getLastReadMessageId();
+                    return lastReadMessageId == null
+                            ? repository.countByChatRoomIdAndSenderIdNot(chatRoomId, memberId)
+                            : repository.countByChatRoomIdAndIdGreaterThanAndSenderIdNot(chatRoomId, lastReadMessageId, memberId);
+                })
+                .orElse(0L);
     }
 
     private ChatMessage toDomain(ChatMessageJpaEntity entity) {
