@@ -1,9 +1,11 @@
 package com.wanted.backend.domain.study_schedule.application.service;
 
 import com.wanted.backend.domain.study_schedule.application.dto.ScheduleDtos;
+import com.wanted.backend.domain.study_schedule.application.port.ReviewPlanPort;
 import com.wanted.backend.domain.study_schedule.application.port.SchedulePlanPort;
 import com.wanted.backend.domain.study_schedule.application.port.StudentTodoPort;
 import com.wanted.backend.domain.study_schedule.application.usecase.ScheduleUseCase;
+import com.wanted.backend.domain.study_schedule.domain.model.ScheduleItemSource;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 @Service
@@ -37,17 +42,21 @@ public class ScheduleService implements ScheduleUseCase {
 
     private final SchedulePlanPort schedulePlanPort;
     private final StudentTodoPort studentTodoPort;
+    private final ReviewPlanPort reviewPlanPort;
 
     /**
-     * AI 슬롯 + 학생 할 일을 합쳐 화면 순서로 정렬한다.
+     * AI 슬롯 + 학생 할 일 + 복습 항목을 합쳐 화면 순서로 정렬한다.
      *
-     * <p>합치는 걸 서버가 하는 이유: 진행률(done/total)이 두 소스를 모두 세야 하고,
-     * 프론트가 두 번 호출해 직접 병합·정렬하면 정렬 규칙이 화면마다 갈린다.
+     * <p>합치는 걸 서버가 하는 이유: 진행률(done/total)이 소스를 모두 세야 하고,
+     * 프론트가 여러 번 호출해 직접 병합·정렬하면 정렬 규칙이 화면마다 갈린다.
      */
-    private List<ScheduleDtos.CalendarItem> mergedItems(Long memberId, LocalDate from, LocalDate to) {
-        return Stream.concat(
+    private List<ScheduleDtos.CalendarItem> mergedItems(
+            Long memberId, LocalDate from, LocalDate to, List<ScheduleDtos.CalendarItem> reviews) {
+        return Stream.of(
                         schedulePlanPort.findSlots(memberId, from, to).stream(),
-                        studentTodoPort.findTodos(memberId, from, to).stream())
+                        studentTodoPort.findTodos(memberId, from, to).stream(),
+                        reviews.stream())
+                .flatMap(s -> s)
                 .sorted(DISPLAY_ORDER)
                 .toList();
     }
@@ -55,15 +64,39 @@ public class ScheduleService implements ScheduleUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleDtos.CalendarItem> getMySchedule(Long memberId, LocalDate from, LocalDate to) {
-        return mergedItems(memberId, from, to);
+        // 캘린더는 복습을 예정일(due) 그 날짜에 노출한다 - findDueReviews 가 (코스, due날짜) 단위로 이미 나눠 준다.
+        return mergedItems(memberId, from, to, reviewPlanPort.findDueReviews(memberId, from, to));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ScheduleDtos.TodayView getMyToday(Long memberId, LocalDate today) {
-        List<ScheduleDtos.CalendarItem> items = mergedItems(memberId, today, today);
-        int done = (int) items.stream().filter(item -> STATUS_DONE.equals(item.status())).count();
-        return new ScheduleDtos.TodayView(items, done, items.size());
+        // 오늘 목록의 복습은 '오늘까지 밀린 것 전부'(from=null)를 코스당 한 줄로 접어 올린다.
+        List<ScheduleDtos.CalendarItem> reviews =
+                collapseByCourse(reviewPlanPort.findDueReviews(memberId, null, today), today);
+        List<ScheduleDtos.CalendarItem> items = mergedItems(memberId, today, today, reviews);
+        // 진행률(done/total)은 완료 체크가 가능한 소스(LESSON/TODO)만 센다.
+        // 복습은 체크박스로 완료하지 않고 유사퀴즈로 넘어가는 항목이라 분모에서 제외한다.
+        List<ScheduleDtos.CalendarItem> countable = items.stream()
+                .filter(item -> item.source() != ScheduleItemSource.REVIEW)
+                .toList();
+        int done = (int) countable.stream().filter(item -> STATUS_DONE.equals(item.status())).count();
+        return new ScheduleDtos.TodayView(items, done, countable.size());
+    }
+
+    /**
+     * 코스당 하나로 접는다(오늘 목록용). 같은 코스에 밀린 due 가 여러 날 있어도 한 줄만 남기고,
+     * 노출 날짜는 오늘로 통일한다("오늘 복습할 것 있음" 어포던스).
+     */
+    private static List<ScheduleDtos.CalendarItem> collapseByCourse(
+            List<ScheduleDtos.CalendarItem> reviews, LocalDate today) {
+        Map<Long, ScheduleDtos.CalendarItem> byCourse = new LinkedHashMap<>();
+        for (ScheduleDtos.CalendarItem review : reviews) {
+            byCourse.computeIfAbsent(review.courseId(), courseId ->
+                    ScheduleDtos.CalendarItem.ofReview(
+                            review.courseId(), today, review.courseTitle(), review.status()));
+        }
+        return new ArrayList<>(byCourse.values());
     }
 
     @Override
