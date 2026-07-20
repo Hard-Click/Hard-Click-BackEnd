@@ -219,6 +219,34 @@ class ScheduleServiceTest {
         verify(reviewPlanPort).findDueReviews(MEMBER_ID, from, to); // 캘린더는 from 을 그대로 넘긴다
     }
 
+    /** from > to 역전 범위는 거부한다(SC005). */
+    @Test
+    void schedule_rejectsReversedRange() {
+        assertThatThrownBy(() -> scheduleService.getMySchedule(MEMBER_ID, TODAY, TODAY.minusDays(1)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.SCHEDULE_DATE_RANGE_INVALID.getMessage());
+    }
+
+    /** 1년을 초과하는 범위는 대량 조회 방지를 위해 거부한다(SC006). 경계 포함 [from, from+1년-1일]까지만 허용. */
+    @Test
+    void schedule_rejectsRangeLongerThanOneYear() {
+        assertThatThrownBy(() -> scheduleService.getMySchedule(MEMBER_ID, TODAY, TODAY.plusYears(1)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.SCHEDULE_DATE_RANGE_TOO_LONG.getMessage());
+    }
+
+    /** 경계값: 정확히 1년(경계 포함)은 허용한다. */
+    @Test
+    void schedule_allowsExactlyOneYearRange() {
+        when(schedulePlanPort.findSlots(anyLong(), any(), any())).thenReturn(List.of());
+        when(studentTodoPort.findTodos(anyLong(), any(), any())).thenReturn(List.of());
+
+        List<ScheduleDtos.CalendarItem> items =
+                scheduleService.getMySchedule(MEMBER_ID, TODAY, TODAY.plusYears(1).minusDays(1));
+
+        assertThat(items).isEmpty();
+    }
+
     @Test
     void completeSlot_succeedsWhenRowUpdated() {
         when(schedulePlanPort.markSlotDone(MEMBER_ID, 5L)).thenReturn(1);
