@@ -26,7 +26,7 @@ public class PreSignupImageUploadService implements PreSignupImageUploadUseCase 
         }
 
         String key = profileImageStoragePort.store(image);
-        String previewUrl = profileImageStoragePort.presignUrl(key);
+        String previewUrl = profileImageStoragePort.publicUrl(key);
 
         return new UploadedImageView(key, previewUrl);
     }
