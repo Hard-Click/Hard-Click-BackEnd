@@ -236,4 +236,14 @@ class ScheduleServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ErrorCode.SCHEDULE_SLOT_NOT_FOUND.getMessage());
     }
+
+    @Test
+    void markPastPlannedAsMissed_delegatesToPortWithTodayAndReturnsCount() {
+        when(schedulePlanPort.markMissedBefore(TODAY)).thenReturn(3);
+
+        int updated = scheduleService.markPastPlannedAsMissed(TODAY);
+
+        assertThat(updated).isEqualTo(3);
+        verify(schedulePlanPort).markMissedBefore(TODAY);
+    }
 }

@@ -109,4 +109,11 @@ public class ScheduleService implements ScheduleUseCase {
             throw new BusinessException(ErrorCode.SCHEDULE_SLOT_NOT_FOUND);
         }
     }
+
+    @Override
+    @Transactional
+    public int markPastPlannedAsMissed(LocalDate today) {
+        // 계획일이 지난 PLANNED 슬롯을 MISSED 로. 배치(ScheduleMissedScheduler)가 매일 호출한다.
+        return schedulePlanPort.markMissedBefore(today);
+    }
 }
