@@ -32,7 +32,7 @@ class PreSignupImageUploadServiceTest {
                 "profileImage", "profile.png", "image/png", "image".getBytes()
         );
         when(profileImageStoragePort.store(image)).thenReturn("profiles/uuid.png");
-        when(profileImageStoragePort.presignUrl("profiles/uuid.png"))
+        when(profileImageStoragePort.publicUrl("profiles/uuid.png"))
                 .thenReturn("https://bucket.s3/profiles/uuid.png");
 
         UploadedImageView result = service.upload(image);

@@ -79,7 +79,7 @@ public class S3ProfileImageStorageAdapter implements ProfileImageStoragePort {
      * presigned URL 유효기간 불일치로 인한 ExpiredToken 문제가 발생하지 않는다.
      */
     @Override
-    public String presignUrl(String key) {
+    public String publicUrl(String key) {
         return s3UrlPresigner.publicUrl(key);
     }
 

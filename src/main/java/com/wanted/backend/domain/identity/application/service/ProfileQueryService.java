@@ -40,9 +40,9 @@ public class ProfileQueryService implements ProfileQueryUseCase {
             return DEFAULT_PROFILE_IMAGE_URL;
         }
         try {
-            return profileImageStoragePort.presignUrl(profileImageKey);
+            return profileImageStoragePort.publicUrl(profileImageKey);
         } catch (Exception e) {
-            log.error("[PROFILE_PRESIGN_FAILED] presignUrl 실패, 기본 이미지로 대체. key={}", profileImageKey, e);
+            log.error("[PROFILE_PRESIGN_FAILED] publicUrl 실패, 기본 이미지로 대체. key={}", profileImageKey, e);
             return DEFAULT_PROFILE_IMAGE_URL;
         }
     }
