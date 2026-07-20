@@ -113,12 +113,12 @@ public class PostRepositoryAdapter implements PostRepository {
     public List<PostSummary> findSummaryByBoardTypeOrderByCommentCount(BoardType boardType, String keyword, int page, int size) {
         return em.createQuery("""
                 SELECT new com.wanted.backend.domain.community.domain.model.PostSummary(
-                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, COUNT(c.id))
+                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, COUNT(c.id), p.isAccepted)
                 FROM PostJpaEntity p
                 JOIN MemberReferenceEntity m ON m.id = p.authorId
                 LEFT JOIN CommentJpaEntity c ON c.postId = p.id
                 WHERE p.boardType = :boardType AND p.title LIKE :keyword AND p.status = :status
-                GROUP BY p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount
+                GROUP BY p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.isAccepted
                 ORDER BY COUNT(c.id) DESC
                 """, PostSummary.class)
                 .setParameter("boardType", boardType)
@@ -133,12 +133,12 @@ public class PostRepositoryAdapter implements PostRepository {
     public List<PostSummary> findAllSummaryOrderByCommentCount(String keyword, int page, int size) {
         return em.createQuery("""
                 SELECT new com.wanted.backend.domain.community.domain.model.PostSummary(
-                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, COUNT(c.id))
+                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, COUNT(c.id), p.isAccepted)
                 FROM PostJpaEntity p
                 JOIN MemberReferenceEntity m ON m.id = p.authorId
                 LEFT JOIN CommentJpaEntity c ON c.postId = p.id
                 WHERE p.title LIKE :keyword AND p.status = :status
-                GROUP BY p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount
+                GROUP BY p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.isAccepted
                 ORDER BY COUNT(c.id) DESC
                 """, PostSummary.class)
                 .setParameter("keyword", "%" + (keyword != null ? keyword : "") + "%")
@@ -153,7 +153,7 @@ public class PostRepositoryAdapter implements PostRepository {
     public List<PostSummary> findSummaryByBoardTypeOrderByCommentCountDenormalized(BoardType boardType, String keyword, int page, int size) {
         return em.createQuery("""
                 SELECT new com.wanted.backend.domain.community.domain.model.PostSummary(
-                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.commentCount)
+                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.commentCount, p.isAccepted)
                 FROM PostJpaEntity p
                 JOIN MemberReferenceEntity m ON m.id = p.authorId
                 WHERE p.boardType = :boardType AND p.title LIKE :keyword AND p.status = :status
@@ -171,7 +171,7 @@ public class PostRepositoryAdapter implements PostRepository {
     public List<PostSummary> findAllSummaryOrderByCommentCountDenormalized(String keyword, int page, int size) {
         return em.createQuery("""
                 SELECT new com.wanted.backend.domain.community.domain.model.PostSummary(
-                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.commentCount)
+                    p.id, p.boardType, p.subject, p.title, m.name, p.createdAt, p.viewCount, p.commentCount, p.isAccepted)
                 FROM PostJpaEntity p
                 JOIN MemberReferenceEntity m ON m.id = p.authorId
                 WHERE p.title LIKE :keyword AND p.status = :status

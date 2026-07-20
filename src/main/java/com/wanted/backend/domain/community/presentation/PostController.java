@@ -38,8 +38,8 @@ public class PostController {
     private final PostQueryUseCase postQueryUseCase;
 
     private static final List<UnifiedBoardItemResponse> MOCK_STUDY_ITEMS = List.of(
-            new UnifiedBoardItemResponse("STUDY", null, 42L, "STUDY", "주말 수학 스터디", "이*연", null, null, "수학1", 3, 6, false, LocalDateTime.of(2026, 5, 18, 17, 0)),
-            new UnifiedBoardItemResponse("STUDY", null, 43L, "STUDY", "영어 독해 스터디", "김*민", null, null, "영어2", 5, 5, true, LocalDateTime.of(2026, 5, 17, 14, 30))
+            new UnifiedBoardItemResponse("STUDY", null, 42L, "STUDY", "주말 수학 스터디", "이*연", null, null, "수학1", 3, 6, false, null, LocalDateTime.of(2026, 5, 18, 17, 0)),
+            new UnifiedBoardItemResponse("STUDY", null, 43L, "STUDY", "영어 독해 스터디", "김*민", null, null, "영어2", 5, 5, true, null, LocalDateTime.of(2026, 5, 17, 14, 30))
     );
 
     public PostController(PostCommandUseCase postCommandUseCase,
