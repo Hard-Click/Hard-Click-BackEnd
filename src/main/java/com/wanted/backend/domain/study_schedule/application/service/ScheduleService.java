@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -26,6 +27,10 @@ import java.util.stream.Stream;
 public class ScheduleService implements ScheduleUseCase {
 
     private static final String STATUS_DONE = "DONE";
+
+    // 캘린더 조회 최대 기간 = 1년. 무제한 범위(예: 10년) 요청 시 대량 조회로 인한 OOM·성능 저하를 막는다.
+    // study_timer 일별 조회(ST018)와 동일한 상한을 쓴다.
+    private static final Period MAX_QUERY_PERIOD = Period.ofYears(1);
 
     /**
      * 정렬 기준: 날짜 → 시작 시각 → 항목 ID.
@@ -64,8 +69,19 @@ public class ScheduleService implements ScheduleUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleDtos.CalendarItem> getMySchedule(Long memberId, LocalDate from, LocalDate to) {
+        validateRange(from, to);
         // 캘린더는 복습을 예정일(due) 그 날짜에 노출한다 - findDueReviews 가 (코스, due날짜) 단위로 이미 나눠 준다.
         return mergedItems(memberId, from, to, reviewPlanPort.findDueReviews(memberId, from, to));
+    }
+
+    private static void validateRange(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BusinessException(ErrorCode.SCHEDULE_DATE_RANGE_INVALID);
+        }
+        // 경계 포함 최대 1년: [from, from+1년-1일] 까지 허용.
+        if (to.isAfter(from.plus(MAX_QUERY_PERIOD).minusDays(1))) {
+            throw new BusinessException(ErrorCode.SCHEDULE_DATE_RANGE_TOO_LONG);
+        }
     }
 
     @Override

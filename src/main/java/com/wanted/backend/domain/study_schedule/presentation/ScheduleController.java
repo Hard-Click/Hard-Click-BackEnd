@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,6 +29,8 @@ import java.util.List;
 public class ScheduleController {
 
     private final ScheduleUseCase scheduleUseCase;
+    // '오늘'은 서버 JVM 기본 타임존(컨테이너 기본 UTC)이 아니라 팀 표준 Clock(Asia/Seoul)으로 계산한다.
+    private final Clock clock;
 
     @GetMapping("/me")
     @Operation(summary = "내 학습 스케줄 조회", description = "기간(from~to) 내 활성 스케줄을 캘린더용으로 조회합니다. 미지정 시 이번 달.")
@@ -38,7 +41,7 @@ public class ScheduleController {
             @Parameter(description = "조회 종료일(ISO). 미지정 시 이번 달 말일", example = "2026-07-31")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate start = from != null ? from : today.withDayOfMonth(1);
         LocalDate end = to != null ? to : today.withDayOfMonth(today.lengthOfMonth());
 
@@ -57,7 +60,7 @@ public class ScheduleController {
         return ApiResponse.success(
                 "오늘 할 일 조회 성공",
                 ScheduleResponses.TodayResponse.from(
-                        scheduleUseCase.getMyToday(userDetails.getMemberId(), LocalDate.now())));
+                        scheduleUseCase.getMyToday(userDetails.getMemberId(), LocalDate.now(clock))));
     }
 
     @PatchMapping("/slots/{slotId}/complete")
