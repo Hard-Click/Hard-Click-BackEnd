@@ -158,6 +158,12 @@ public class CourseCommandService implements CourseCommandUseCase {
 
         courseRepository.save(course);
 
+        // CP-SAT 스케줄러 입력용 학습 정책 갱신(권장 완강 주수 / 하루 학습 상한).
+        courseLearningPolicyPort.save(
+                course.getId(),
+                command.recommendedWeeks(),
+                command.dailyMaxMinutes() == null ? DEFAULT_DAILY_MAX_MINUTES : command.dailyMaxMinutes());
+
         // 삭제된 섹션의 퀴즈를 같은 트랜잭션에서 정리(quiz 리스너가 동기 구독). orphan 방지.
         if (!deletedSectionIds.isEmpty()) {
             eventPublisher.publishEvent(SectionDeletedEvent.of(deletedSectionIds));

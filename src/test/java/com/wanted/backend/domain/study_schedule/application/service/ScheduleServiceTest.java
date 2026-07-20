@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.study_schedule.application.service;
 
 import com.wanted.backend.domain.study_schedule.application.dto.ScheduleDtos;
+import com.wanted.backend.domain.study_schedule.application.port.ReviewPlanPort;
 import com.wanted.backend.domain.study_schedule.application.port.SchedulePlanPort;
 import com.wanted.backend.domain.study_schedule.application.port.StudentTodoPort;
 import com.wanted.backend.domain.study_schedule.domain.model.ScheduleItemSource;
@@ -17,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,13 +31,16 @@ class ScheduleServiceTest {
 
     private SchedulePlanPort schedulePlanPort;
     private StudentTodoPort studentTodoPort;
+    private ReviewPlanPort reviewPlanPort;
     private ScheduleService scheduleService;
 
     @BeforeEach
     void setUp() {
         schedulePlanPort = mock(SchedulePlanPort.class);
         studentTodoPort = mock(StudentTodoPort.class);
-        scheduleService = new ScheduleService(schedulePlanPort, studentTodoPort);
+        reviewPlanPort = mock(ReviewPlanPort.class);
+        when(reviewPlanPort.findDueReviews(anyLong(), any(), any())).thenReturn(List.of());
+        scheduleService = new ScheduleService(schedulePlanPort, studentTodoPort, reviewPlanPort);
     }
 
     private static ScheduleDtos.CalendarItem lessonAt(long id, LocalTime start, int minutes, String status) {
@@ -44,6 +50,10 @@ class ScheduleServiceTest {
 
     private static ScheduleDtos.CalendarItem todoAt(long id, LocalTime start, LocalTime end, String status) {
         return ScheduleDtos.CalendarItem.ofTodo(id, TODAY, start, end, "복습", "지난주 복습 퀴즈", status);
+    }
+
+    private static ScheduleDtos.CalendarItem reviewOf(long courseId, LocalDate due, String courseTitle) {
+        return ScheduleDtos.CalendarItem.ofReview(courseId, due, courseTitle, "PLANNED");
     }
 
     @Test
@@ -133,6 +143,80 @@ class ScheduleServiceTest {
         assertThat(view.items().get(0).source()).isEqualTo(ScheduleItemSource.TODO);
         assertThat(view.items().get(0).enrollmentId()).isNull();
         assertThat(view.totalCount()).isEqualTo(1);
+    }
+
+    /** 복습 항목은 courseId 를 실은 REVIEW 소스로, 시각이 없어 목록 맨 뒤에 온다(유사퀴즈 진입용). */
+    @Test
+    void surfacesDueReviewAsReviewSourceWithCourseId() {
+        when(schedulePlanPort.findSlots(anyLong(), any(), any())).thenReturn(List.of(
+                lessonAt(1L, LocalTime.of(7, 0), 60, "PLANNED")));
+        when(studentTodoPort.findTodos(anyLong(), any(), any())).thenReturn(List.of());
+        when(reviewPlanPort.findDueReviews(anyLong(), any(), any())).thenReturn(List.of(
+                reviewOf(42L, TODAY, "수능 영어 실전")));
+
+        ScheduleDtos.TodayView view = scheduleService.getMyToday(MEMBER_ID, TODAY);
+
+        ScheduleDtos.CalendarItem review = view.items().stream()
+                .filter(item -> item.source() == ScheduleItemSource.REVIEW)
+                .findFirst().orElseThrow();
+        assertThat(review.courseId()).isEqualTo(42L);
+        assertThat(review.startTime()).isNull();
+        assertThat(review.title()).contains("복습");
+        // 시각 없는 REVIEW 는 07:00 강의 뒤에 온다.
+        assertThat(view.items()).extracting(ScheduleDtos.CalendarItem::source)
+                .containsExactly(ScheduleItemSource.LESSON, ScheduleItemSource.REVIEW);
+    }
+
+    /** 복습은 체크박스 완료 대상이 아니므로 진행률 분모(total)에서 빠진다. */
+    @Test
+    void excludesReviewFromProgressCount() {
+        when(schedulePlanPort.findSlots(anyLong(), any(), any())).thenReturn(List.of(
+                lessonAt(1L, LocalTime.of(7, 0), 60, "DONE")));
+        when(studentTodoPort.findTodos(anyLong(), any(), any())).thenReturn(List.of());
+        when(reviewPlanPort.findDueReviews(anyLong(), any(), any())).thenReturn(List.of(
+                reviewOf(42L, TODAY, "수능 영어 실전")));
+
+        ScheduleDtos.TodayView view = scheduleService.getMyToday(MEMBER_ID, TODAY);
+
+        assertThat(view.items()).hasSize(2);      // 강의 + 복습이 목록엔 둘 다 보이고
+        assertThat(view.doneCount()).isEqualTo(1);
+        assertThat(view.totalCount()).isEqualTo(1); // 분모는 완료 가능한 강의 1개만
+    }
+
+    /** 오늘 목록은 같은 코스에 여러 날 밀린 복습을 한 줄로 접고, 밀린 것까지 잡도록 from=null 로 조회한다. */
+    @Test
+    void collapsesMultipleDueDatesPerCourseForToday() {
+        when(schedulePlanPort.findSlots(anyLong(), any(), any())).thenReturn(List.of());
+        when(studentTodoPort.findTodos(anyLong(), any(), any())).thenReturn(List.of());
+        when(reviewPlanPort.findDueReviews(anyLong(), any(), any())).thenReturn(List.of(
+                reviewOf(42L, TODAY.minusDays(2), "수능 영어 실전"),
+                reviewOf(42L, TODAY.minusDays(1), "수능 영어 실전"),
+                reviewOf(50L, TODAY, "수능 수학 실전")));
+
+        ScheduleDtos.TodayView view = scheduleService.getMyToday(MEMBER_ID, TODAY);
+
+        assertThat(view.items()).extracting(ScheduleDtos.CalendarItem::courseId)
+                .containsExactlyInAnyOrder(42L, 50L);          // 코스당 한 줄
+        assertThat(view.items()).extracting(ScheduleDtos.CalendarItem::planDate)
+                .containsOnly(TODAY);                           // 노출 날짜는 오늘로 통일
+        verify(reviewPlanPort).findDueReviews(eq(MEMBER_ID), isNull(), eq(TODAY)); // 밀린 것까지(from=null)
+    }
+
+    /** 캘린더(기간 조회)는 복습을 접지 않고 예정일 그대로, 요청 기간을 그대로 넘긴다. */
+    @Test
+    void calendarKeepsReviewOnItsDueDateWithinRange() {
+        LocalDate from = TODAY;
+        LocalDate to = TODAY.plusDays(6);
+        when(schedulePlanPort.findSlots(anyLong(), any(), any())).thenReturn(List.of());
+        when(studentTodoPort.findTodos(anyLong(), any(), any())).thenReturn(List.of());
+        when(reviewPlanPort.findDueReviews(anyLong(), any(), any())).thenReturn(List.of(
+                reviewOf(42L, TODAY.plusDays(3), "수능 영어 실전")));
+
+        List<ScheduleDtos.CalendarItem> items = scheduleService.getMySchedule(MEMBER_ID, from, to);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).planDate()).isEqualTo(TODAY.plusDays(3));
+        verify(reviewPlanPort).findDueReviews(MEMBER_ID, from, to); // 캘린더는 from 을 그대로 넘긴다
     }
 
     @Test
