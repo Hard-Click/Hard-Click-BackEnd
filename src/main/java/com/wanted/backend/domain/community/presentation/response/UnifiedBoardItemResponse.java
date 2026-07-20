@@ -32,24 +32,27 @@ public record UnifiedBoardItemResponse(
         Integer maxCount,
         @Schema(description = "모집 마감 여부 (STUDY 타입)", example = "false")
         Boolean isClosed,
+        @Schema(description = "채택 완료 여부 (POST 타입, QUESTION 게시판에서만 의미 있음)", example = "true")
+        Boolean isAccepted,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss+09:00")
         @Schema(description = "작성일시", example = "2025-03-15T14:30:00")
         LocalDateTime createdAt
 ) {
     public static UnifiedBoardItemResponse fromPost(PostItemResponse post) {
         return fromFields("POST", post.postId(), post.boardType().name(),
-                post.title(), post.authorName(), post.viewCount(), post.commentCount(), post.createdAt());
+                post.title(), post.authorName(), post.viewCount(), post.commentCount(), post.isAccepted(), post.createdAt());
     }
 
     public static UnifiedBoardItemResponse fromPostItem(PostItemResult result) {
         return fromFields("POST", result.postId(), result.boardType().name(),
-                result.title(), result.authorName(), result.viewCount(), result.commentCount(), result.createdAt());
+                result.title(), result.authorName(), result.viewCount(), result.commentCount(), result.isAccepted(), result.createdAt());
     }
 
     private static UnifiedBoardItemResponse fromFields(String type, Long postId, String boardType,
-                                                       String title, String authorName, Integer viewCount, Integer commentCount, LocalDateTime createdAt) {
+                                                       String title, String authorName, Integer viewCount, Integer commentCount,
+                                                       Boolean isAccepted, LocalDateTime createdAt) {
         return new UnifiedBoardItemResponse(
                 type, postId, null, boardType, title, authorName,
-                viewCount, commentCount, null, null, null, null, createdAt);
+                viewCount, commentCount, null, null, null, null, isAccepted, createdAt);
     }
 }

@@ -11,5 +11,6 @@ public record PostSummary(
         String authorName,
         LocalDateTime createdAt,
         int viewCount,
-        long commentCount
+        long commentCount,
+        boolean isAccepted
 ) {}
