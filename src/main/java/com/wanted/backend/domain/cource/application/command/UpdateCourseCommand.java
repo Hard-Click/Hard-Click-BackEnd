@@ -16,7 +16,9 @@ public record UpdateCourseCommand(
         List<String> learningObjectives,
         List<String> targetAudience,
         List<String> techTags,
-        String level
+        String level,
+        Integer recommendedWeeks,
+        Integer dailyMaxMinutes
 ) {
     public record SectionCommand(
             Long id,           // null = 신규 섹션
