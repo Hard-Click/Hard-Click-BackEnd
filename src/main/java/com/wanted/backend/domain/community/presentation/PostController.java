@@ -25,8 +25,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Tag(name = "Community Post", description = "커뮤니티 게시글 API")
@@ -36,11 +34,6 @@ public class PostController {
 
     private final PostCommandUseCase postCommandUseCase;
     private final PostQueryUseCase postQueryUseCase;
-
-    private static final List<UnifiedBoardItemResponse> MOCK_STUDY_ITEMS = List.of(
-            new UnifiedBoardItemResponse("STUDY", null, 42L, "STUDY", "주말 수학 스터디", "이*연", null, null, "수학1", 3, 6, false, LocalDateTime.of(2026, 5, 18, 17, 0)),
-            new UnifiedBoardItemResponse("STUDY", null, 43L, "STUDY", "영어 독해 스터디", "김*민", null, null, "영어2", 5, 5, true, LocalDateTime.of(2026, 5, 17, 14, 30))
-    );
 
     public PostController(PostCommandUseCase postCommandUseCase,
                           PostQueryUseCase postQueryUseCase) {
@@ -146,9 +139,9 @@ public class PostController {
 
         boolean isAdmin = "ADMIN".equals(userDetails.getRole());
         PostListResult result = postQueryUseCase.getList(null, sort, keyword, page, isAdmin, userDetails.getMemberId());
-        List<UnifiedBoardItemResponse> items = new ArrayList<>(
-                result.posts().stream().map(UnifiedBoardItemResponse::fromPostItem).toList());
-        items.addAll(MOCK_STUDY_ITEMS);
+        List<UnifiedBoardItemResponse> items = result.posts().stream()
+                .map(UnifiedBoardItemResponse::fromPostItem)
+                .toList();
         return ApiResponse.success("게시글 목록 조회 성공",
                 new UnifiedBoardListResponse(items, result.currentPage(), result.totalPages(), result.totalCount()));
     }
