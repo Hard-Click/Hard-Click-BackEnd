@@ -19,6 +19,10 @@ services:
       - AWS_REGION=${AWS_REGION:-ap-northeast-2}
       - TOSS_SECRET_KEY=${TOSS_SECRET_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
+      # 유사문제 추천 AI 서버 (quiz.ai.*) — SSM /hard-click/prod/QUIZ_AI_* 파라미터로 주입.
+      # 파라미터 미설정 시 기본값 false로 기능이 안전하게 꺼진다.
+      - QUIZ_AI_ENABLED=${QUIZ_AI_ENABLED:-false}
+      - QUIZ_AI_BASE_URL=${QUIZ_AI_BASE_URL:-http://localhost:8000}
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
