@@ -176,7 +176,7 @@ public class PostQueryService implements PostQueryUseCase {
                 post.getId(), post.getBoardType(),
                 post.getBoardType() == BoardType.QUESTION ? post.getSubject() : null,
                 post.getTitle(), displayName, post.getCreatedAt(),
-                post.getViewCount(), commentCount);
+                post.getViewCount(), commentCount, post.isAccepted());
     }
 
     private PostItemResult toItemResult(PostSummary summary, boolean isAdmin) {
@@ -185,6 +185,6 @@ public class PostQueryService implements PostQueryUseCase {
                 summary.postId(), summary.boardType(),
                 summary.boardType() == BoardType.QUESTION ? summary.subject() : null,
                 summary.title(), displayName, summary.createdAt(),
-                summary.viewCount(), (int) summary.commentCount());
+                summary.viewCount(), (int) summary.commentCount(), summary.isAccepted());
     }
 }

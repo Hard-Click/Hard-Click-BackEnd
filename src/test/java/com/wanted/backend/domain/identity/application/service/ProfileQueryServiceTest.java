@@ -31,8 +31,8 @@ class ProfileQueryServiceTest {
     void setUp() {
         memberRepository = mock(MemberRepository.class);
         profileImageStoragePort = mock(ProfileImageStoragePort.class);
-        // presignUrl은 입력 key를 그대로 반환하도록 스텁(프리사이닝 로직은 어댑터 단위 테스트 영역)
-        when(profileImageStoragePort.presignUrl(anyString()))
+        // publicUrl은 입력 key를 그대로 반환하도록 스텁(URL 조립 로직은 어댑터 단위 테스트 영역)
+        when(profileImageStoragePort.publicUrl(anyString()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         service = new ProfileQueryService(memberRepository, profileImageStoragePort);
     }

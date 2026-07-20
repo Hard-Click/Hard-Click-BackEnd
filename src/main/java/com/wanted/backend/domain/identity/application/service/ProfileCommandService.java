@@ -57,9 +57,9 @@ public class ProfileCommandService implements ProfileCommandUseCase {
         String profileImageUrl = null;
         if (saved.getProfileImageUrl() != null) {
             try {
-                profileImageUrl = profileImageStoragePort.presignUrl(saved.getProfileImageUrl());
+                profileImageUrl = profileImageStoragePort.publicUrl(saved.getProfileImageUrl());
             } catch (Exception e) {
-                log.error("[PROFILE_PRESIGN_FAILED] 업로드 후 presignUrl 실패. key={}", saved.getProfileImageUrl(), e);
+                log.error("[PROFILE_PRESIGN_FAILED] 업로드 후 publicUrl 실패. key={}", saved.getProfileImageUrl(), e);
             }
         }
 

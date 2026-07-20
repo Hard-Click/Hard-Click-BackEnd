@@ -11,5 +11,6 @@ public record PostItemResult(
         String authorName,
         LocalDateTime createdAt,
         int viewCount,
-        int commentCount
+        int commentCount,
+        boolean isAccepted
 ) {}

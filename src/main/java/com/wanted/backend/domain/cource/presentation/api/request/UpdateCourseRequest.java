@@ -6,6 +6,7 @@ import com.wanted.backend.domain.cource.domain.model.PriceType;
 import com.wanted.backend.global.domain.SubjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -50,7 +51,17 @@ public record UpdateCourseRequest(
 
         @Schema(description = "난이도 (입문 / 중급 / 심화)", example = "중급")
         @NotNull(message = "난이도는 필수입니다.")
-        CourseLevel level
+        CourseLevel level,
+
+        @Schema(description = "권장 완강 기간(주). CP-SAT 스케줄러 입력.", example = "12")
+        @Min(value = 1, message = "권장 완강 기간은 1주 이상이어야 합니다.")
+        @Max(value = 52, message = "권장 완강 기간은 최대 52주입니다.")
+        Integer recommendedWeeks,
+
+        @Schema(description = "코스별 강도 상한(하루 최대 학습 분). 비우면 120분 적용.", example = "120")
+        @Min(value = 1, message = "강도 상한은 1분 이상이어야 합니다.")
+        @Max(value = 1440, message = "강도 상한은 하루 최대 분(1440분)을 초과할 수 없습니다.")
+        Integer dailyMaxMinutes
 ) {
     public UpdateCourseCommand toCommand(Long courseId, Long requesterId) {
         List<UpdateCourseCommand.SectionCommand> sectionCommands = sections == null
@@ -70,6 +81,7 @@ public record UpdateCourseRequest(
 
         return new UpdateCourseCommand(courseId, requesterId, title, subject.name(),
                 thumbnailUrl, priceType, price, sectionCommands,
-                learningObjectives, targetAudience, techTags, level.getLabel());
+                learningObjectives, targetAudience, techTags, level.getLabel(),
+                recommendedWeeks, dailyMaxMinutes);
     }
 }

@@ -34,12 +34,15 @@ public record PostItemResponse(
         int viewCount,
 
         @Schema(description = "댓글수", example = "8")
-        int commentCount
+        int commentCount,
+
+        @Schema(description = "채택 완료 여부 — QUESTION 게시판에서만 의미 있음 (FREE는 항상 false)", example = "true")
+        boolean isAccepted
 ) {
         public static PostItemResponse from(PostItemResult result) {
                 return new PostItemResponse(
                         result.postId(), result.boardType(), result.subject(),
                         result.title(), result.authorName(), result.createdAt(),
-                        result.viewCount(), result.commentCount());
+                        result.viewCount(), result.commentCount(), result.isAccepted());
         }
 }

@@ -76,6 +76,21 @@ public final class ScheduleDtos {
                     subject, title, TimeBlock.minutesBetween(startTime, endTime), status,
                     null, null, null, null, null);
         }
+
+        /**
+         * 복습 항목(코스 단위). 복습 카드가 due 에 도달한 코스 하나당 한 줄.
+         *
+         * <p>시각을 붙이지 않는다(startTime/endTime=null) - 복습은 특정 시간블록에 배치하지 않고 '오늘 할 일'
+         * 목록 하단에만 노출한다. itemId 에는 courseId 를 넣어 목록 안에서 안정적인 키가 되게 한다(완료 대상 아님).
+         * 과목은 프론트 색상 매핑상 '복습'(→ REVIEW 카테고리)으로 고정하고, 실제 강의 정보는 courseId/courseTitle 로 전달한다.
+         */
+        public static CalendarItem ofReview(
+                Long courseId, LocalDate planDate, String courseTitle, String status) {
+            return new CalendarItem(
+                    ScheduleItemSource.REVIEW, courseId, planDate, null, null,
+                    "복습", courseTitle + " 복습", 0, status,
+                    null, courseId, courseTitle, null, null);
+        }
     }
 
     /** '오늘 할 일' + 진행률(done/total). AI 슬롯과 학생 할 일을 합쳐서 센다. */
