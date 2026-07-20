@@ -6,6 +6,7 @@ import com.wanted.backend.domain.study_schedule.application.port.SchedulePlanPor
 import com.wanted.backend.domain.study_schedule.application.port.StudentTodoPort;
 import com.wanted.backend.domain.study_schedule.application.usecase.ScheduleUseCase;
 import com.wanted.backend.domain.study_schedule.domain.model.ScheduleItemSource;
+import com.wanted.backend.global.common.DateRanges;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -69,19 +70,10 @@ public class ScheduleService implements ScheduleUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleDtos.CalendarItem> getMySchedule(Long memberId, LocalDate from, LocalDate to) {
-        validateRange(from, to);
+        DateRanges.requireValidRange(from, to, MAX_QUERY_PERIOD,
+                ErrorCode.SCHEDULE_DATE_RANGE_INVALID, ErrorCode.SCHEDULE_DATE_RANGE_TOO_LONG);
         // 캘린더는 복습을 예정일(due) 그 날짜에 노출한다 - findDueReviews 가 (코스, due날짜) 단위로 이미 나눠 준다.
         return mergedItems(memberId, from, to, reviewPlanPort.findDueReviews(memberId, from, to));
-    }
-
-    private static void validateRange(LocalDate from, LocalDate to) {
-        if (from.isAfter(to)) {
-            throw new BusinessException(ErrorCode.SCHEDULE_DATE_RANGE_INVALID);
-        }
-        // 경계 포함 최대 1년: [from, from+1년-1일] 까지 허용.
-        if (to.isAfter(from.plus(MAX_QUERY_PERIOD).minusDays(1))) {
-            throw new BusinessException(ErrorCode.SCHEDULE_DATE_RANGE_TOO_LONG);
-        }
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.wanted.backend.domain.study_timer.application.query.GetDailyStudyTime
 import com.wanted.backend.domain.study_timer.application.usecase.GetDailyStudyTimeUseCase;
 import com.wanted.backend.domain.study_timer.domain.model.DailyStudyStat;
 import com.wanted.backend.domain.study_timer.domain.repository.DailyStudyStatsRepository;
+import com.wanted.backend.global.common.DateRanges;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -61,17 +62,9 @@ public class GetDailyStudyTimeService implements GetDailyStudyTimeUseCase {
         if (query.endDate() == null) {
             throw new BusinessException(ErrorCode.STUDY_TIMER_DAILY_END_DATE_REQUIRED);
         }
-        if (query.startDate().isAfter(query.endDate())) {
-            throw new BusinessException(ErrorCode.STUDY_TIMER_DAILY_DATE_RANGE_INVALID);
-        }
-        validateDateRange(query.startDate(), query.endDate());
-    }
-
-    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
-        LocalDate maxAllowedEndDate = startDate.plus(MAX_DAILY_STUDY_TIME_QUERY_PERIOD).minusDays(1);
-
-        if (endDate.isAfter(maxAllowedEndDate)) {
-            throw new BusinessException(ErrorCode.STUDY_TIMER_DAILY_DATE_RANGE_TOO_LONG);
-        }
+        DateRanges.requireValidRange(
+                query.startDate(), query.endDate(), MAX_DAILY_STUDY_TIME_QUERY_PERIOD,
+                ErrorCode.STUDY_TIMER_DAILY_DATE_RANGE_INVALID,
+                ErrorCode.STUDY_TIMER_DAILY_DATE_RANGE_TOO_LONG);
     }
 }
