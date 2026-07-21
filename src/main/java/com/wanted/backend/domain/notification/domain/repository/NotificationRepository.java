@@ -14,10 +14,4 @@ public interface NotificationRepository {
     boolean existsNextPage(Long receiverId, Long lastId);
     List<Notification> saveAll(List<Notification> notifications);
     void deleteByRedirectUrlStartingWith(String urlPrefix);
-
-    // 공지 상세 조회 시 단건 읽음 여부 반환
-    boolean isNoticeRead(Long memberId, Long noticeId);
-
-    // 공지 목록 조회 시 읽음 처리된 공지 ID 목록 반환
-    List<Long> findReadNoticeIds(Long memberId, List<Long> noticeIds);
 }

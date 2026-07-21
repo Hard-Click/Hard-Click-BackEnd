@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.notice;
 
 import com.wanted.backend.domain.notice.application.policy.NoticeCreatePolicy;
+import com.wanted.backend.domain.notice.application.port.AdminValidationPort;
 import com.wanted.backend.domain.notice.application.port.CourseInstructorPort;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
@@ -20,6 +21,9 @@ class NoticeCreatePolicyTest {
 
     @Mock
     private CourseInstructorPort courseInstructorPort;
+
+    @Mock
+    private AdminValidationPort adminValidationPort;
 
     @InjectMocks
     private NoticeCreatePolicy noticeCreatePolicy;

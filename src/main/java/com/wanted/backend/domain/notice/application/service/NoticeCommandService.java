@@ -8,6 +8,7 @@ import com.wanted.backend.domain.notice.application.policy.GlobalNoticeCreatePol
 import com.wanted.backend.domain.notice.application.policy.NoticeCreatePolicy;
 import com.wanted.backend.domain.notice.application.policy.NoticeUpdatePolicy;
 import com.wanted.backend.domain.notice.application.port.AdminValidationPort;
+import com.wanted.backend.domain.notice.application.port.NoticeReadPort;
 import com.wanted.backend.domain.notice.application.usecase.NoticeCommandUseCase;
 import com.wanted.backend.domain.notice.domain.event.NoticeCreatedEvent;
 import com.wanted.backend.domain.notice.domain.model.Notice;
@@ -30,13 +31,16 @@ public class NoticeCommandService implements NoticeCommandUseCase {
     private final AdminValidationPort adminValidationPort;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationRepository notificationRepository;
+    private final NoticeReadPort noticeReadPort;
 
     public NoticeCommandService(NoticeRepository noticeRepository,
                                 NoticeCreatePolicy noticeCreatePolicy,
                                 GlobalNoticeCreatePolicy globalNoticeCreatePolicy,
                                 NoticeUpdatePolicy noticeUpdatePolicy,
                                 AdminValidationPort adminValidationPort,
-                                ApplicationEventPublisher eventPublisher, NotificationRepository notificationRepository) {
+                                ApplicationEventPublisher eventPublisher,
+                                NotificationRepository notificationRepository,
+                                NoticeReadPort noticeReadPort) {
         this.noticeRepository = noticeRepository;
         this.noticeCreatePolicy = noticeCreatePolicy;
         this.globalNoticeCreatePolicy = globalNoticeCreatePolicy;
@@ -44,6 +48,7 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         this.adminValidationPort = adminValidationPort;
         this.eventPublisher = eventPublisher;
         this.notificationRepository = notificationRepository;
+        this.noticeReadPort = noticeReadPort;
     }
 
     @Override
@@ -91,5 +96,14 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         noticeUpdatePolicy.validate(command.memberId(), notice);
         noticeRepository.deleteById(command.noticeId());
         notificationRepository.deleteByRedirectUrlStartingWith("/notices/" + command.noticeId());
+    }
+
+    @Override
+    public void markAsRead(Long memberId, Long noticeId) {
+        // 존재하지 않는 공지는 읽음 처리 대상이 아니다. 조회/목록과 동일하게 공개 리소스라 소유 검증은 없다.
+        if (noticeRepository.findById(noticeId).isEmpty()) {
+            throw new BusinessException(ErrorCode.NOTICE_NOT_FOUND);
+        }
+        noticeReadPort.markRead(memberId, noticeId);
     }
 }
