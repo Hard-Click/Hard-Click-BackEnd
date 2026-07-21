@@ -97,11 +97,11 @@ public class AdminPaymentQueryAdapter implements AdminPaymentQueryPort {
                 order.getId(),
                 order.getId(),
                 order.getOrderNo(),
-                toPaymentType(order.getPaymentType()),
+                PaymentType.fromRawOrDefault(order.getPaymentType()),
                 member == null ? null : member.getName(),
                 member == null ? null : member.getEmail(),
                 order.getFinalAmount(),
-                toPaymentStatus(order.getStatus()),
+                PaymentStatus.fromOrderStatus(order.getStatus()),
                 order.getPaidAt()
         );
     }
@@ -120,24 +120,6 @@ public class AdminPaymentQueryAdapter implements AdminPaymentQueryPort {
             case READY -> Set.of("READY");
             // orders에 대응 상태가 없는 필터(PENDING/FAILED)는 결과 없음.
             case PENDING, FAILED -> Set.of();
-        };
-    }
-
-    static PaymentType toPaymentType(String raw) {
-        if (raw == null) return PaymentType.COURSE;
-        try {
-            return PaymentType.valueOf(raw);
-        } catch (IllegalArgumentException e) {
-            return PaymentType.COURSE;
-        }
-    }
-
-    static PaymentStatus toPaymentStatus(String orderStatus) {
-        return switch (orderStatus) {
-            case "PAID", "PARTIAL_REFUNDED" -> PaymentStatus.PAID;
-            case "REFUNDED" -> PaymentStatus.REFUNDED;
-            case "CANCELED" -> PaymentStatus.CANCELED;
-            default -> PaymentStatus.READY;
         };
     }
 }

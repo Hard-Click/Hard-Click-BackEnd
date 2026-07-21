@@ -1,7 +1,6 @@
 package com.wanted.backend.domain.payment.infrastructure.persistence;
 
 import com.wanted.backend.domain.payment.domain.model.PaymentStatus;
-import com.wanted.backend.domain.payment.domain.model.PaymentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,8 +9,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 관리자 결제 목록의 상태/타입 매핑 검증.
- * DB 없이 검증 가능한 순수 로직만 다룬다(orders 쿼리 자체는 @SpringBootTest 통합 테스트 영역).
+ * 관리자 필터(PaymentStatus)를 실제 주문 상태 집합으로 변환하는 admin 전용 로직 검증.
+ * (주문상태→PaymentStatus, 원문→PaymentType 매핑은 enum으로 이관 — PaymentStatusTest/PaymentTypeTest 참고.)
  */
 class AdminPaymentQueryAdapterMappingTest {
 
@@ -44,24 +43,5 @@ class AdminPaymentQueryAdapterMappingTest {
     void resolveOrderStatuses_noOrderCounterpartIsEmpty() {
         assertThat(AdminPaymentQueryAdapter.resolveOrderStatuses(PaymentStatus.PENDING)).isEmpty();
         assertThat(AdminPaymentQueryAdapter.resolveOrderStatuses(PaymentStatus.FAILED)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("주문 상태를 응답용 PaymentStatus로 매핑한다(PAID/PARTIAL_REFUNDED→PAID)")
-    void toPaymentStatus_mapping() {
-        assertThat(AdminPaymentQueryAdapter.toPaymentStatus("PAID")).isEqualTo(PaymentStatus.PAID);
-        assertThat(AdminPaymentQueryAdapter.toPaymentStatus("PARTIAL_REFUNDED")).isEqualTo(PaymentStatus.PAID);
-        assertThat(AdminPaymentQueryAdapter.toPaymentStatus("REFUNDED")).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(AdminPaymentQueryAdapter.toPaymentStatus("CANCELED")).isEqualTo(PaymentStatus.CANCELED);
-        assertThat(AdminPaymentQueryAdapter.toPaymentStatus("READY")).isEqualTo(PaymentStatus.READY);
-    }
-
-    @Test
-    @DisplayName("결제 타입은 문자열을 enum으로 변환하고, null·미지원 값은 COURSE로 폴백한다")
-    void toPaymentType_mapping() {
-        assertThat(AdminPaymentQueryAdapter.toPaymentType("SUBSCRIPTION")).isEqualTo(PaymentType.SUBSCRIPTION);
-        assertThat(AdminPaymentQueryAdapter.toPaymentType("COURSE")).isEqualTo(PaymentType.COURSE);
-        assertThat(AdminPaymentQueryAdapter.toPaymentType(null)).isEqualTo(PaymentType.COURSE);
-        assertThat(AdminPaymentQueryAdapter.toPaymentType("UNKNOWN")).isEqualTo(PaymentType.COURSE);
     }
 }
