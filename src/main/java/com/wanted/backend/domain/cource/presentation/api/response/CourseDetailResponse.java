@@ -79,7 +79,13 @@ public record CourseDetailResponse(
         String instructorIntroduction,
 
         @Schema(description = "강사 경력", example = "전 대성마이맥 수학 강사\n전 메가스터디 인기 강사\n현 FLOWN 수학 대표 강사")
-        String instructorCareer
+        String instructorCareer,
+
+        @Schema(description = "권장 완강 기간(주). 미설정(구 강의) 시 null.", example = "12")
+        Integer recommendedWeeks,
+
+        @Schema(description = "코스별 강도 상한(하루 최대 학습 분). 미설정(구 강의) 시 null.", example = "120")
+        Integer dailyMaxMinutes
 ) {
     @Schema(description = "섹션(챕터) 응답")
     public record SectionResponse(
@@ -168,7 +174,9 @@ public record CourseDetailResponse(
                 result.instructorRating(),
                 result.instructorOneLineIntro(),
                 result.instructorIntroduction(),
-                result.instructorCareer()
+                result.instructorCareer(),
+                result.recommendedWeeks(),
+                result.dailyMaxMinutes()
         );
     }
 }

@@ -3,6 +3,7 @@ package com.wanted.backend.domain.cource.application.service;
 import com.wanted.backend.domain.cource.application.dto.CourseDetailResult;
 import com.wanted.backend.domain.cource.application.dto.CourseListResult;
 import com.wanted.backend.domain.cource.application.dto.InstructorDashboardResult;
+import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.EnrollmentStatsPort;
 import com.wanted.backend.domain.cource.application.port.InstructorQueryPort;
 import com.wanted.backend.domain.cource.application.port.InstructorStatsPort;
@@ -41,6 +42,7 @@ public class CourseQueryService implements CourseQueryUseCase {
     private final ReviewStatsPort reviewStatsPort;
     private final EnrollmentStatsPort enrollmentStatsPort;
     private final InstructorStatsPort instructorStatsPort;
+    private final CourseLearningPolicyPort courseLearningPolicyPort;
     private final S3UrlPresigner s3UrlPresigner;
 
     @Override
@@ -156,6 +158,11 @@ public class CourseQueryService implements CourseQueryUseCase {
         String instructorName = nameMap.getOrDefault(course.getAuthorId(), "알 수 없음");
         InstructorQueryPort.InstructorProfile instructorProfile = instructorQueryPort.findProfileById(course.getAuthorId());
 
+        // 학습 정책(권장 완강 기간·하루 강도 상한). 정책 레코드가 없는 구 강의는 두 값 모두 null.
+        CourseLearningPolicyPort.LearningPolicy policy = courseLearningPolicyPort.find(courseId).orElse(null);
+        Integer recommendedWeeks = policy == null ? null : policy.recommendedWeeks();
+        Integer dailyMaxMinutes = policy == null ? null : policy.dailyMaxMinutes();
+
         List<CourseDetailResult.SectionResult> sections = course.getSections().stream()
                 .sorted(Comparator.comparingInt(s -> s.getOrderIndex()))
                 .map(section -> new CourseDetailResult.SectionResult(
@@ -192,7 +199,8 @@ public class CourseQueryService implements CourseQueryUseCase {
                 instructorProfile.career(),
                 sections,
                 course.getLearningObjectives(), course.getTargetAudience(),
-                course.getTechTags(), course.getLevel()
+                course.getTechTags(), course.getLevel(),
+                recommendedWeeks, dailyMaxMinutes
         );
     }
 

@@ -28,7 +28,10 @@ public record CourseDetailResult(
         List<String> learningObjectives,
         List<String> targetAudience,
         List<String> techTags,
-        String level
+        String level,
+        // 학습 정책(강의 수정 화면 프리필용). 미설정(구 강의) 시 null.
+        Integer recommendedWeeks,
+        Integer dailyMaxMinutes
 ) {
     public record SectionResult(
             Long sectionId,
