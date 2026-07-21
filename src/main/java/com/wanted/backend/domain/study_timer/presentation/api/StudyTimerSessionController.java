@@ -6,8 +6,10 @@ import com.wanted.backend.domain.study_timer.application.command.ResumeStudyTime
 import com.wanted.backend.domain.study_timer.application.command.SaveStudyTimerHeartbeatCommand;
 import com.wanted.backend.domain.study_timer.application.command.StartStudyTimerSessionCommand;
 import com.wanted.backend.domain.study_timer.application.query.GetCurrentStudyTimerSessionQuery;
+import com.wanted.backend.domain.study_timer.application.query.GetStudyTimerSessionsByDateQuery;
 import com.wanted.backend.domain.study_timer.application.usecase.EndStudyTimerSessionUseCase;
 import com.wanted.backend.domain.study_timer.application.usecase.GetCurrentStudyTimerSessionUseCase;
+import com.wanted.backend.domain.study_timer.application.usecase.GetStudyTimerSessionsByDateUseCase;
 import com.wanted.backend.domain.study_timer.application.usecase.PauseStudyTimerSessionUseCase;
 import com.wanted.backend.domain.study_timer.application.usecase.ResumeStudyTimerSessionUseCase;
 import com.wanted.backend.domain.study_timer.application.usecase.SaveStudyTimerHeartbeatUseCase;
@@ -18,6 +20,7 @@ import com.wanted.backend.domain.study_timer.presentation.api.request.ResumeStud
 import com.wanted.backend.domain.study_timer.presentation.api.request.SaveStudyTimerHeartbeatRequest;
 import com.wanted.backend.domain.study_timer.presentation.api.request.StartStudyTimerSessionRequest;
 import com.wanted.backend.domain.study_timer.presentation.api.response.CurrentStudyTimerSessionResponse;
+import com.wanted.backend.domain.study_timer.presentation.api.response.DailyStudyTimerSessionResponse;
 import com.wanted.backend.domain.study_timer.presentation.api.response.StudyTimerHeartbeatResponse;
 import com.wanted.backend.domain.study_timer.presentation.api.response.StudyTimerSessionEndResponse;
 import com.wanted.backend.domain.study_timer.presentation.api.response.StudyTimerSessionPauseResponse;
@@ -32,6 +35,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -41,7 +45,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.List;
 
 @Validated
 @RestController
@@ -56,6 +65,35 @@ public class StudyTimerSessionController {
     private final ResumeStudyTimerSessionUseCase resumeStudyTimerSessionUseCase;
     private final EndStudyTimerSessionUseCase endStudyTimerSessionUseCase;
     private final GetCurrentStudyTimerSessionUseCase getCurrentStudyTimerSessionUseCase;
+    private final GetStudyTimerSessionsByDateUseCase getStudyTimerSessionsByDateUseCase;
+    // '오늘' 기본값을 서버 JVM 타임존이 아닌 팀 표준 Clock(Asia/Seoul)으로 계산한다.
+    private final Clock clock;
+
+    @GetMapping
+    @Operation(
+            summary = "특정 날짜의 순공시간 세션 목록 조회",
+            description = "타임테이블에 실제 공부 시간대를 막대로 표시하기 위한, 해당 날짜의 종료된(ENDED) 세션 목록입니다. "
+                    + "date 미지정 시 오늘(KST). 진행 중 세션은 /sessions/current, 중단 세션은 제외됩니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "세션 목록 조회 성공 (없으면 빈 배열)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+    })
+    public ResponseEntity<ApiResponse<List<DailyStudyTimerSessionResponse>>> sessionsByDate(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "조회 날짜(ISO). 미지정 시 오늘(KST)", example = "2026-07-21")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        LocalDate target = date != null ? date : LocalDate.now(clock);
+        List<DailyStudyTimerSessionResponse> body =
+                getStudyTimerSessionsByDateUseCase.handle(
+                                new GetStudyTimerSessionsByDateQuery(userDetails.getMemberId(), target))
+                        .stream()
+                        .map(DailyStudyTimerSessionResponse::from)
+                        .toList();
+
+        return ApiResponse.success("순공시간 세션 목록을 조회했습니다.", body);
+    }
 
     @GetMapping("/current")
     @Operation(
