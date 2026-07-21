@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -27,6 +28,18 @@ public class StudyTimerSessionRepositoryAdapter implements StudyTimerSessionRepo
 
     private final SpringDataStudyTimerSessionRepository repository;
     private final Clock clock;
+
+    @Override
+    public List<StudyTimerSession> findEndedSessionsByDate(Long memberId, LocalDate date) {
+        // 날짜 경계는 Clock(KST) 기준 wall-clock. started_at 도 같은 존으로 저장되므로 LocalDateTime 범위로 비교.
+        LocalDateTime from = date.atStartOfDay();
+        LocalDateTime toExclusive = date.plusDays(1).atStartOfDay();
+        return repository.findByMemberIdAndStatusAndStartedAtGreaterThanEqualAndStartedAtLessThanOrderByStartedAtAscIdAsc(
+                        memberId, StudyTimerSessionStatus.ENDED, from, toExclusive)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
 
     @Override
     public boolean existsRunningByMemberId(Long memberId) {
