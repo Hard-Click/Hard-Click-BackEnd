@@ -34,7 +34,7 @@ public class StudyTimerSessionRepositoryAdapter implements StudyTimerSessionRepo
         // 날짜 경계는 Clock(KST) 기준 wall-clock. started_at 도 같은 존으로 저장되므로 LocalDateTime 범위로 비교.
         LocalDateTime from = date.atStartOfDay();
         LocalDateTime toExclusive = date.plusDays(1).atStartOfDay();
-        return repository.findByMemberIdAndStatusAndStartedAtGreaterThanEqualAndStartedAtLessThanOrderByStartedAtAsc(
+        return repository.findByMemberIdAndStatusAndStartedAtGreaterThanEqualAndStartedAtLessThanOrderByStartedAtAscIdAsc(
                         memberId, StudyTimerSessionStatus.ENDED, from, toExclusive)
                 .stream()
                 .map(this::toDomain)
