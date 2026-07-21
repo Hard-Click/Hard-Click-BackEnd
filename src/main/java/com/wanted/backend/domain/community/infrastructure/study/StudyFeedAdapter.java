@@ -17,16 +17,17 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class StudyFeedAdapter implements StudyFeedPort {
 
-    // status != ACTIVE 면 모집 마감(FULL). DISSOLVED 는 애초에 조회에서 제외된다.
-    private static final String STATUS_DISSOLVED = "DISSOLVED";
+    // 전체 피드 노출 대상 상태. 해산(DISSOLVED)은 목록에서 제외한다.
+    // status != ACTIVE(=FULL)면 모집 마감으로 표기한다.
     private static final String STATUS_ACTIVE = "ACTIVE";
+    private static final String STATUS_FULL = "FULL";
 
     private final StudyReferenceRepository studyReferenceRepository;
     private final MemberNamePort memberNamePort;
 
     @Override
     public List<StudyFeedItem> findActiveStudies() {
-        List<StudyReferenceEntity> studies = studyReferenceRepository.findByStatusNot(STATUS_DISSOLVED);
+        List<StudyReferenceEntity> studies = studyReferenceRepository.findByStatusIn(List.of(STATUS_ACTIVE, STATUS_FULL));
         if (studies.isEmpty()) {
             return List.of();
         }

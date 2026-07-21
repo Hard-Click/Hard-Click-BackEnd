@@ -90,6 +90,12 @@ public class PostQueryService implements PostQueryUseCase {
                 : getListByBatchIn(null, sort, keyword, 0, limit, isAdmin);
     }
 
+    @Override
+    public int getPostCount(String keyword) {
+        // 전체 게시판(boardType=null) 기준 캐시된 게시글 수(TTL 30초) — 목록 조회 I/O 없이 count만.
+        return postCountCache.count(null, keyword);
+    }
+
     // 방법④(비정규화)로 측정 중 — ③(JOIN+DTO Projection)은 findSummaryByBoardTypeOrderByCommentCount /
     // findAllSummaryOrderByCommentCount에 그대로 남아있음, 비교 측정 끝나면 둘 중 채택된 것으로 정리 예정
     private List<PostItemResult> getListByCommentCount(BoardType boardType, String keyword, int page, int size, boolean isAdmin) {

@@ -30,13 +30,14 @@ public class UnifiedBoardQueryService implements UnifiedBoardQueryUseCase {
 
     @Override
     public UnifiedFeedResult getUnifiedFeed(PostSortType sort, String keyword, int page, boolean isAdmin, Long memberId) {
-        // 게시글 총 개수(페이지 수·totalCount 계산용)는 getList 결과에서 가져온다.
-        int postTotal = postQueryUseCase.getList(null, sort, keyword, 0, isAdmin, memberId).totalCount();
-
         // 스터디를 전역 정렬 기준으로 정확히 끼워 넣으려면, 요청 페이지 윈도를 덮는
         // 상위 (page+1)*PAGE_SIZE 게시글이 필요하다(스터디는 소량이라 전량 로드).
+        // 접근 검증은 getTopForFeed 안에서 수행된다.
         int limit = (page + 1) * PAGE_SIZE;
         List<PostItemResult> topPosts = postQueryUseCase.getTopForFeed(sort, keyword, limit, isAdmin, memberId);
+
+        // 총 개수는 캐시된 count 만(목록 조회 I/O 없이) — totalCount·totalPages 계산용.
+        int postTotal = postQueryUseCase.getPostCount(keyword);
 
         return UnifiedFeedAssembler.assemble(
                 topPosts, studyFeedPort.findActiveStudies(), sort, page, PAGE_SIZE, postTotal);
