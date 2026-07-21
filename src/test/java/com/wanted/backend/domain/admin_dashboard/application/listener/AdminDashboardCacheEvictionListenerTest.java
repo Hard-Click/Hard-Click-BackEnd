@@ -35,13 +35,19 @@ class AdminDashboardCacheEvictionListenerTest {
     }
 
     @Test
-    @DisplayName("공지 변경 이벤트를 받으면 대시보드 요약 캐시의 'summary' 키를 무효화한다")
+    @DisplayName("공지 변경 이벤트를 받으면 'summary' 키를 무효화하고 성공 메트릭을 증가시킨다")
     void evictsSummaryKeyOnNoticeChanged() {
         when(cacheManager.getCache(AdminDashboardCache.CACHE_NAME)).thenReturn(cache);
 
         listener.onNoticeChanged(NoticeChangedEvent.of(1L, NoticeChangedEvent.ChangeType.CREATED_GLOBAL));
 
         verify(cache).evict(AdminDashboardCache.SUMMARY_KEY);
+
+        double successes = meterRegistry.get("admin.dashboard.cache.evict")
+                .tag("result", "success")
+                .counter()
+                .count();
+        assertThat(successes).isEqualTo(1.0);
     }
 
     @Test

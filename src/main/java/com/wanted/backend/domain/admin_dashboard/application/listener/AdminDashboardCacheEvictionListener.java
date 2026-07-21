@@ -26,10 +26,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class AdminDashboardCacheEvictionListener {
 
     private final CacheManager cacheManager;
+    private final Counter evictSuccesses;
     private final Counter evictFailures;
 
     public AdminDashboardCacheEvictionListener(CacheManager cacheManager, MeterRegistry meterRegistry) {
         this.cacheManager = cacheManager;
+        this.evictSuccesses = Counter.builder("admin.dashboard.cache.evict")
+                .tag("result", "success")
+                .register(meterRegistry);
         this.evictFailures = Counter.builder("admin.dashboard.cache.evict")
                 .tag("result", "failure")
                 .register(meterRegistry);
@@ -42,10 +46,21 @@ public class AdminDashboardCacheEvictionListener {
             if (cache != null) {
                 cache.evict(AdminDashboardCache.SUMMARY_KEY);
             }
+            recordMetric(evictSuccesses);
         } catch (RuntimeException e) {
-            evictFailures.increment();
+            recordMetric(evictFailures);
             log.error("[AdminDashboard] 요약 캐시 무효화 실패. noticeId={}, changeType={}",
                     event.noticeId(), event.changeType(), e);
+        }
+    }
+
+    // AFTER_COMMIT에서는 메트릭 기록 자체의 예외도 커밋 콜러로 새면 안 된다(evict와 동일한 이유).
+    // increment는 사실상 예외를 던지지 않지만, 방어적으로 격리한다.
+    private void recordMetric(Counter counter) {
+        try {
+            counter.increment();
+        } catch (RuntimeException e) {
+            log.error("[AdminDashboard] 캐시 evict 메트릭 기록 실패", e);
         }
     }
 }
