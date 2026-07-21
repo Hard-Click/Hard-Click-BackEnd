@@ -53,8 +53,11 @@ public class AdminPaymentController {
             @Parameter(description = "페이지당 항목 수", example = "20")
             @RequestParam(defaultValue = "20") int size
     ) {
+        // paidAt 단독 정렬은 동률(같은 결제 시각) 시 페이지 경계에서 순서가 불안정해 행 누락/중복이
+        // 생길 수 있어, 결정적 보조 키(id DESC)를 더해 안정 정렬을 보장한다.
+        Sort sort = Sort.by(Sort.Direction.DESC, "paidAt").and(Sort.by(Sort.Direction.DESC, "id"));
         Page<AdminPaymentQueryPort.AdminPaymentData> result = getAdminPaymentsUseCase.handle(
-                status, keyword, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "paidAt")));
+                status, keyword, PageRequest.of(page, size, sort));
         return ApiResponse.success("관리자 결제 목록 조회 성공", AdminPaymentListResponse.from(result));
     }
 

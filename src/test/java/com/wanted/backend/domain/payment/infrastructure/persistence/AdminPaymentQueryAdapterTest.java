@@ -40,20 +40,23 @@ import static org.assertj.core.api.Assertions.assertThat;
         config = @SqlConfig(encoding = "UTF-8"))
 class AdminPaymentQueryAdapterTest {
 
-    private static final Pageable PAGE = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "paidAt"));
+    // 운영(AdminPaymentController)과 동일: paidAt DESC + 동률 안정화용 id DESC 보조 키
+    private static final Pageable PAGE = PageRequest.of(0, 20,
+            Sort.by(Sort.Direction.DESC, "paidAt").and(Sort.by(Sort.Direction.DESC, "id")));
 
     @Autowired
     private AdminPaymentQueryAdapter adapter;
 
     @Test
-    @DisplayName("실 결제(orders)를 노출하고 미결제 READY는 제외하며 paidAt DESC로 정렬한다")
+    @DisplayName("실 결제(orders)를 노출하고 미결제 READY는 제외하며 paidAt DESC + id DESC로 안정 정렬한다")
     void showsRealOrderBasedPaymentsExcludingReady() {
         Page<AdminPaymentData> page = adapter.search(null, null, PAGE);
 
-        // 206(READY) 제외, paidAt desc: 203>204>205>207>208
+        // 206(READY) 제외. 205와 207은 paidAt 동률(2026-07-18) → 보조 키 id DESC로 207이 205보다 앞.
+        // 최종: 203(07-20) > 204(07-19) > 207(07-18,id↑) > 205(07-18) > 208(07-16)
         assertThat(page.getContent())
                 .extracting(AdminPaymentData::paymentId)
-                .containsExactly(203L, 204L, 205L, 207L, 208L);
+                .containsExactly(203L, 204L, 207L, 205L, 208L);
     }
 
     @Test

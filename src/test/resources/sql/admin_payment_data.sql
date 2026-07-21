@@ -10,5 +10,5 @@ INSERT INTO orders (order_id, member_id, order_no, payment_type, status, final_a
     (204, 101, 'ORD-20260719-COURSE01', 'COURSE',       'PAID',               89000, '2026-07-19 09:00:00'),
     (205, 100, 'ORD-20260718-REFUND01', 'COURSE',       'REFUNDED',           89000, '2026-07-18 08:00:00'),
     (206, 101, 'ORD-20260721-READY001', 'COURSE',       'READY',              50000, NULL),
-    (207, 999, 'ORD-20260717-DELMEM01', 'SUBSCRIPTION', 'PAID',             3660000, '2026-07-17 07:00:00'),
+    (207, 999, 'ORD-20260717-DELMEM01', 'SUBSCRIPTION', 'PAID',             3660000, '2026-07-18 08:00:00'),
     (208, 100, 'ORD-20260716-PARTIAL1', 'COURSE',       'PARTIAL_REFUNDED',   89000, '2026-07-16 06:00:00');
