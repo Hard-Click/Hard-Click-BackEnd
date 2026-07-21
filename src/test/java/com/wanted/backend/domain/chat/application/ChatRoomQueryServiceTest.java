@@ -181,6 +181,27 @@ class ChatRoomQueryServiceTest {
     }
 
     @Test
+    @DisplayName("닫힌(CLOSED) 채팅방은 목록에서 제외되고 활성 방만 반환된다")
+    void getMyRooms_success_excludesClosedRooms() {
+        // given: 참여 중인 방 2개 중 하나는 스터디 삭제로 CLOSED 된 상태
+        ChatRoom active = ChatRoom.restore(12L, 45L, 1L, ChatRoomStatus.ACTIVE, LocalDateTime.now(), LocalDateTime.now());
+        ChatRoom closed = ChatRoom.restore(13L, 46L, 1L, ChatRoomStatus.CLOSED, LocalDateTime.now(), LocalDateTime.now());
+        given(chatRoomParticipantRepository.findChatRoomIdsByMemberId(1L)).willReturn(List.of(12L, 13L));
+        given(chatRoomRepository.findAllByIdIn(List.of(12L, 13L))).willReturn(List.of(active, closed));
+        // 활성 방(12L)만 상세 조립되므로 그 경로만 스텁한다(닫힌 방은 매핑 전에 걸러짐).
+        given(studyInfoQueryPort.getStudyInfo(45L)).willReturn(Optional.of(new StudyInfoResult("수학 스터디", "MATH_1")));
+        given(chatMessageRepository.findLatestByChatRoomId(12L)).willReturn(Optional.empty());
+        given(chatMessageRepository.countUnreadByChatRoomIdAndMemberId(12L, 1L)).willReturn(0L);
+
+        // when
+        List<MyChatRoomDetail> result = chatRoomQueryService.getMyRooms(1L);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).chatRoomId()).isEqualTo(12L);
+    }
+
+    @Test
     @DisplayName("마지막 메시지 전송 시각 최신순으로 정렬되어 반환된다")
     void getMyRooms_success_sortedByLastMessageAt() {
         // given

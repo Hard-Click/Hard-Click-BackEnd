@@ -10,6 +10,7 @@ import com.wanted.backend.domain.chat.application.result.ParticipantDetail;
 import com.wanted.backend.domain.chat.application.usecase.ChatRoomQueryUseCase;
 import com.wanted.backend.domain.chat.domain.model.ChatMessage;
 import com.wanted.backend.domain.chat.domain.model.ChatRoom;
+import com.wanted.backend.domain.chat.domain.model.ChatRoomStatus;
 import com.wanted.backend.domain.chat.domain.repository.ChatMessageRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomRepository;
@@ -86,7 +87,10 @@ public class ChatRoomQueryService implements ChatRoomQueryUseCase {
             return List.of();
         }
 
-        List<ChatRoom> chatRooms = chatRoomRepository.findAllByIdIn(chatRoomIds);
+        // 스터디 삭제·해산 등으로 닫힌(CLOSED) 방은 목록에서 제외한다(참여자 행은 close 시 남아있으므로 상태로 거른다).
+        List<ChatRoom> chatRooms = chatRoomRepository.findAllByIdIn(chatRoomIds).stream()
+                .filter(chatRoom -> chatRoom.getStatus() == ChatRoomStatus.ACTIVE)
+                .toList();
 
         return chatRooms.stream()
                 .map(chatRoom -> toMyChatRoomDetail(chatRoom, memberId))
