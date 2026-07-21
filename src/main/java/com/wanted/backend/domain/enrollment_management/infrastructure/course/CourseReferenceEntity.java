@@ -22,4 +22,9 @@ public class CourseReferenceEntity {
 
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
+
+    // course.status enum('DELETED','DRAFT','PUBLISHED'). 소프트 삭제는 status=DELETED 로 표현된다
+    // (course 테이블엔 deleted_at 컬럼이 없음). 수강 목록에서 삭제 강의를 거르는 데 쓴다.
+    @Column(name = "status", nullable = false)
+    private String status;
 }

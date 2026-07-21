@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS course (
     course_id BIGINT NOT NULL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
-    thumbnail_url VARCHAR(500)
+    thumbnail_url VARCHAR(500),
+    status VARCHAR(20) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS course_section (
