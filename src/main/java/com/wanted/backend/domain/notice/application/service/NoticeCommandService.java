@@ -16,6 +16,7 @@ import com.wanted.backend.domain.notice.domain.repository.NoticeRepository;
 import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,7 +67,10 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         return saved.getId();
     }
 
+    // 전체 공지 변경은 관리자 대시보드의 recentNotices/totalNoticeCount(GLOBAL·PUBLISHED 기준)에
+    // 영향을 주므로, 캐시(adminDashboard:v2, TTL 10분)를 무효화해 즉시 반영되게 한다.
     @Override
+    @CacheEvict(cacheNames = "adminDashboard:v2", key = "'summary'")
     public Long createGlobal(CreateGlobalNoticeCommand command) {
         globalNoticeCreatePolicy.validate(command.adminId());
 
@@ -80,7 +84,10 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         return saved.getId();
     }
 
+    // 수정/삭제는 GLOBAL/COURSE 모두 대상일 수 있으나, 대시보드 캐시는 단일 'summary' 키라
+    // 항상 무효화해도 부담이 없고 최신성이 보장된다.
     @Override
+    @CacheEvict(cacheNames = "adminDashboard:v2", key = "'summary'")
     public void update(UpdateNoticeCommand command) {
         Notice notice = noticeRepository.findById(command.noticeId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTICE_NOT_FOUND));
@@ -90,6 +97,7 @@ public class NoticeCommandService implements NoticeCommandUseCase {
     }
 
     @Override
+    @CacheEvict(cacheNames = "adminDashboard:v2", key = "'summary'")
     public void delete(DeleteNoticeCommand command) {
         Notice notice = noticeRepository.findById(command.noticeId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTICE_NOT_FOUND));
