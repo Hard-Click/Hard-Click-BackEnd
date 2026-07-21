@@ -81,6 +81,11 @@ public class StudentTodoJpaEntity {
         this.status = TodoStatus.DONE;
     }
 
+    /** 완료 취소 - 실수 체크·마음 변경 시 되돌린다. LESSON 슬롯과 달리 TODO는 양방향이다. */
+    public void markPlanned() {
+        this.status = TodoStatus.PLANNED;
+    }
+
     public boolean isOwnedBy(Long memberId) {
         return this.memberId.equals(memberId);
     }

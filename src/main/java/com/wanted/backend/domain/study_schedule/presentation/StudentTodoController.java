@@ -98,4 +98,21 @@ public class StudentTodoController {
         studentTodoUseCase.complete(userDetails.getMemberId(), todoId);
         return ApiResponse.successNoContent("완료 처리되었습니다.");
     }
+
+    @Operation(summary = "할 일 완료 취소",
+            description = "본인 할 일의 완료를 취소(PLANNED)합니다. 실수 체크·마음 변경 시 되돌립니다. "
+                    + "AI 학습 슬롯(LESSON)은 대상이 아니며 TODO에만 적용됩니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "완료 취소 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "없거나 타인 소유")
+    })
+    @PatchMapping("/{todoId}/incomplete")
+    public ResponseEntity<ApiResponse<Void>> incomplete(
+            @Parameter(description = "할 일 ID", example = "5") @PathVariable Long todoId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        studentTodoUseCase.incomplete(userDetails.getMemberId(), todoId);
+        return ApiResponse.successNoContent("완료가 취소되었습니다.");
+    }
 }

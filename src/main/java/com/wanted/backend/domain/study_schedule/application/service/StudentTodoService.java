@@ -44,6 +44,13 @@ public class StudentTodoService implements StudentTodoUseCase {
         }
     }
 
+    @Override
+    public void incomplete(Long memberId, Long todoId) {
+        if (!studentTodoPort.markPlanned(memberId, todoId)) {
+            throw new BusinessException(ErrorCode.TODO_NOT_FOUND);
+        }
+    }
+
     /**
      * 시간 규칙 - 타임테이블에 그릴 수 있는 형태인지 본다.
      *
