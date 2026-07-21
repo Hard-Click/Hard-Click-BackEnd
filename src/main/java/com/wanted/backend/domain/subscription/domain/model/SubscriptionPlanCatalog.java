@@ -22,7 +22,8 @@ public final class SubscriptionPlanCatalog {
             "신규 강의 추가 시 자동 이용 가능",
             "학습 진도율 저장",
             "퀴즈 응시 가능",
-            "마이페이지 학습 통계 반영"
+            "마이페이지 학습 통계 반영",
+            "AI 학습 스케줄러 이용 가능"
     );
 
     private SubscriptionPlanCatalog() {
