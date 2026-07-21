@@ -56,7 +56,8 @@ public class SimilarQuizController {
         List<SubmitSimilarQuizCommand.AnswerCommand> answers =
                 request == null || request.answers() == null ? List.of()
                         : request.answers().stream()
-                                .map(a -> new SubmitSimilarQuizCommand.AnswerCommand(a.questionId(), a.selectedIndex()))
+                                .map(a -> new SubmitSimilarQuizCommand.AnswerCommand(
+                                        a.questionId(), a.selectedIndex(), a.timeSpentSeconds()))
                                 .toList();
 
         SimilarQuizSubmissionResult result = submitSimilarQuizUseCase.submit(
