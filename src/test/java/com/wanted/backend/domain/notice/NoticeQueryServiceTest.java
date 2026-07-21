@@ -4,13 +4,13 @@ import com.wanted.backend.domain.notice.application.command.GetNoticeListCommand
 import com.wanted.backend.domain.notice.application.port.CourseInfoPort;
 import com.wanted.backend.domain.notice.application.port.EnrolledCoursePort;
 import com.wanted.backend.domain.notice.application.port.InstructorCoursePort;
+import com.wanted.backend.domain.notice.application.port.NoticeReadPort;
 import com.wanted.backend.domain.notice.application.result.NoticeDetailResult;
 import com.wanted.backend.domain.notice.application.result.NoticeListResult;
 import com.wanted.backend.domain.notice.application.service.NoticeQueryService;
 import com.wanted.backend.domain.notice.domain.model.Notice;
 import com.wanted.backend.domain.notice.domain.model.NoticeStatus;
 import com.wanted.backend.domain.notice.domain.repository.NoticeRepository;
-import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -48,7 +48,7 @@ class NoticeQueryServiceTest {
     private EnrolledCoursePort enrolledCoursePort;
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private NoticeReadPort noticeReadPort;
 
     private NoticeQueryService noticeQueryService;
 
@@ -58,7 +58,7 @@ class NoticeQueryServiceTest {
     private void init() {
         noticeQueryService = new NoticeQueryService(
                 noticeRepository, courseInfoPort, instructorCoursePort,
-                enrolledCoursePort, notificationRepository);
+                enrolledCoursePort, noticeReadPort);
     }
 
     private Notice courseNotice() {
@@ -101,6 +101,22 @@ class NoticeQueryServiceTest {
     }
 
     @Test
+    @DisplayName("읽음 처리된 공지는 상세 조회 시 isRead=true로 내려온다")
+    void getDetail_reflectsReadState() {
+        init();
+        Long memberId = 20L;
+        when(noticeRepository.findById(noticeId)).thenReturn(java.util.Optional.of(courseNotice()));
+        when(courseInfoPort.getCourseNameByCourseId(courseId)).thenReturn("스프링 부트 강의");
+        when(noticeRepository.findPreviousNotice(anyLong(), anyString(), anyLong()))
+                .thenReturn(java.util.Optional.empty());
+        when(noticeReadPort.isRead(memberId, noticeId)).thenReturn(true);
+
+        NoticeDetailResult result = noticeQueryService.getDetail(noticeId, memberId, "STUDENT");
+
+        assertThat(result.isRead()).isTrue();
+    }
+
+    @Test
     @DisplayName("존재하지 않는 공지사항 조회 시 실패한다")
     void getDetail_fail_noticeNotFound() {
         init();
@@ -123,7 +139,7 @@ class NoticeQueryServiceTest {
         when(noticeRepository.findCourseNotices(eq(courseId), anyString(), any(Pageable.class)))
                 .thenReturn(page);
         when(courseInfoPort.getCourseNameByCourseId(courseId)).thenReturn("스프링 부트 강의");
-        when(notificationRepository.findReadNoticeIds(isNull(), anyList())).thenReturn(List.of());
+        when(noticeReadPort.findReadNoticeIds(isNull(), anyList())).thenReturn(List.of());
 
         GetNoticeListCommand command = new GetNoticeListCommand(
                 "COURSE", courseId, null, 0, 10, null, null);
@@ -158,7 +174,7 @@ class NoticeQueryServiceTest {
         when(noticeRepository.findCourseNoticesByIds(eq(List.of(courseId)), anyString(), any(Pageable.class)))
                 .thenReturn(page);
         when(courseInfoPort.getCourseNamesByCourseIds(anyList())).thenReturn(java.util.Map.of(courseId, "스프링 부트 강의"));
-        when(notificationRepository.findReadNoticeIds(eq(studentId), anyList())).thenReturn(List.of());
+        when(noticeReadPort.findReadNoticeIds(eq(studentId), anyList())).thenReturn(List.of());
 
         GetNoticeListCommand command = new GetNoticeListCommand(
                 "COURSE", null, null, 0, 10, studentId, "STUDENT");

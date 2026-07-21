@@ -198,6 +198,30 @@ public class NoticeController {
         return ApiResponse.success("공지사항이 수정되었습니다.", new UpdateNoticeResponse(noticeId));
     }
 
+    @PatchMapping("/notices/{noticeId}/read")
+    @Operation(
+            summary = "공지사항 읽음 처리",
+            description = """
+                로그인한 회원 기준으로 해당 공지를 읽음 처리합니다.
+                - 공지 목록/배너에서 직접 상세로 진입하는 경로에서 호출하면 안읽음 표시(빨간 점)가 해제됩니다.
+                - 이미 읽은 공지를 다시 호출해도 성공합니다(멱등).
+                """
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공지사항 읽음 처리 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항을 찾을 수 없음")
+    })
+    public ResponseEntity<ApiResponse<Void>> markNoticeAsRead(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "읽음 처리할 공지사항 ID", example = "4")
+            @PathVariable Long noticeId) {
+
+        noticeCommandUseCase.markAsRead(userDetails.getMemberId(), noticeId);
+
+        return ApiResponse.successNoContent("공지사항 읽음 처리 완료");
+    }
+
     @DeleteMapping("/notices/{noticeId}")
     @Operation(
             summary = "공지사항 삭제",
