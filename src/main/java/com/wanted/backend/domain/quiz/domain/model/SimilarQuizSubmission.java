@@ -45,6 +45,14 @@ public class SimilarQuizSubmission {
                 correctCount, submittedAt, new ArrayList<>(answers));
     }
 
+    /** 영속화 이후 채번된 식별자를 반영해 도메인 객체를 복원한다(어댑터 save 반환용). */
+    public static SimilarQuizSubmission restore(Long id, Long similarQuizId, Long memberId, int score,
+                                                int totalQuestionCount, int correctCount,
+                                                LocalDateTime submittedAt, List<Answer> answers) {
+        return new SimilarQuizSubmission(id, similarQuizId, memberId, score, totalQuestionCount,
+                correctCount, submittedAt, new ArrayList<>(answers));
+    }
+
     public Long getId() { return id; }
     public Long getSimilarQuizId() { return similarQuizId; }
     public Long getMemberId() { return memberId; }

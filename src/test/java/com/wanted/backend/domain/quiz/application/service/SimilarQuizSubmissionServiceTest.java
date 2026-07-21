@@ -182,6 +182,33 @@ class SimilarQuizSubmissionServiceTest {
     }
 
     @Test
+    void submitKeepsBoundaryTimeSpent() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        // 경계값: 0초(즉답도 진짜값)와 3600초(상한 포함)는 유지. 초과(3601+)만 이상치로 null 처리하므로
+        // normalizeTimeSpent 의 > 가 >= 로, < 0 이 <= 0 으로 잘못 리팩터되면 이 두 값이 깨진다 — 그 회귀를 막는다.
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 0),
+                new SubmitSimilarQuizCommand.AnswerCommand(Q2_ID, Q2_ANSWER_INDEX, 3600)));
+
+        service.submit(command);
+
+        ArgumentCaptor<SimilarQuizSubmission> captor = ArgumentCaptor.forClass(SimilarQuizSubmission.class);
+        verify(submissionRepository).save(captor.capture());
+        SimilarQuizSubmission saved = captor.getValue();
+        assertThat(timeSpentOf(saved, Q1_ID)).isEqualTo(0);
+        assertThat(timeSpentOf(saved, Q2_ID)).isEqualTo(3600);
+    }
+
+    private static Integer timeSpentOf(SimilarQuizSubmission submission, long questionId) {
+        return submission.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(questionId)).findFirst().orElseThrow()
+                .getTimeSpentSeconds();
+    }
+
+    @Test
     void submitRejectsWhenNotSubscribed() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(false);
 

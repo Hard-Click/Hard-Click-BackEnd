@@ -25,8 +25,8 @@ public class SimilarQuizSubmissionRepositoryAdapter implements SimilarQuizSubmis
         }
 
         SimilarQuizSubmissionJpaEntity saved = jpaRepository.save(entity);
-        return SimilarQuizSubmission.create(
-                saved.getSimilarQuizId(), saved.getMemberId(), saved.getScore(),
+        return SimilarQuizSubmission.restore(
+                saved.getId(), saved.getSimilarQuizId(), saved.getMemberId(), saved.getScore(),
                 saved.getTotalQuestionCount(), saved.getCorrectCount(), saved.getSubmittedAt(),
                 submission.getAnswers());
     }
