@@ -73,8 +73,8 @@ public class PostQueryService implements PostQueryUseCase {
         // 댓글순 정렬은 방법③(JOIN + DTO Projection)으로 작성자명/댓글수까지 한 쿼리에 받아온다.
         // 그 외 정렬은 기존 방법②(Batch IN + Map)를 그대로 쓴다.
         List<PostItemResult> items = sort == PostSortType.comments
-                ? getListByCommentCount(boardType, keyword, page, isAdmin)
-                : getListByBatchIn(boardType, sort, keyword, page, isAdmin);
+                ? getListByCommentCount(boardType, keyword, page, PAGE_SIZE, isAdmin)
+                : getListByBatchIn(boardType, sort, keyword, page, PAGE_SIZE, isAdmin);
 
         return new PostListResult(
                 items, page,
@@ -82,21 +82,29 @@ public class PostQueryService implements PostQueryUseCase {
                 totalCount);
     }
 
+    @Override
+    public List<PostItemResult> getTopForFeed(PostSortType sort, String keyword, int limit, boolean isAdmin, Long memberId) {
+        communityAccessPolicy.validateAccessIfLoggedIn(memberId);
+        return sort == PostSortType.comments
+                ? getListByCommentCount(null, keyword, 0, limit, isAdmin)
+                : getListByBatchIn(null, sort, keyword, 0, limit, isAdmin);
+    }
+
     // 방법④(비정규화)로 측정 중 — ③(JOIN+DTO Projection)은 findSummaryByBoardTypeOrderByCommentCount /
     // findAllSummaryOrderByCommentCount에 그대로 남아있음, 비교 측정 끝나면 둘 중 채택된 것으로 정리 예정
-    private List<PostItemResult> getListByCommentCount(BoardType boardType, String keyword, int page, boolean isAdmin) {
+    private List<PostItemResult> getListByCommentCount(BoardType boardType, String keyword, int page, int size, boolean isAdmin) {
         List<PostSummary> summaries = boardType != null
-                ? postRepository.findSummaryByBoardTypeOrderByCommentCountDenormalized(boardType, keyword, page, PAGE_SIZE)
-                : postRepository.findAllSummaryOrderByCommentCountDenormalized(keyword, page, PAGE_SIZE);
+                ? postRepository.findSummaryByBoardTypeOrderByCommentCountDenormalized(boardType, keyword, page, size)
+                : postRepository.findAllSummaryOrderByCommentCountDenormalized(keyword, page, size);
 
         return summaries.stream().map(s -> toItemResult(s, isAdmin)).toList();
     }
 
     private List<PostItemResult> getListByBatchIn(BoardType boardType, PostSortType sort,
-                                                   String keyword, int page, boolean isAdmin) {
+                                                   String keyword, int page, int size, boolean isAdmin) {
         List<Post> posts = boardType != null
-                ? postRepository.findByBoardType(boardType, sort, keyword, page, PAGE_SIZE)
-                : postRepository.findAll(sort, keyword, page, PAGE_SIZE);
+                ? postRepository.findByBoardType(boardType, sort, keyword, page, size)
+                : postRepository.findAll(sort, keyword, page, size);
 
         // 작성자명 + 댓글 수 일괄 조회 — N+1 제거
         Set<Long> authorIds = posts.stream().map(Post::getAuthorId).collect(Collectors.toSet());
