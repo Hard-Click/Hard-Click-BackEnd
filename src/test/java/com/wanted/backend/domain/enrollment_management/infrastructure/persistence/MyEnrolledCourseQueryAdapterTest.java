@@ -97,4 +97,15 @@ class MyEnrolledCourseQueryAdapterTest {
 
         assertThat(result).isEmpty();
     }
+
+    /**
+     * 수강 상태는 정상(IN_PROGRESS)이지만 강의가 소프트 삭제(status=DELETED)된 경우,
+     * 목록에서 제외돼야 한다 — 상세는 삭제 강의에 404를 내므로 목록에만 남으면 클릭 시 불일치가 난다.
+     */
+    @Test
+    void 소프트_삭제된_강의의_수강은_목록에서_제외된다() {
+        List<MyEnrolledCourseData> result = queryAdapter.findByMemberId(4L);
+
+        assertThat(result).isEmpty();
+    }
 }
