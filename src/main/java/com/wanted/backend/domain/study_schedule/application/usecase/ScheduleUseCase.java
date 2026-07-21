@@ -14,4 +14,10 @@ public interface ScheduleUseCase {
 
     /** 슬롯 완료 체크. */
     void completeSlot(Long memberId, Long slotId);
+
+    /**
+     * 계획일이 지난 미완료(PLANNED) 슬롯을 MISSED 로 일괄 전이한다(배치용).
+     * @return 전이된 슬롯 수
+     */
+    int markPastPlannedAsMissed(LocalDate today);
 }
