@@ -103,6 +103,21 @@ class UnifiedFeedAssemblerTest {
         assertThat(page1.totalCount()).isEqualTo(4);
     }
 
+    /** QUESTION 게시글의 과목(subject)이 통합 항목의 subjectName 으로 내려간다 — 개별 게시판 API와 필드 일치. */
+    @Test
+    void mapsQuestionPostSubject() {
+        PostItemResult question = new PostItemResult(
+                5L, BoardType.QUESTION, "MATH_1", "수1 쎈 287번", "작성자", T, 3, 1, false);
+
+        UnifiedFeedResult result = UnifiedFeedAssembler.assemble(
+                List.of(question), List.of(), PostSortType.latest, 0, 10, 1);
+
+        UnifiedFeedItemResult item = result.items().get(0);
+        assertThat(item.type()).isEqualTo("POST");
+        assertThat(item.boardType()).isEqualTo("QUESTION");
+        assertThat(item.subjectName()).isEqualTo("MATH_1");
+    }
+
     /** 스터디 항목 필드 매핑 확인. */
     @Test
     void mapsStudyFields() {

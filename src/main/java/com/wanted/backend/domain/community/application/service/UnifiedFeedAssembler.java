@@ -69,9 +69,10 @@ final class UnifiedFeedAssembler {
     }
 
     private static UnifiedFeedItemResult fromPost(PostItemResult post) {
+        // subjectName: QUESTION 게시글의 과목(PostItemResult.subject, FREE는 null). 개별 게시판 API와 필드 일치.
         return new UnifiedFeedItemResult(
                 TYPE_POST, post.postId(), null, post.boardType().name(), post.title(), post.authorName(),
-                post.viewCount(), post.commentCount(), null, null, null, null, post.isAccepted(), post.createdAt());
+                post.viewCount(), post.commentCount(), post.subject(), null, null, null, post.isAccepted(), post.createdAt());
     }
 
     private static UnifiedFeedItemResult fromStudy(StudyFeedItem study) {
