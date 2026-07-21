@@ -4,18 +4,20 @@ import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizComma
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.SubmitSimilarQuizUseCase;
-import com.wanted.backend.domain.quiz.domain.model.Quiz;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.model.SimilarQuiz;
+import com.wanted.backend.domain.quiz.domain.model.SimilarQuizSubmission;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
 import com.wanted.backend.domain.quiz.domain.repository.SimilarQuizRepository;
+import com.wanted.backend.domain.quiz.domain.repository.SimilarQuizSubmissionRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,8 +32,9 @@ import java.util.stream.Collectors;
  * (코스 전체 로딩 회피). 정답 보기 순서(answerIndex)는 optionNumber ASC로 정렬된 보기 목록에서 정답 보기의
  * 위치(0-based)다 — 생성(①) 응답이 노출한 보기 순서와 동일하므로 selectedIndex와 직접 비교할 수 있다.
  *
- * 트랜잭션 경계: 외부 호출이 없는 순수 조회 채점이므로 두 조회(findById·findQuestionsByIds)를 하나의
- * 읽기 전용 트랜잭션으로 묶어 Read Skew를 막는다.
+ * 트랜잭션 경계: 채점 결과(제출·답안)를 저장하므로 쓰기 트랜잭션이다. 조회(findById·findQuestionsByIds)와
+ * 저장을 하나의 트랜잭션으로 묶는다. 재응시를 허용하므로 저장마다 새 제출 이력이 시간순으로 쌓인다
+ * (추천기가 라운드 단위로 난이도·시간 신호를 판정하는 근거).
  */
 @Service
 @RequiredArgsConstructor
@@ -39,10 +42,11 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
 
     private final SimilarQuizRepository similarQuizRepository;
     private final QuizRepository quizRepository;
+    private final SimilarQuizSubmissionRepository submissionRepository;
     private final SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public SimilarQuizSubmissionResult submit(SubmitSimilarQuizCommand command) {
         if (!subscriptionAccessPort.hasActiveSubscription(command.memberId())) {
             throw new BusinessException(ErrorCode.SIMILAR_QUIZ_SUBSCRIPTION_REQUIRED);
@@ -57,13 +61,16 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
                 .stream().collect(Collectors.toMap(QuizQuestion::getId, Function.identity()));
 
         Map<Long, Integer> selectedByQuestion = new HashMap<>();
+        Map<Long, Integer> timeByQuestion = new HashMap<>();
         if (command.answers() != null) {
             for (SubmitSimilarQuizCommand.AnswerCommand answer : command.answers()) {
                 selectedByQuestion.put(answer.questionId(), answer.selectedIndex());
+                timeByQuestion.put(answer.questionId(), answer.timeSpentSeconds());
             }
         }
 
         List<SimilarQuizSubmissionResult.Question> questions = new ArrayList<>();
+        List<SimilarQuizSubmission.Answer> answersToPersist = new ArrayList<>();
         int correctCount = 0;
         for (Long questionId : similarQuiz.getQuestionIds()) {
             QuizQuestion question = questionById.get(questionId);
@@ -81,10 +88,17 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
             questions.add(new SimilarQuizSubmissionResult.Question(
                     questionId, question.getQuestionText(), optionTexts,
                     answerIndex, selectedIndex, question.getExplanation(), correct));
+            answersToPersist.add(SimilarQuizSubmission.Answer.of(
+                    questionId, selectedIndex, correct, timeByQuestion.get(questionId)));
         }
 
         int totalCount = questions.size();
         int score = totalCount == 0 ? 0 : Math.round((float) correctCount * 100 / totalCount);
+
+        // 복습 이력 저장(재응시 허용 → 시간순 누적). 추천기가 이 이력으로 난이도·시간 신호를 판정한다.
+        submissionRepository.save(SimilarQuizSubmission.create(
+                similarQuiz.getId(), command.memberId(), score, totalCount, correctCount,
+                LocalDateTime.now(), answersToPersist));
 
         return new SimilarQuizSubmissionResult(similarQuiz.getId(), score, correctCount, totalCount, questions);
     }

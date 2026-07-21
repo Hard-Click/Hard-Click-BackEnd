@@ -10,5 +10,5 @@ public record SubmitSimilarQuizCommand(
         Long memberId,
         List<AnswerCommand> answers
 ) {
-    public record AnswerCommand(Long questionId, Integer selectedIndex) {}
+    public record AnswerCommand(Long questionId, Integer selectedIndex, Integer timeSpentSeconds) {}
 }
