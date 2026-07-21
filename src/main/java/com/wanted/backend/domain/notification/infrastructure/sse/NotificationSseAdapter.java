@@ -21,6 +21,9 @@ public class NotificationSseAdapter implements NotificationSsePort {
     private static final String EVENT_NAME = "notification";
     // 최초 연결 시 전송하는 더미 이벤트 (연결 확립용 - 브라우저 EventSource는 첫 데이터 수신 전까지 연결 미확인)
     private static final String CONNECT_EVENT_NAME = "connect";
+    // ALB idle timeout(기본 60초) 이전에 트래픽을 흘려 커넥션 유지용 (스케줄러가 주기 전송)
+    private static final String HEARTBEAT_EVENT_NAME = "heartbeat";
+    private static final String HEARTBEAT_DATA = "ping";
 
     // 멤버 1명이 복수 탭/기기에서 연결할 수 있으므로 List로 관리
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
@@ -51,6 +54,16 @@ public class NotificationSseAdapter implements NotificationSsePort {
         }
         for (SseEmitter emitter : memberEmitters) {
             sendToEmitter(memberId, emitter, EVENT_NAME, payload);
+        }
+    }
+
+    @Override
+    public void sendHeartbeat() {
+        for (Map.Entry<Long, List<SseEmitter>> entry : emitters.entrySet()) {
+            Long memberId = entry.getKey();
+            for (SseEmitter emitter : entry.getValue()) {
+                sendToEmitter(memberId, emitter, HEARTBEAT_EVENT_NAME, HEARTBEAT_DATA);
+            }
         }
     }
 
