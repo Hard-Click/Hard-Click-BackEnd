@@ -97,6 +97,24 @@ class ReviewQuizServiceTest {
     }
 
     @Test
+    void generateDeduplicatesRepeatedSimilarIdWithinSameGroup() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        // 추천기가 한 그룹 안에서 같은 유사문제 id를 중복으로 돌려줘도 응답엔 한 번만 실려야 한다.
+        when(recommender.recommendReview(eq(MEMBER_ID), anyInt())).thenReturn(List.of(
+                new ReviewItem(1101L, 137L, List.of(201L, 201L, 202L))));
+        when(quizRepository.findQuestionsByIds(anyList())).thenReturn(List.of(
+                question(201L, "유사201"), question(202L, "유사202")));
+
+        ReviewQuizResult result = service.generateForStudent(MEMBER_ID);
+
+        assertThat(result).isNotNull();
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).similar())
+                .extracting(ReviewQuizResult.Question::questionId)
+                .containsExactly(201L, 202L);
+    }
+
+    @Test
     void generateReturnsNullWhenSimilarQuestionsNotFound() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(recommender.recommendReview(eq(MEMBER_ID), anyInt())).thenReturn(List.of(

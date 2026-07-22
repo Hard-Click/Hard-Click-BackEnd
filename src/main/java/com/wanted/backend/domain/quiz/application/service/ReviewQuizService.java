@@ -67,7 +67,7 @@ public class ReviewQuizService implements ReviewQuizUseCase {
         List<ReviewGroup> groups = new ArrayList<>();
         for (ReviewItem item : items) {
             List<Question> questions = new ArrayList<>();
-            for (Long similarId : item.similarIds()) {
+            for (Long similarId : item.similarIds().stream().distinct().toList()) {
                 QuizQuestion question = questionById.get(similarId);
                 if (question == null) {
                     continue; // 인덱싱 전/조회 불가 문항 스킵
