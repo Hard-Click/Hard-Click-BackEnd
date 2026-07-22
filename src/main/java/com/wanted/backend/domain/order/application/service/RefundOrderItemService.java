@@ -9,12 +9,11 @@ import com.wanted.backend.domain.order.domain.model.OrderStatus;
 import com.wanted.backend.domain.order.domain.policy.OrderRefundPolicy;
 import com.wanted.backend.domain.order.domain.repository.OrderRepository;
 import com.wanted.backend.domain.payment.application.port.PgClient;
+import com.wanted.backend.global.common.DistributedLock;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +21,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 주문 항목 단위 환불. 실제 Toss 결제취소(/v1/payments/{paymentKey}/cancel) 호출 후
@@ -39,28 +37,18 @@ public class RefundOrderItemService implements RefundOrderItemUseCase {
     private static final String CANCEL_REASON = "학생 요청에 의한 강의 환불";
     private static final String LOCK_KEY_PREFIX = "order:refund:lock:";
     private static final Duration LOCK_TTL = Duration.ofSeconds(30);
-    private static final DefaultRedisScript<Long> UNLOCK_SCRIPT = new DefaultRedisScript<>(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-            Long.class);
 
     private final OrderRepository orderRepository;
     private final OrderEnrollmentRevocationPort enrollmentRevocationPort;
     private final OrderCourseProgressPort orderCourseProgressPort;
     private final PgClient pgClient;
-    private final StringRedisTemplate redisTemplate;
+    private final DistributedLock distributedLock;
     private final Clock clock;
 
     @Override
     public void refund(Long memberId, Long orderId, Long courseId, String idempotencyKey) {
         // 동일 주문 항목에 대한 동시 환불 방지
-        String lockKey = LOCK_KEY_PREFIX + orderId + ":" + courseId;
-        String lockValue = UUID.randomUUID().toString();
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, LOCK_TTL);
-        if (acquired == null || !acquired) {
-            throw new BusinessException(ErrorCode.DUPLICATE_PAYMENT_REQUEST);
-        }
-
-        try {
+        distributedLock.runWithLock(LOCK_KEY_PREFIX + orderId + ":" + courseId, LOCK_TTL, () -> {
             // Step 1: 검증 (짧은 읽기 전용 TX)
             Order order = orderRepository.findById(orderId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
@@ -115,13 +103,6 @@ public class RefundOrderItemService implements RefundOrderItemUseCase {
             } catch (RuntimeException e) {
                 log.error("[REFUND_REVOKE_FAILED] DB 환불 완료됐지만 수강권 박탈 실패 — 수동 보정 필요. orderId: {}, courseId: {}", orderId, courseId, e);
             }
-
-        } finally {
-            try {
-                redisTemplate.execute(UNLOCK_SCRIPT, List.of(lockKey), lockValue);
-            } catch (RuntimeException e) {
-                log.error("[REFUND_LOCK_RELEASE_FAILED] orderId: {}, lockKey: {}", orderId, lockKey, e);
-            }
-        }
+        });
     }
 }

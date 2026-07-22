@@ -8,6 +8,7 @@ import com.wanted.backend.domain.order.domain.model.OrderType;
 import com.wanted.backend.domain.order.domain.repository.OrderRepository;
 import com.wanted.backend.domain.payment.application.port.PgClient;
 import com.wanted.backend.domain.subscription.application.usecase.CancelSubscriptionUseCase;
+import com.wanted.backend.global.common.DistributedLock;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,19 +18,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -45,8 +44,7 @@ class AdminRefundOrderServiceTest {
     @Mock private PgClient pgClient;
     @Mock private OrderEnrollmentRevocationPort enrollmentRevocationPort;
     @Mock private CancelSubscriptionUseCase cancelSubscriptionUseCase;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock private DistributedLock distributedLock;
 
     @InjectMocks private AdminRefundOrderService service;
 
@@ -54,8 +52,11 @@ class AdminRefundOrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        lenient().when(valueOps.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+        // 락을 획득한 것처럼 콜백을 그대로 실행한다.
+        lenient().doAnswer(invocation -> {
+            invocation.getArgument(2, Runnable.class).run();
+            return null;
+        }).when(distributedLock).runWithLock(anyString(), any(Duration.class), any(Runnable.class));
     }
 
     private Order order(Long id, OrderType type, OrderStatus status, int finalAmount, List<OrderItem> items) {
@@ -155,7 +156,8 @@ class AdminRefundOrderServiceTest {
     @Test
     @DisplayName("락 획득 실패 시 중복 요청으로 처리하고 주문 조회조차 하지 않는다")
     void rejectsWhenLockNotAcquired() {
-        when(valueOps.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+        doThrow(new BusinessException(ErrorCode.DUPLICATE_PAYMENT_REQUEST))
+                .when(distributedLock).runWithLock(anyString(), any(Duration.class), any(Runnable.class));
 
         assertThatThrownBy(() -> service.refund(203L))
                 .isInstanceOf(BusinessException.class)
