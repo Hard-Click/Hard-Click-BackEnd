@@ -9,8 +9,8 @@ import java.util.List;
 
 @Schema(description = "섹션 수정 요청")
 public record UpdateSectionRequest(
-        @Schema(description = "섹션 ID (null이면 신규 섹션)", example = "1")
-        Long id,
+        @Schema(description = "섹션 ID (신규 섹션이면 필드 생략 또는 null)", example = "1")
+        Long sectionId,
 
         @Schema(description = "섹션 제목", example = "섹션 1: 함수의 극한")
         @NotBlank(message = "섹션 제목은 필수입니다.")
