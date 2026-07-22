@@ -85,8 +85,8 @@ public class GetLessonGrassService implements GetLessonGrassUseCase {
     public String resolveCacheKey(GetLessonGrassQuery query) {
         LocalDate today = LocalDate.now(clock);
         int year = query.year() != null ? query.year() : today.getYear();
-        String scope = query.month() != null ? year + "-" + query.month() : String.valueOf(year);
-        String key = query.memberId() + ":" + scope;
-        return year >= today.getYear() ? key + ":" + today : key;
+        return query.month() != null
+                ? LessonGrassCacheKey.monthly(query.memberId(), year, query.month(), today)
+                : LessonGrassCacheKey.yearly(query.memberId(), year, today);
     }
 }

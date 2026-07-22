@@ -44,11 +44,8 @@ public class LessonGrassStatUpdater {
     }
 
     // 완료된 날(statDate)이 속한 연간뷰·월간뷰 캐시만 정밀 제거한다.
-    // 키의 마지막 세그먼트는 '완료일'이 아니라 '조회 시점(오늘)'이어야 한다 — GetLessonGrassService.resolveCacheKey 와
-    // 동일하게 today=now(clock) 를 쓰고, 현재연도 이상만 today suffix 를 붙인다(과거연도는 연/월만으로 키 고정).
-    // 이렇게 하지 않으면 자정을 넘겨 처리되는 완료(특히 연말→연초)에서 실제 조회 키와 어긋나 stale 이 남는다.
-    //   - 연간: 현재연도 이상 memberId:year:today / 과거연도 memberId:year
-    //   - 월간: 현재연도 이상 memberId:year-month:today / 과거연도 memberId:year-month  (month 제로패딩 없음)
+    // 키 규칙은 조회(resolveCacheKey)와 LessonGrassCacheKey 로 공유한다 — 마지막 세그먼트는 '완료일'이 아니라
+    // '조회 시점(오늘=now(clock))'이어야, 자정을 넘겨 처리되는 완료(특히 연말→연초)에서도 실제 조회 키와 어긋나지 않는다.
     private void evictLessonGrassCache(Long memberId, LocalDate statDate) {
         Cache cache = cacheManager.getCache(LESSON_GRASS_CACHE);
         if (cache == null) {
@@ -56,12 +53,7 @@ public class LessonGrassStatUpdater {
         }
         LocalDate today = LocalDate.now(clock);
         int year = statDate.getYear();
-        boolean currentYearOnward = year >= today.getYear();
-
-        String yearKey = memberId + ":" + year;                                  // 연간뷰
-        cache.evict(currentYearOnward ? yearKey + ":" + today : yearKey);
-
-        String monthKey = memberId + ":" + year + "-" + statDate.getMonthValue(); // 월간뷰
-        cache.evict(currentYearOnward ? monthKey + ":" + today : monthKey);
+        cache.evict(LessonGrassCacheKey.yearly(memberId, year, today));
+        cache.evict(LessonGrassCacheKey.monthly(memberId, year, statDate.getMonthValue(), today));
     }
 }
