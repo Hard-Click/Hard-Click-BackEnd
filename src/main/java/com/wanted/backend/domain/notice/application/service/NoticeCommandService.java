@@ -10,6 +10,7 @@ import com.wanted.backend.domain.notice.application.policy.NoticeUpdatePolicy;
 import com.wanted.backend.domain.notice.application.port.AdminValidationPort;
 import com.wanted.backend.domain.notice.application.port.NoticeReadPort;
 import com.wanted.backend.domain.notice.application.usecase.NoticeCommandUseCase;
+import com.wanted.backend.domain.notice.domain.event.NoticeChangedEvent;
 import com.wanted.backend.domain.notice.domain.event.NoticeCreatedEvent;
 import com.wanted.backend.domain.notice.domain.model.Notice;
 import com.wanted.backend.domain.notice.domain.repository.NoticeRepository;
@@ -66,6 +67,10 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         return saved.getId();
     }
 
+    // 전체 공지 변경은 관리자 대시보드의 recentNotices/totalNoticeCount(GLOBAL·PUBLISHED 기준)에
+    // 영향을 준다. 캐시 무효화는 NoticeChangedEvent를 발행해 admin_dashboard 리스너가 커밋 후
+    // 처리한다(커밋 전 stale 재적재 방지 + evict 실패를 공지 작업과 격리). @CacheEvict를 직접 걸면
+    // 트랜잭션 커밋과 분리돼 위 두 문제를 못 막는다.
     @Override
     public Long createGlobal(CreateGlobalNoticeCommand command) {
         globalNoticeCreatePolicy.validate(command.adminId());
@@ -76,10 +81,14 @@ public class NoticeCommandService implements NoticeCommandUseCase {
 
         eventPublisher.publishEvent(NoticeCreatedEvent.of(
                 saved.getId(), null, "GLOBAL", saved.getTitle(), true));
+        eventPublisher.publishEvent(NoticeChangedEvent.of(
+                saved.getId(), NoticeChangedEvent.ChangeType.CREATED_GLOBAL));
 
         return saved.getId();
     }
 
+    // 수정/삭제는 GLOBAL/COURSE 모두 대상일 수 있으나, 대시보드 캐시는 단일 'summary' 키라
+    // 항상 무효화해도 부담이 없고 최신성이 보장된다.
     @Override
     public void update(UpdateNoticeCommand command) {
         Notice notice = noticeRepository.findById(command.noticeId())
@@ -87,6 +96,9 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         noticeUpdatePolicy.validate(command.memberId(), notice);
         notice.update(command.title(), command.content(), command.isPinned());
         noticeRepository.save(notice);
+
+        eventPublisher.publishEvent(NoticeChangedEvent.of(
+                notice.getId(), NoticeChangedEvent.ChangeType.UPDATED));
     }
 
     @Override
@@ -96,6 +108,9 @@ public class NoticeCommandService implements NoticeCommandUseCase {
         noticeUpdatePolicy.validate(command.memberId(), notice);
         noticeRepository.deleteById(command.noticeId());
         notificationRepository.deleteByRedirectUrlStartingWith("/notices/" + command.noticeId());
+
+        eventPublisher.publishEvent(NoticeChangedEvent.of(
+                command.noticeId(), NoticeChangedEvent.ChangeType.DELETED));
     }
 
     @Override
