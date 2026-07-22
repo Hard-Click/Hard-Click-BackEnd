@@ -108,4 +108,15 @@ class MyEnrolledCourseQueryAdapterTest {
 
         assertThat(result).isEmpty();
     }
+
+    /**
+     * 강의가 비공개(status=DRAFT)면 수강 중이어도 목록에서 제외돼야 한다 — PUBLISHED 만 노출.
+     * (강사가 게시 중단한 강의를 학생 수강 목록에 남기지 않는다.)
+     */
+    @Test
+    void 비공개_DRAFT_강의의_수강은_목록에서_제외된다() {
+        List<MyEnrolledCourseData> result = queryAdapter.findByMemberId(5L);
+
+        assertThat(result).isEmpty();
+    }
 }

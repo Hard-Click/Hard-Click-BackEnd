@@ -7,6 +7,8 @@ DELETE FROM course;
 INSERT INTO course (course_id, title, thumbnail_url, status) VALUES (20, 'Spring Course', null, 'PUBLISHED');
 -- 소프트 삭제된 강의: 수강 중이어도 목록에서 제외돼야 한다.
 INSERT INTO course (course_id, title, thumbnail_url, status) VALUES (21, 'Deleted Course', null, 'DELETED');
+-- 비공개(DRAFT) 강의: 게시 중단 상태라 수강 목록에서 제외돼야 한다.
+INSERT INTO course (course_id, title, thumbnail_url, status) VALUES (22, 'Draft Course', null, 'DRAFT');
 
 -- 섹션 2개를 의도적으로 order_index와 id 순서가 어긋나게 둬서, id가 아니라 order_index가
 -- 정렬을 결정하는지(섹션 경계를 넘는 정렬 보존까지) 검증한다.
@@ -50,4 +52,11 @@ INSERT INTO enrollment (
     enrollment_id, member_id, course_id, enrolled_at, status, expired_at
 ) VALUES (
     203, 4, 21, CURRENT_TIMESTAMP, 'IN_PROGRESS', null
+);
+
+-- member 5: 수강 상태는 정상이지만 강의가 비공개(status=DRAFT) -> 목록에서 제외돼야 함
+INSERT INTO enrollment (
+    enrollment_id, member_id, course_id, enrolled_at, status, expired_at
+) VALUES (
+    204, 5, 22, CURRENT_TIMESTAMP, 'IN_PROGRESS', null
 );
