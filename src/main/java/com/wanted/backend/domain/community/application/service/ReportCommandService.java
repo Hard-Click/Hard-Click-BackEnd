@@ -75,15 +75,17 @@ public class ReportCommandService implements ReportCommandUseCase {
         if (count >= REPORT_FLAG_THRESHOLD) {
             log.warn("[Report Flag] targetType: {}, targetId: {}, count: {}",
                     command.targetType(), command.targetId(), count);
+            // 관리자 신고 목록은 3건 이상 누적된 대상만 노출한다(AdminReportQueryAdapter).
+            // 1·2건째에 알림만 먼저 가면 목록엔 아무것도 안 보여 혼란스러우므로,
+            // 알림도 동일 기준(3건째부터)으로 발송한다. 4·5건째 이후는 매번 발송된다.
+            eventPublisher.publishEvent(ReportCreatedEvent.of(
+                    reportId, command.targetType().name(), command.targetId()));
         }
         // 회원 단위 자동 차단 로직
         int totalReportCount = reportRepository.countByReportedMemberId(reportedMemberId);
         if (totalReportCount >= AUTO_SUSPEND_REPORT_THRESHOLD) {
             memberAutoSuspendPort.suspendForReportThreshold(reportedMemberId);
         }
-
-        eventPublisher.publishEvent(ReportCreatedEvent.of(
-                reportId, command.targetType().name(), command.targetId()));
 
         return reportId;
     }

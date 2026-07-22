@@ -6,6 +6,7 @@ import com.wanted.backend.domain.study_schedule.application.port.SchedulePlanPor
 import com.wanted.backend.domain.study_schedule.application.port.StudentTodoPort;
 import com.wanted.backend.domain.study_schedule.application.usecase.ScheduleUseCase;
 import com.wanted.backend.domain.study_schedule.domain.model.ScheduleItemSource;
+import com.wanted.backend.global.common.DateRanges;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -26,6 +28,10 @@ import java.util.stream.Stream;
 public class ScheduleService implements ScheduleUseCase {
 
     private static final String STATUS_DONE = "DONE";
+
+    // 캘린더 조회 최대 기간 = 1년. 무제한 범위(예: 10년) 요청 시 대량 조회로 인한 OOM·성능 저하를 막는다.
+    // study_timer 일별 조회(ST018)와 동일한 상한을 쓴다.
+    private static final Period MAX_QUERY_PERIOD = Period.ofYears(1);
 
     /**
      * 정렬 기준: 날짜 → 시작 시각 → 항목 ID.
@@ -64,6 +70,8 @@ public class ScheduleService implements ScheduleUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleDtos.CalendarItem> getMySchedule(Long memberId, LocalDate from, LocalDate to) {
+        DateRanges.requireValidRange(from, to, MAX_QUERY_PERIOD,
+                ErrorCode.SCHEDULE_DATE_RANGE_INVALID, ErrorCode.SCHEDULE_DATE_RANGE_TOO_LONG);
         // 캘린더는 복습을 예정일(due) 그 날짜에 노출한다 - findDueReviews 가 (코스, due날짜) 단위로 이미 나눠 준다.
         return mergedItems(memberId, from, to, reviewPlanPort.findDueReviews(memberId, from, to));
     }
@@ -108,5 +116,12 @@ public class ScheduleService implements ScheduleUseCase {
         if (updated == 0) {
             throw new BusinessException(ErrorCode.SCHEDULE_SLOT_NOT_FOUND);
         }
+    }
+
+    @Override
+    @Transactional
+    public int markPastPlannedAsMissed(LocalDate today) {
+        // 계획일이 지난 PLANNED 슬롯을 MISSED 로. 배치(ScheduleMissedScheduler)가 매일 호출한다.
+        return schedulePlanPort.markMissedBefore(today);
     }
 }

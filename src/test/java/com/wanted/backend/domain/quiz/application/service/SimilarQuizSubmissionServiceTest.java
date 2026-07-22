@@ -6,20 +6,26 @@ import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionRe
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
 import com.wanted.backend.domain.quiz.domain.model.QuizQuestion;
 import com.wanted.backend.domain.quiz.domain.model.SimilarQuiz;
+import com.wanted.backend.domain.quiz.domain.model.SimilarQuizSubmission;
 import com.wanted.backend.domain.quiz.domain.repository.QuizRepository;
 import com.wanted.backend.domain.quiz.domain.repository.SimilarQuizRepository;
+import com.wanted.backend.domain.quiz.domain.repository.SimilarQuizSubmissionRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class SimilarQuizSubmissionServiceTest {
@@ -31,6 +37,7 @@ class SimilarQuizSubmissionServiceTest {
 
     private SimilarQuizRepository similarQuizRepository;
     private QuizRepository quizRepository;
+    private SimilarQuizSubmissionRepository submissionRepository;
     private SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
     private SimilarQuizSubmissionService service;
 
@@ -38,40 +45,53 @@ class SimilarQuizSubmissionServiceTest {
     void setUp() {
         similarQuizRepository = mock(SimilarQuizRepository.class);
         quizRepository = mock(QuizRepository.class);
+        submissionRepository = mock(SimilarQuizSubmissionRepository.class);
         subscriptionAccessPort = mock(SimilarQuizSubscriptionAccessPort.class);
-        service = new SimilarQuizSubmissionService(similarQuizRepository, quizRepository, subscriptionAccessPort);
+        service = new SimilarQuizSubmissionService(
+                similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort);
     }
 
-    // 문항 10(정답=보기2, answerIndex 1)·20(정답=보기1, answerIndex 0) — 유사퀴즈가 참조하는 원문항.
+    // 유사퀴즈가 참조하는 원문항 두 개. 정답 위치(answerIndex)를 인자로 명시한다.
+    private static final long Q1_ID = 10L;   // 정답 = 보기 index 1
+    private static final int  Q1_ANSWER_INDEX = 1;
+    private static final long Q2_ID = 20L;   // 정답 = 보기 index 0
+    private static final int  Q2_ANSWER_INDEX = 0;
+
     private List<QuizQuestion> courseQuestions() {
-        QuizQuestion q10 = QuizQuestion.restore(10L, 1, "질문10", "해설10", List.of(
-                QuizOption.restore(101L, 1, "오답", false),
-                QuizOption.restore(102L, 2, "정답", true),
-                QuizOption.restore(103L, 3, "오답", false),
-                QuizOption.restore(104L, 4, "오답", false)));
-        QuizQuestion q20 = QuizQuestion.restore(20L, 2, "질문20", "해설20", List.of(
-                QuizOption.restore(201L, 1, "정답", true),
-                QuizOption.restore(202L, 2, "오답", false),
-                QuizOption.restore(203L, 3, "오답", false),
-                QuizOption.restore(204L, 4, "오답", false)));
-        return List.of(q10, q20);
+        return List.of(fourChoiceQuestion(Q1_ID, Q1_ANSWER_INDEX), fourChoiceQuestion(Q2_ID, Q2_ANSWER_INDEX));
+    }
+
+    // 정답 위치(answerIndex)가 아닌 유효한 오답 보기 위치(0~3). 시나리오의 "오답 선택"을 상수에서 파생해
+    // 정답 인덱스를 바꿔도 오답 시나리오가 자동으로 따라오게 한다(매직 리터럴 제거).
+    private static int wrongIndex(int answerIndex) {
+        return answerIndex == 0 ? 1 : 0;
+    }
+
+    // 4지선다 문항 생성 — correctIndex(0~3) 위치의 보기만 정답. 보기 id는 문항 id에서 파생해 고유성 보장.
+    private QuizQuestion fourChoiceQuestion(long questionId, int correctIndex) {
+        List<QuizOption> options = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            boolean correct = (i == correctIndex);
+            options.add(QuizOption.restore(questionId * 10 + i, i + 1, correct ? "정답" : "오답", correct));
+        }
+        return QuizQuestion.restore(questionId, 1, "질문" + questionId, "해설" + questionId, options);
     }
 
     private SimilarQuiz similarQuiz(Long ownerId) {
         return SimilarQuiz.restore(SIMILAR_QUIZ_ID, ownerId, COURSE_ID, 3, "3주차 오답 유사 퀴즈",
-                List.of(10L, 20L), LocalDateTime.of(2026, 5, 12, 10, 0));
+                List.of(Q1_ID, Q2_ID), LocalDateTime.of(2026, 5, 12, 10, 0));
     }
 
     @Test
     void submitGradesWithAnswersExplanationsAndScore() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
-        when(quizRepository.findQuestionsByIds(List.of(10L, 20L))).thenReturn(courseQuestions());
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
-        // 10번은 정답(index 1), 20번은 오답(index 2, 정답 index 0)
+        // Q1은 정답 선택, Q2는 오답 선택
         SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
-                new SubmitSimilarQuizCommand.AnswerCommand(10L, 1),
-                new SubmitSimilarQuizCommand.AnswerCommand(20L, 2)));
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 70),
+                new SubmitSimilarQuizCommand.AnswerCommand(Q2_ID, wrongIndex(Q2_ANSWER_INDEX), null)));
 
         SimilarQuizSubmissionResult result = service.submit(command);
 
@@ -80,36 +100,112 @@ class SimilarQuizSubmissionServiceTest {
         assertThat(result.correctCount()).isEqualTo(1);
         assertThat(result.score()).isEqualTo(50);
 
-        SimilarQuizSubmissionResult.Question q10 = result.questions().get(0);
-        assertThat(q10.questionId()).isEqualTo(10L);
-        assertThat(q10.answerIndex()).isEqualTo(1);
-        assertThat(q10.selectedIndex()).isEqualTo(1);
-        assertThat(q10.correct()).isTrue();
-        assertThat(q10.explanation()).isEqualTo("해설10");
+        SimilarQuizSubmissionResult.Question q1 = result.questions().get(0);
+        assertThat(q1.questionId()).isEqualTo(Q1_ID);
+        assertThat(q1.answerIndex()).isEqualTo(Q1_ANSWER_INDEX);
+        assertThat(q1.selectedIndex()).isEqualTo(Q1_ANSWER_INDEX);
+        assertThat(q1.correct()).isTrue();
+        assertThat(q1.explanation()).isEqualTo("해설" + Q1_ID);
 
-        SimilarQuizSubmissionResult.Question q20 = result.questions().get(1);
-        assertThat(q20.answerIndex()).isZero();
-        assertThat(q20.selectedIndex()).isEqualTo(2);
-        assertThat(q20.correct()).isFalse();
+        SimilarQuizSubmissionResult.Question q2 = result.questions().get(1);
+        assertThat(q2.answerIndex()).isEqualTo(Q2_ANSWER_INDEX);
+        assertThat(q2.selectedIndex()).isEqualTo(wrongIndex(Q2_ANSWER_INDEX));
+        assertThat(q2.correct()).isFalse();
     }
 
     @Test
     void submitTreatsUnansweredQuestionAsIncorrectWithNullSelectedIndex() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
-        when(quizRepository.findQuestionsByIds(List.of(10L, 20L))).thenReturn(courseQuestions());
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
-        // 10번만 정답 제출, 20번 미응답
+        // Q1만 정답 제출, Q2 미응답
         SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
-                new SubmitSimilarQuizCommand.AnswerCommand(10L, 1)));
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, null)));
 
         SimilarQuizSubmissionResult result = service.submit(command);
 
         assertThat(result.correctCount()).isEqualTo(1);
         assertThat(result.score()).isEqualTo(50);
-        SimilarQuizSubmissionResult.Question q20 = result.questions().get(1);
-        assertThat(q20.selectedIndex()).isNull();
-        assertThat(q20.correct()).isFalse();
+        SimilarQuizSubmissionResult.Question q2 = result.questions().get(1);
+        assertThat(q2.selectedIndex()).isNull();
+        assertThat(q2.correct()).isFalse();
+    }
+
+    @Test
+    void submitPersistsSubmissionWithPerQuestionTimeAndCorrectness() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        // Q1 정답+70초, Q2 오답+시간 미측정(null)
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 70),
+                new SubmitSimilarQuizCommand.AnswerCommand(Q2_ID, wrongIndex(Q2_ANSWER_INDEX), null)));
+
+        service.submit(command);
+
+        ArgumentCaptor<SimilarQuizSubmission> captor = ArgumentCaptor.forClass(SimilarQuizSubmission.class);
+        verify(submissionRepository).save(captor.capture());
+        SimilarQuizSubmission saved = captor.getValue();
+        assertThat(saved.getSimilarQuizId()).isEqualTo(SIMILAR_QUIZ_ID);
+        assertThat(saved.getMemberId()).isEqualTo(MEMBER_ID);
+        assertThat(saved.getCorrectCount()).isEqualTo(1);
+
+        SimilarQuizSubmission.Answer a1 = saved.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(Q1_ID)).findFirst().orElseThrow();
+        assertThat(a1.getTimeSpentSeconds()).isEqualTo(70);
+        assertThat(a1.isCorrect()).isTrue();
+
+        SimilarQuizSubmission.Answer a2 = saved.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(Q2_ID)).findFirst().orElseThrow();
+        assertThat(a2.getTimeSpentSeconds()).isNull();
+        assertThat(a2.isCorrect()).isFalse();
+    }
+
+    @Test
+    void submitNullifiesOutOfRangeTimeSpent() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        // 음수·상한 초과(3600s 초과)는 신뢰 불가 → null(미측정). 보기 인덱스는 이 테스트와 무관해 정답 위치로 채운다.
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, -5),
+                new SubmitSimilarQuizCommand.AnswerCommand(Q2_ID, Q2_ANSWER_INDEX, 3601)));
+
+        service.submit(command);
+
+        ArgumentCaptor<SimilarQuizSubmission> captor = ArgumentCaptor.forClass(SimilarQuizSubmission.class);
+        verify(submissionRepository).save(captor.capture());
+        assertThat(captor.getValue().getAnswers()).allMatch(a -> a.getTimeSpentSeconds() == null);
+    }
+
+    @Test
+    void submitKeepsBoundaryTimeSpent() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        // 경계값: 0초(즉답도 진짜값)와 3600초(상한 포함)는 유지. 초과(3601+)만 이상치로 null 처리하므로
+        // normalizeTimeSpent 의 > 가 >= 로, < 0 이 <= 0 으로 잘못 리팩터되면 이 두 값이 깨진다 — 그 회귀를 막는다.
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 0),
+                new SubmitSimilarQuizCommand.AnswerCommand(Q2_ID, Q2_ANSWER_INDEX, 3600)));
+
+        service.submit(command);
+
+        ArgumentCaptor<SimilarQuizSubmission> captor = ArgumentCaptor.forClass(SimilarQuizSubmission.class);
+        verify(submissionRepository).save(captor.capture());
+        SimilarQuizSubmission saved = captor.getValue();
+        assertThat(timeSpentOf(saved, Q1_ID)).isEqualTo(0);
+        assertThat(timeSpentOf(saved, Q2_ID)).isEqualTo(3600);
+    }
+
+    private static Integer timeSpentOf(SimilarQuizSubmission submission, long questionId) {
+        return submission.getAnswers().stream()
+                .filter(a -> a.getQuestionId().equals(questionId)).findFirst().orElseThrow()
+                .getTimeSpentSeconds();
     }
 
     @Test
@@ -121,6 +217,7 @@ class SimilarQuizSubmissionServiceTest {
         assertThatThrownBy(() -> service.submit(command))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SIMILAR_QUIZ_SUBSCRIPTION_REQUIRED);
+        verifyNoInteractions(submissionRepository); // 거부 시 이력 저장 안 함
     }
 
     @Test

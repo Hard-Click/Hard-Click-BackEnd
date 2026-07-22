@@ -5,6 +5,9 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
  * course_learning_policy 저장 어댑터. 전용 JPA 엔티티 없이 native upsert 로 처리한다
  * (해당 테이블은 CP-SAT 입력 전용이라 도메인 애그리거트에 얹지 않고 정책 레코드만 관리).
@@ -31,5 +34,26 @@ public class CourseLearningPolicyAdapter implements CourseLearningPolicyPort {
                 .setParameter("weeks", recommendedWeeks)
                 .setParameter("daily", dailyMaxMinutes)
                 .executeUpdate();
+    }
+
+    @Override
+    public Optional<LearningPolicy> find(Long courseId) {
+        // course_id 는 PK(1:1)라 0 또는 1행. 값 컬럼은 nullable이므로 Number 캐스팅 시 null 방어.
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = entityManager.createNativeQuery("""
+                select recommended_duration_weeks, daily_recommended_minutes
+                from course_learning_policy
+                where course_id = :courseId
+                """)
+                .setParameter("courseId", courseId)
+                .getResultList();
+
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] row = rows.get(0);
+        Integer weeks = row[0] == null ? null : ((Number) row[0]).intValue();
+        Integer daily = row[1] == null ? null : ((Number) row[1]).intValue();
+        return Optional.of(new LearningPolicy(weeks, daily));
     }
 }

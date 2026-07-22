@@ -27,4 +27,7 @@ public interface StudentTodoPort {
 
     /** 할 일 완료 체크. @return 갱신 여부(false = 없음/타인 소유) */
     boolean markDone(Long memberId, Long todoId);
+
+    /** 할 일 완료 취소(PLANNED 로 되돌림). @return 갱신 여부(false = 없음/타인 소유) */
+    boolean markPlanned(Long memberId, Long todoId);
 }

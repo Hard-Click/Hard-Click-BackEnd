@@ -20,4 +20,7 @@ public interface StudentTodoUseCase {
 
     /** 할 일 완료 체크. */
     void complete(Long memberId, Long todoId);
+
+    /** 할 일 완료 취소(PLANNED 로 되돌림). */
+    void incomplete(Long memberId, Long todoId);
 }

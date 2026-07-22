@@ -5,8 +5,10 @@ import com.wanted.backend.domain.community.application.command.DeletePostCommand
 import com.wanted.backend.domain.community.application.command.UpdatePostCommand;
 import com.wanted.backend.domain.community.application.result.PostDetailResult;
 import com.wanted.backend.domain.community.application.result.PostListResult;
+import com.wanted.backend.domain.community.application.result.UnifiedFeedResult;
 import com.wanted.backend.domain.community.application.usecase.PostCommandUseCase;
 import com.wanted.backend.domain.community.application.usecase.PostQueryUseCase;
+import com.wanted.backend.domain.community.application.usecase.UnifiedBoardQueryUseCase;
 import com.wanted.backend.domain.community.domain.model.BoardType;
 import com.wanted.backend.domain.community.domain.model.PostSortType;
 import com.wanted.backend.domain.community.presentation.request.CreatePostRequest;
@@ -34,11 +36,14 @@ public class PostController {
 
     private final PostCommandUseCase postCommandUseCase;
     private final PostQueryUseCase postQueryUseCase;
+    private final UnifiedBoardQueryUseCase unifiedBoardQueryUseCase;
 
     public PostController(PostCommandUseCase postCommandUseCase,
-                          PostQueryUseCase postQueryUseCase) {
+                          PostQueryUseCase postQueryUseCase,
+                          UnifiedBoardQueryUseCase unifiedBoardQueryUseCase) {
         this.postCommandUseCase = postCommandUseCase;
         this.postQueryUseCase = postQueryUseCase;
+        this.unifiedBoardQueryUseCase = unifiedBoardQueryUseCase;
     }
 
 
@@ -138,9 +143,10 @@ public class PostController {
             @RequestParam(defaultValue = "0") int page) {
 
         boolean isAdmin = "ADMIN".equals(userDetails.getRole());
-        PostListResult result = postQueryUseCase.getList(null, sort, keyword, page, isAdmin, userDetails.getMemberId());
-        List<UnifiedBoardItemResponse> items = result.posts().stream()
-                .map(UnifiedBoardItemResponse::fromPostItem)
+        UnifiedFeedResult result = unifiedBoardQueryUseCase.getUnifiedFeed(
+                sort, keyword, page, isAdmin, userDetails.getMemberId());
+        List<UnifiedBoardItemResponse> items = result.items().stream()
+                .map(UnifiedBoardItemResponse::fromUnified)
                 .toList();
         return ApiResponse.success("게시글 목록 조회 성공",
                 new UnifiedBoardListResponse(items, result.currentPage(), result.totalPages(), result.totalCount()));

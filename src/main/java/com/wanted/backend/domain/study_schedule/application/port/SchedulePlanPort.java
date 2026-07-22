@@ -19,4 +19,11 @@ public interface SchedulePlanPort {
      * @return 갱신된 행 수(0이면 없음/타인 소유)
      */
     int markSlotDone(Long memberId, Long slotId);
+
+    /**
+     * 계획일이 지났는데(plan_date &lt; today) 아직 PLANNED 인 슬롯을 MISSED 로 일괄 전이한다.
+     * 매일 배치가 호출 - "하루 지나면 못 한 학습으로 표시"의 원천. DONE/이미 MISSED 는 건드리지 않는다.
+     * @return 갱신된 행 수
+     */
+    int markMissedBefore(LocalDate today);
 }

@@ -1,8 +1,8 @@
 package com.wanted.backend.domain.payment.presentation;
 
+import com.wanted.backend.domain.order.application.usecase.AdminRefundOrderUseCase;
 import com.wanted.backend.domain.payment.application.port.AdminPaymentQueryPort;
 import com.wanted.backend.domain.payment.application.usecase.GetAdminPaymentsUseCase;
-import com.wanted.backend.domain.payment.application.usecase.RefundPaymentUseCase;
 import com.wanted.backend.domain.payment.domain.model.PaymentStatus;
 import com.wanted.backend.domain.payment.presentation.response.AdminPaymentListResponse;
 import com.wanted.backend.global.common.ApiResponse;
@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPaymentController {
 
     private final GetAdminPaymentsUseCase getAdminPaymentsUseCase;
-    private final RefundPaymentUseCase refundPaymentUseCase;
+    private final AdminRefundOrderUseCase adminRefundOrderUseCase;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -53,8 +53,11 @@ public class AdminPaymentController {
             @Parameter(description = "페이지당 항목 수", example = "20")
             @RequestParam(defaultValue = "20") int size
     ) {
+        // paidAt 단독 정렬은 동률(같은 결제 시각) 시 페이지 경계에서 순서가 불안정해 행 누락/중복이
+        // 생길 수 있어, 결정적 보조 키(id DESC)를 더해 안정 정렬을 보장한다.
+        Sort sort = Sort.by(Sort.Direction.DESC, "paidAt").and(Sort.by(Sort.Direction.DESC, "id"));
         Page<AdminPaymentQueryPort.AdminPaymentData> result = getAdminPaymentsUseCase.handle(
-                status, keyword, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "paidAt")));
+                status, keyword, PageRequest.of(page, size, sort));
         return ApiResponse.success("관리자 결제 목록 조회 성공", AdminPaymentListResponse.from(result));
     }
 
@@ -72,9 +75,9 @@ public class AdminPaymentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 환불된 결제이거나 환불 불가 상태")
     })
     public ResponseEntity<ApiResponse<Void>> refund(
-            @Parameter(description = "환불할 결제 ID", example = "1")
+            @Parameter(description = "환불할 결제 ID (= 주문 ID, 목록의 paymentId)", example = "203")
             @PathVariable Long paymentId) {
-        refundPaymentUseCase.handle(paymentId);
+        adminRefundOrderUseCase.refund(paymentId);
         return ApiResponse.successNoContent("환불이 처리되었습니다.");
     }
 }

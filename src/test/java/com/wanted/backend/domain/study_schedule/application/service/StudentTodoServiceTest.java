@@ -91,6 +91,7 @@ class StudentTodoServiceTest {
         when(studentTodoPort.update(anyLong(), anyLong(), any())).thenReturn(false);
         when(studentTodoPort.delete(anyLong(), anyLong())).thenReturn(false);
         when(studentTodoPort.markDone(anyLong(), anyLong())).thenReturn(false);
+        when(studentTodoPort.markPlanned(anyLong(), anyLong())).thenReturn(false);
 
         assertThatThrownBy(() -> studentTodoService.update(MEMBER_ID, 999L, command(null, null)))
                 .isInstanceOf(BusinessException.class)
@@ -102,6 +103,11 @@ class StudentTodoServiceTest {
 
         assertThatThrownBy(() -> studentTodoService.complete(MEMBER_ID, 999L))
                 .isInstanceOf(BusinessException.class);
+
+        assertThatThrownBy(() -> studentTodoService.incomplete(MEMBER_ID, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.TODO_NOT_FOUND);
     }
 
     @Test
@@ -110,5 +116,13 @@ class StudentTodoServiceTest {
 
         assertThatCode(() -> studentTodoService.complete(MEMBER_ID, 5L)).doesNotThrowAnyException();
         verify(studentTodoPort).markDone(MEMBER_ID, 5L);
+    }
+
+    @Test
+    void incompletesOwnedTodo() {
+        when(studentTodoPort.markPlanned(MEMBER_ID, 5L)).thenReturn(true);
+
+        assertThatCode(() -> studentTodoService.incomplete(MEMBER_ID, 5L)).doesNotThrowAnyException();
+        verify(studentTodoPort).markPlanned(MEMBER_ID, 5L);
     }
 }

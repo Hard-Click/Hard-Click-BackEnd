@@ -24,6 +24,9 @@ public record SimilarQuizSubmitRequest(
             @NotNull(message = "selectedIndex는 필수입니다.")
             @Min(value = 0, message = "selectedIndex는 0 이상이어야 합니다.")
             @Max(value = 3, message = "selectedIndex는 3 이하여야 합니다.")
-            Integer selectedIndex
+            Integer selectedIndex,
+
+            @Schema(description = "문제 풀이 체류 시간(초, 재방문 누적). 미측정 시 null", example = "42")
+            Integer timeSpentSeconds
     ) {}
 }

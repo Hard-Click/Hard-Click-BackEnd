@@ -97,6 +97,19 @@ public class SchedulePlanAdapter implements SchedulePlanPort {
                 .executeUpdate();
     }
 
+    @Override
+    public int markMissedBefore(LocalDate today) {
+        // 지난 계획일(plan_date < today)의 PLANNED 슬롯만 MISSED 로. 스냅샷 최신 여부는 따지지 않는다
+        // (과거 스냅샷 슬롯은 조회에서 어차피 제외되므로 마킹돼도 무해 — 조건 단순화가 배치 안정성에 유리).
+        return entityManager.createNativeQuery("""
+                update schedule_slot ss
+                set ss.status = 'MISSED'
+                where ss.status = 'PLANNED' and ss.plan_date < :today
+                """)
+                .setParameter("today", today)
+                .executeUpdate();
+    }
+
     // ----- helpers -----
 
     private static long toLong(Object value) {

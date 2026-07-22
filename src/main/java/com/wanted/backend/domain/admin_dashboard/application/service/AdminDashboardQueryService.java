@@ -1,5 +1,6 @@
 package com.wanted.backend.domain.admin_dashboard.application.service;
 
+import com.wanted.backend.domain.admin_dashboard.application.cache.AdminDashboardCache;
 import com.wanted.backend.domain.admin_dashboard.application.dto.AdminDashboardResult;
 import com.wanted.backend.domain.admin_dashboard.application.port.AdminDashboardQueryPort;
 import com.wanted.backend.domain.admin_dashboard.application.usecase.GetAdminDashboardUseCase;
@@ -16,7 +17,7 @@ public class AdminDashboardQueryService implements GetAdminDashboardUseCase {
     private final AdminDashboardQueryPort adminDashboardQueryPort;
 
     @Override
-    @Cacheable(cacheNames = "adminDashboard:v2", key = "'summary'", sync = true)
+    @Cacheable(cacheNames = AdminDashboardCache.CACHE_NAME, key = "'summary'", sync = true)
     public AdminDashboardResult getDashboard() {
         return adminDashboardQueryPort.findDashboard();
     }

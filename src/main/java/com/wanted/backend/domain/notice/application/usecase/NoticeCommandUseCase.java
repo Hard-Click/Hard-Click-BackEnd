@@ -11,4 +11,7 @@ public interface NoticeCommandUseCase {
     Long createGlobal(CreateGlobalNoticeCommand command);
     void update(UpdateNoticeCommand command);
     void delete(DeleteNoticeCommand command);
+
+    /** 공지 읽음 처리(회원 기준). 이미 읽음이면 멱등하게 통과. */
+    void markAsRead(Long memberId, Long noticeId);
 }

@@ -5,6 +5,7 @@ import com.wanted.backend.domain.community.application.usecase.CommentCommandUse
 import com.wanted.backend.domain.community.application.usecase.CommentQueryUseCase;
 import com.wanted.backend.domain.community.application.usecase.PostCommandUseCase;
 import com.wanted.backend.domain.community.application.usecase.PostQueryUseCase;
+import com.wanted.backend.domain.community.application.usecase.UnifiedBoardQueryUseCase;
 import com.wanted.backend.domain.community.application.usecase.ReviewCommandUseCase;
 import com.wanted.backend.domain.community.application.usecase.ReviewQueryUseCase;
 import com.wanted.backend.domain.community.presentation.request.CreateReviewRequest;
@@ -34,6 +35,7 @@ class CommunityControllerTest {
     @MockitoBean private ReviewQueryUseCase reviewQueryUseCase;
     @MockitoBean private PostCommandUseCase postCommandUseCase;
     @MockitoBean private PostQueryUseCase postQueryUseCase;
+    @MockitoBean private UnifiedBoardQueryUseCase unifiedBoardQueryUseCase;
     @MockitoBean private CommentCommandUseCase commentCommandUseCase;
     @MockitoBean private CommentQueryUseCase commentQueryUseCase;
 

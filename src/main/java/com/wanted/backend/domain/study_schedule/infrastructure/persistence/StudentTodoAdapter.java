@@ -68,6 +68,16 @@ public class StudentTodoAdapter implements StudentTodoPort {
                 .orElse(false);
     }
 
+    @Override
+    public boolean markPlanned(Long memberId, Long todoId) {
+        return findOwned(memberId, todoId)
+                .map(todo -> {
+                    todo.markPlanned();
+                    return true;
+                })
+                .orElse(false);
+    }
+
     /** 남의 할 일을 id 만 알고 건드리지 못하게 소유를 함께 확인한다. */
     private java.util.Optional<StudentTodoJpaEntity> findOwned(Long memberId, Long todoId) {
         return repository.findById(todoId).filter(todo -> todo.isOwnedBy(memberId));

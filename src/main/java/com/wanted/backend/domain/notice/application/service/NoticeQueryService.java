@@ -4,13 +4,13 @@ import com.wanted.backend.domain.notice.application.command.GetNoticeListCommand
 import com.wanted.backend.domain.notice.application.port.CourseInfoPort;
 import com.wanted.backend.domain.notice.application.port.EnrolledCoursePort;
 import com.wanted.backend.domain.notice.application.port.InstructorCoursePort;
+import com.wanted.backend.domain.notice.application.port.NoticeReadPort;
 import com.wanted.backend.domain.notice.application.result.NoticeDetailResult;
 import com.wanted.backend.domain.notice.application.result.NoticeItemResult;
 import com.wanted.backend.domain.notice.application.result.NoticeListResult;
 import com.wanted.backend.domain.notice.application.usecase.NoticeQueryUseCase;
 import com.wanted.backend.domain.notice.domain.model.Notice;
 import com.wanted.backend.domain.notice.domain.repository.NoticeRepository;
-import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import org.springframework.data.domain.Page;
@@ -32,18 +32,18 @@ public class NoticeQueryService implements NoticeQueryUseCase {
     private final CourseInfoPort courseInfoPort;
     private final InstructorCoursePort instructorCoursePort;
     private final EnrolledCoursePort enrolledCoursePort;
-    private final NotificationRepository notificationRepository;
+    private final NoticeReadPort noticeReadPort;
 
     public NoticeQueryService(NoticeRepository noticeRepository,
                               CourseInfoPort courseInfoPort,
                               InstructorCoursePort instructorCoursePort,
                               EnrolledCoursePort enrolledCoursePort,
-                              NotificationRepository notificationRepository) {
+                              NoticeReadPort noticeReadPort) {
         this.noticeRepository = noticeRepository;
         this.courseInfoPort = courseInfoPort;
         this.instructorCoursePort = instructorCoursePort;
         this.enrolledCoursePort = enrolledCoursePort;
-        this.notificationRepository = notificationRepository;
+        this.noticeReadPort = noticeReadPort;
     }
 
     @Override
@@ -99,7 +99,7 @@ public class NoticeQueryService implements NoticeQueryUseCase {
             return new NoticeListResult(List.of(), noticePage.getTotalPages());
         }
 
-        List<Long> readIds = notificationRepository.findReadNoticeIds(command.memberId(), noticeIds);
+        List<Long> readIds = noticeReadPort.findReadNoticeIds(command.memberId(), noticeIds);
 
         final String finalCourseName = courseName;
         Map<Long, String> courseNameMap = Map.of();
@@ -138,7 +138,7 @@ public class NoticeQueryService implements NoticeQueryUseCase {
 
         // 강의 상세와 동일하게 공개 — 로그인/수강·소유 여부와 무관하게 누구나 조회 가능
 
-        boolean isRead = notificationRepository.isNoticeRead(memberId, noticeId);
+        boolean isRead = noticeReadPort.isRead(memberId, noticeId);
 
         String courseName = "COURSE".equals(notice.getType())
                 ? courseInfoPort.getCourseNameByCourseId(notice.getCourseId())

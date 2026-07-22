@@ -2,6 +2,7 @@ package com.wanted.backend.domain.community.presentation.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.wanted.backend.domain.community.application.result.PostItemResult;
+import com.wanted.backend.domain.community.application.result.UnifiedFeedItemResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -46,6 +47,15 @@ public record UnifiedBoardItemResponse(
     public static UnifiedBoardItemResponse fromPostItem(PostItemResult result) {
         return fromFields("POST", result.postId(), result.boardType().name(),
                 result.title(), result.authorName(), result.viewCount(), result.commentCount(), result.isAccepted(), result.createdAt());
+    }
+
+    // 전체 피드용 통합 항목(POST/STUDY) 매핑. 소스별로 채워진 필드가 다르며 그대로 내려준다.
+    public static UnifiedBoardItemResponse fromUnified(UnifiedFeedItemResult item) {
+        return new UnifiedBoardItemResponse(
+                item.type(), item.postId(), item.groupId(), item.boardType(),
+                item.title(), item.authorName(), item.viewCount(), item.commentCount(),
+                item.subjectName(), item.currentCount(), item.maxCount(), item.isClosed(),
+                item.isAccepted(), item.createdAt());
     }
 
     private static UnifiedBoardItemResponse fromFields(String type, Long postId, String boardType,

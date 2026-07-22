@@ -52,9 +52,9 @@ public class MyPaymentHistoryQueryAdapter implements MyPaymentHistoryQueryPort {
                         order.getId(),
                         order.getId(),
                         order.getOrderNo(),
-                        toPaymentType(order.getPaymentType()),
+                        PaymentType.fromRawOrDefault(order.getPaymentType()),
                         order.getFinalAmount(),
-                        toPaymentStatus(order.getStatus()),
+                        PaymentStatus.fromOrderStatus(order.getStatus()),
                         order.getPaidAt(),
                         courseIdsByOrderId.getOrDefault(order.getId(), List.of()),
                         planIdByOrderId.get(order.getId())
@@ -83,21 +83,4 @@ public class MyPaymentHistoryQueryAdapter implements MyPaymentHistoryQueryPort {
         return result;
     }
 
-    private PaymentType toPaymentType(String raw) {
-        if (raw == null) return PaymentType.COURSE;
-        try {
-            return PaymentType.valueOf(raw);
-        } catch (IllegalArgumentException e) {
-            return PaymentType.COURSE;
-        }
-    }
-
-    private PaymentStatus toPaymentStatus(String orderStatus) {
-        return switch (orderStatus) {
-            case "PAID", "PARTIAL_REFUNDED" -> PaymentStatus.PAID;
-            case "REFUNDED" -> PaymentStatus.REFUNDED;
-            case "CANCELED" -> PaymentStatus.CANCELED;
-            default -> PaymentStatus.READY;
-        };
-    }
 }
