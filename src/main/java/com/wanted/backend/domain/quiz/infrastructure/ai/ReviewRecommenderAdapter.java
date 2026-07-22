@@ -72,6 +72,7 @@ public class ReviewRecommenderAdapter implements ReviewRecommenderPort {
                     continue;
                 }
                 long sectionId = item.get("section_id") instanceof Number s ? s.longValue() : 0L;
+                long courseId = item.get("course_id") instanceof Number c ? c.longValue() : 0L;
                 List<Long> similarIds = new ArrayList<>();
                 if (item.get("similar") instanceof List<?> similar) {
                     for (Object sid : similar) {
@@ -80,7 +81,7 @@ public class ReviewRecommenderAdapter implements ReviewRecommenderPort {
                         }
                     }
                 }
-                items.add(new ReviewItem(problemId.longValue(), sectionId, similarIds));
+                items.add(new ReviewItem(problemId.longValue(), sectionId, courseId, similarIds));
             }
             return items;
         } catch (Exception e) {
