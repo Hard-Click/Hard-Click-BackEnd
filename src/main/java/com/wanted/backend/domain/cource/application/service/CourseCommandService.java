@@ -6,6 +6,7 @@ import com.wanted.backend.domain.cource.application.command.CreateCourseCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
 import com.wanted.backend.domain.cource.application.command.UploadCourseThumbnailCommand;
+import com.wanted.backend.domain.cource.application.port.CourseAdminCheckPort;
 import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
 import com.wanted.backend.domain.cource.application.port.ThumbnailStoragePort;
@@ -57,9 +58,18 @@ public class CourseCommandService implements CourseCommandUseCase {
     private final NotificationRepository notificationRepository;
     private final CourseVideoCatalogSyncPort videoCatalogSyncPort;
     private final CourseLearningPolicyPort courseLearningPolicyPort;
+    private final CourseAdminCheckPort courseAdminCheckPort;
 
     // 강도 상한 미입력 시 적용할 전역 기본 하루 학습 상한(분).
     private static final int DEFAULT_DAILY_MAX_MINUTES = 120;
+
+    // 강의 쓰기 권한: 소유 강사이거나 관리자(ROLE_ADMIN)면 허용.
+    // 기획상 관리자는 소유 강사가 아니어도 모든 강의를 등록·수정·삭제·공개전환할 수 있다.
+    private void authorizeCourseWrite(Long authorId, Long requesterId) {
+        if (!authorId.equals(requesterId) && !courseAdminCheckPort.isAdmin(requesterId)) {
+            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
+        }
+    }
 
     @Override
     public Long create(CreateCourseCommand command) {
@@ -117,9 +127,7 @@ public class CourseCommandService implements CourseCommandUseCase {
             throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
         }
 
-        if (!course.getAuthorId().equals(command.requesterId())) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(course.getAuthorId(), command.requesterId());
 
         // 삭제될 섹션 계산: 기존 섹션 중 수정 요청에 남지 않은 것 → 해당 섹션 퀴즈를 cascade 삭제한다.
         List<Long> existingSectionIds = course.getSections().stream()
@@ -178,9 +186,7 @@ public class CourseCommandService implements CourseCommandUseCase {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
 
-        if (!course.getAuthorId().equals(requesterId)) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(course.getAuthorId(), requesterId);
 
         course.softDelete();
         courseRepository.save(course);
@@ -196,9 +202,7 @@ public class CourseCommandService implements CourseCommandUseCase {
             throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
         }
 
-        if (!course.getAuthorId().equals(command.requesterId())) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(course.getAuthorId(), command.requesterId());
 
         if (command.targetStatus() == CourseStatus.PUBLISHED) {
             course.publish();
@@ -224,9 +228,7 @@ public class CourseCommandService implements CourseCommandUseCase {
         if (courseInfo.isDeleted()) {
             throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
         }
-        if (!courseInfo.authorId().equals(command.requesterId())) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(courseInfo.authorId(), command.requesterId());
 
         return videoStoragePort.generatePresignedPutUrl(command.lessonId(), command.originalFilename());
     }
@@ -241,9 +243,7 @@ public class CourseCommandService implements CourseCommandUseCase {
         if (courseInfo.isDeleted()) {
             throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
         }
-        if (!courseInfo.authorId().equals(command.requesterId())) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(courseInfo.authorId(), command.requesterId());
 
         // 이 레슨용으로 발급된 키가 맞는지 prefix로 확인 — 임의의 s3Key를 붙이는 것을 차단한다.
         String expectedPrefix = VIDEO_KEY_PREFIX + command.lessonId() + "_";
@@ -274,9 +274,7 @@ public class CourseCommandService implements CourseCommandUseCase {
         if (course.isDeleted()) {
             throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
         }
-        if (!course.getAuthorId().equals(command.requesterId())) {
-            throw new BusinessException(ErrorCode.COURSE_ACCESS_DENIED);
-        }
+        authorizeCourseWrite(course.getAuthorId(), command.requesterId());
 
         ThumbnailStoragePort.StoredThumbnail stored = thumbnailStoragePort.store(
                 command.courseId(), command.originalFilename(), command.imageData());

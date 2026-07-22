@@ -1,8 +1,10 @@
 package com.wanted.backend.domain.cource.application.service;
 
+import com.wanted.backend.domain.cource.application.command.ChangeCourseStatusCommand;
 import com.wanted.backend.domain.cource.application.command.ConfirmVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
+import com.wanted.backend.domain.cource.application.port.CourseAdminCheckPort;
 import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
 import com.wanted.backend.domain.cource.application.port.ThumbnailStoragePort;
@@ -18,6 +20,7 @@ import com.wanted.backend.domain.cource.domain.repository.CourseRepository;
 import com.wanted.backend.domain.cource.domain.repository.LessonRepository;
 import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
 import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,6 +52,7 @@ class CourseCommandServiceTest {
     private VideoStoragePort videoStoragePort;
     private CourseVideoCatalogSyncPort videoCatalogSyncPort;
     private ApplicationEventPublisher eventPublisher;
+    private CourseAdminCheckPort courseAdminCheckPort;
     private CourseCommandService service;
     private ResourcelessTransactionManager transactionManager;
 
@@ -62,6 +66,7 @@ class CourseCommandServiceTest {
         NotificationRepository notificationRepository = mock(NotificationRepository.class);
         videoCatalogSyncPort = mock(CourseVideoCatalogSyncPort.class);
         CourseLearningPolicyPort courseLearningPolicyPort = mock(CourseLearningPolicyPort.class);
+        courseAdminCheckPort = mock(CourseAdminCheckPort.class);
         Clock clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC);
         // 실제 DB 없이도 TransactionTemplate의 트랜잭션 동기화(afterCommit)가 동작하게 해주는
         // 리소스 없는 트랜잭션 매니저(테스트 더블) — 단위테스트 표준 패턴.
@@ -77,7 +82,8 @@ class CourseCommandServiceTest {
                 clock,
                 notificationRepository,
                 videoCatalogSyncPort,
-                courseLearningPolicyPort
+                courseLearningPolicyPort,
+                courseAdminCheckPort
         );
     }
 
@@ -243,6 +249,83 @@ class CourseCommandServiceTest {
         updateInTransaction(updateKeepingSections(courseId, authorId, 1L, 2L));
 
         verify(eventPublisher, never()).publishEvent(any(SectionDeletedEvent.class));
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_강의를_수정할_수_있다() {
+        Long courseId = 86L, authorId = 10L, adminId = 99L;
+        Course course = courseWithSections(courseId, authorId, 1L, 2L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseAdminCheckPort.isAdmin(adminId)).thenReturn(true);
+
+        assertThatCode(() -> updateInTransaction(updateKeepingSections(courseId, adminId, 1L, 2L)))
+                .doesNotThrowAnyException();
+
+        verify(courseRepository).save(any(Course.class));
+    }
+
+    @Test
+    void 소유자도_관리자도_아니면_강의_수정이_거부된다_CR004() {
+        Long courseId = 86L, authorId = 10L, otherId = 77L;
+        Course course = courseWithSections(courseId, authorId, 1L, 2L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseAdminCheckPort.isAdmin(otherId)).thenReturn(false);
+
+        assertThatThrownBy(() -> updateInTransaction(updateKeepingSections(courseId, otherId, 1L, 2L)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_ACCESS_DENIED);
+
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    void 소유_강사는_강의를_삭제할_수_있다() {
+        Long courseId = 86L;
+        Course course = courseWithSections(courseId, 10L, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+        service.delete(courseId, 10L);
+
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_강의를_삭제할_수_있다() {
+        Long courseId = 86L;
+        Course course = courseWithSections(courseId, 10L, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseAdminCheckPort.isAdmin(99L)).thenReturn(true);
+
+        service.delete(courseId, 99L);
+
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    void 소유자도_관리자도_아니면_강의_삭제가_거부된다_CR004() {
+        Long courseId = 86L;
+        Course course = courseWithSections(courseId, 10L, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseAdminCheckPort.isAdmin(77L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.delete(courseId, 77L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_ACCESS_DENIED);
+
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_공개상태를_전환할_수_있다() {
+        Long courseId = 86L;
+        Course course = courseWithSections(courseId, 10L, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseAdminCheckPort.isAdmin(99L)).thenReturn(true);
+
+        service.changeStatus(new ChangeCourseStatusCommand(courseId, 99L, CourseStatus.DRAFT));
+
+        verify(courseRepository).save(course);
     }
 
     private void updateInTransaction(UpdateCourseCommand command) {
