@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  id-token: write   # OIDC 토큰 발급에 필요 (역할 기반 인증, 액세스 키 없음)
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -28,47 +32,26 @@ jobs:
           platforms: linux/amd64
           tags: jongjun/hard-click-backend:latest
 
-      - name: EC2 배포
-        uses: appleboy/ssh-action@v1
+      - name: AWS 자격증명 설정 (OIDC — 액세스 키 없이 역할 assume)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            if ! docker compose version > /dev/null 2>&1; then
-              mkdir -p ~/.docker/cli-plugins
-              curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
-              chmod +x ~/.docker/cli-plugins/docker-compose
-            fi
+          role-to-assume: arn:aws:iam::635249349258:role/hard-click-ci-deploy-role
+          aws-region: ap-northeast-2
 
-            mkdir -p ~/hard-click
+      - name: ASG 인스턴스에 SSM으로 재배포 명령 전송
+        run: |
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Role,Values=app" "Name=instance-state-name,Values=running" \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text)
 
-            curl -fsSL https://raw.githubusercontent.com/Hard-Click/Hard-Click-BackEnd-Module4/main/docker-compose.prod.yml \
-              -o ~/hard-click/docker-compose.prod.yml
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "실행 중인 앱 인스턴스가 없습니다"
+            exit 1
+          fi
 
-            cat > ~/hard-click/.env << 'ENVEOF'
-            DB_URL=${{ secrets.DB_URL }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-            S3_BUCKET=${{ secrets.S3_BUCKET }}
-            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-            TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
-            S3_PRESIGN_ACCESS_KEY=${{ secrets.S3_PRESIGN_ACCESS_KEY }}
-            S3_PRESIGN_SECRET_KEY=${{ secrets.S3_PRESIGN_SECRET_KEY }}
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-            ENVEOF
-
-            cd ~/hard-click
-            docker compose -f docker-compose.prod.yml pull app
-
-            # docker-compose가 관리하지 않는 동일 이름의 컨테이너(수동 docker run 등)가 남아있으면
-            # "Conflict. The container name ... is already in use" 에러로 up -d가 조용히 실패하므로 먼저 제거한다.
-            docker rm -f hard-click-app 2>/dev/null || true
-
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            docker image prune -f
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids $INSTANCE_IDS \
+            --parameters commands='["curl -fsSL https://raw.githubusercontent.com/Hard-Click/Hard-Click-BackEnd/main/infra/deploy.sh -o /tmp/deploy.sh","chmod +x /tmp/deploy.sh","sudo /tmp/deploy.sh"]' \
+            --comment "GitHub Actions 배포 ${{ github.sha }}"

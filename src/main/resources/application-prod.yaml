@@ -1,4 +1,12 @@
 spring:
+  data:
+    redis:
+      # ElastiCache 복제 그룹을 전송 중 암호화(TLS) 활성화 상태로 생성했는데, 클라이언트(Lettuce)가
+      # 평문으로 연결을 시도하면 TCP 연결은 맺어지지만 그 이후 프로토콜 핸드셰이크에서 서로 응답을
+      # 못 알아들어 타임아웃 없이 영원히 멈춘다(actuator/health가 무한 hang하던 근본 원인).
+      ssl:
+        enabled: true
+
   flyway:
     # prod out-of-order 활성화.
     # 담당자별 버전 레인(V3.1.x~V3.5.x)이 병렬로 머지되어 낮은 버전이 뒤늦게 들어오는 구조라,

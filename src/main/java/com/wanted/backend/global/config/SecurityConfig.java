@@ -73,6 +73,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",
+                                "/actuator/health/**",
                                 "/ws-chat/**"
                         ).permitAll()
                         // Prometheus는 같은 Docker 네트워크(브리지 대역) 또는 localhost에서만 스크랩하므로

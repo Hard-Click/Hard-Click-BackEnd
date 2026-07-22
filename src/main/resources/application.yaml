@@ -2,6 +2,14 @@ spring:
   application:
     name: hard-click
 
+  # Lettuce의 LettuceConnectionFactory가 ReactiveRedisConnectionFactory도 구현하기 때문에,
+  # WebFlux를 쓰지 않는 블로킹(MVC) 전용 앱인데도 Spring Boot가 RedisReactiveHealthIndicator를
+  # 자동 등록한다. 이 리액티브 헬스 체크가 boundedElastic 스케줄러에서 응답 없이 멈춰
+  # /actuator/health 전체가 영원히 타임아웃 없이 hang하는 원인이었음 -> 명시적으로 비활성화.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.actuate.autoconfigure.data.redis.RedisReactiveHealthContributorAutoConfiguration
+
   Jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -184,9 +192,15 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
   health:
     mail:
       enabled: false
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
