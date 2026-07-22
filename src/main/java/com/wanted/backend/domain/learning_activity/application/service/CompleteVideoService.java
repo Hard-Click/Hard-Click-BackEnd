@@ -43,6 +43,15 @@ public class CompleteVideoService implements CompleteVideoUseCase {
             VideoAccessInfo accessInfo = playable.accessInfo();
             VideoProgress progress = playable.progress();
 
+            // 이미 완료된 영상이면 완료는 멱등하다 — 재저장·이벤트 재발행 없이 성공으로 끝낸다.
+            // VideoCompletedEvent 를 '미완료→완료' 전이에서 1회만 발행해야, 반복 complete 호출(더블클릭·FE 재시도)에
+            // 랭킹·수강량 잔디가 이벤트당 +1 로 중복 집계되지 않는다.
+            // (동시 최초 완료의 경합까지 막으려면 소비자 멱등키/outbox 가 필요 — 별도 후속 이슈.)
+            if (progress.isCompleted()) {
+                errorCode = null;
+                return;
+            }
+
             if (!videoCompletionPolicy.canComplete(effectiveProgressSeconds(progress), accessInfo.durationSeconds())) {
                 throw new BusinessException(ErrorCode.VIDEO_COMPLETION_CONDITION_NOT_MET);
             }
