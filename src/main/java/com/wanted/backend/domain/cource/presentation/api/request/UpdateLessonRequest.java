@@ -6,8 +6,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 @Schema(description = "레슨 수정 요청")
 public record UpdateLessonRequest(
-        @Schema(description = "레슨 ID (null이면 신규 레슨)", example = "1")
-        Long id,
+        @Schema(description = "레슨 ID (신규 레슨이면 필드 생략 또는 null)", example = "1")
+        Long lessonId,
 
         @Schema(description = "레슨 제목", example = "함수의 극한 개념 정리")
         @NotBlank(message = "회차 제목은 필수입니다.")

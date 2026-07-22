@@ -9,6 +9,7 @@ public interface CourseReferenceRepository extends JpaRepository<CourseReference
 
     List<CourseReferenceEntity> findByIdIn(Collection<Long> courseIds);
 
-    // 소프트 삭제(status=DELETED)된 강의는 제외하고 조회한다.
-    List<CourseReferenceEntity> findByIdInAndStatusNot(Collection<Long> courseIds, String status);
+    // 수강 목록에 노출할 상태(PUBLISHED)만 조회한다 — 삭제(DELETED)·비공개(DRAFT)는 모두 제외.
+    // 긍정형 단일 상태라 (course_id, status) 인덱스 활용에 유리하다.
+    List<CourseReferenceEntity> findByIdInAndStatus(Collection<Long> courseIds, String status);
 }
