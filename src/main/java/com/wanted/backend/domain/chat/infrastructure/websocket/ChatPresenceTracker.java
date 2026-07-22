@@ -5,6 +5,7 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.PresenceUpdateMessage;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -19,6 +20,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -40,15 +42,20 @@ public class ChatPresenceTracker {
     private final MemberNamePort memberNamePort;
     private final ChatBroadcastPort chatBroadcastPort;
     private final StringRedisTemplate redisTemplate;
+    // 인스턴스 로컬 카운터 — ASG 다중 인스턴스에서는 전체 합이 아니라 "이 인스턴스가 물고 있는 세션 수"만 의미하지만,
+    // 로컬 개발/데모(단일 인스턴스) 환경에서 "지금 접속 중인 세션 수"를 보기 위한 용도로는 충분하다.
+    private final AtomicInteger onlineSessionCount = new AtomicInteger(0);
 
     public ChatPresenceTracker(ChatRoomParticipantRepository chatRoomParticipantRepository,
                                MemberNamePort memberNamePort,
                                ChatBroadcastPort chatBroadcastPort,
-                               StringRedisTemplate redisTemplate) {
+                               StringRedisTemplate redisTemplate,
+                               MeterRegistry meterRegistry) {
         this.chatRoomParticipantRepository = chatRoomParticipantRepository;
         this.memberNamePort = memberNamePort;
         this.chatBroadcastPort = chatBroadcastPort;
         this.redisTemplate = redisTemplate;
+        meterRegistry.gauge("chat.presence.online", onlineSessionCount);
     }
 
     // Redis 읽기/쓰기가 STOMP 인바운드 채널 스레드에서 동기 실행되므로, Redis 장애가
@@ -68,6 +75,7 @@ public class ChatPresenceTracker {
 
             redisTemplate.opsForSet().add(roomKey(chatRoomId), memberId.toString());
             redisTemplate.opsForValue().set(sessionKey(accessor.getSessionId()), chatRoomId.toString());
+            onlineSessionCount.incrementAndGet();
 
             broadcastPresence(chatRoomId);
         } catch (Exception e) {
@@ -92,6 +100,7 @@ public class ChatPresenceTracker {
 
             Long chatRoomId = Long.valueOf(chatRoomIdValue);
             redisTemplate.opsForSet().remove(roomKey(chatRoomId), memberId.toString());
+            onlineSessionCount.updateAndGet(count -> Math.max(0, count - 1));
 
             broadcastPresence(chatRoomId);
         } catch (Exception e) {

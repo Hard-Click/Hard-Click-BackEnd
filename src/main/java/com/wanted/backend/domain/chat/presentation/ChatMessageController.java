@@ -8,6 +8,8 @@ import com.wanted.backend.domain.chat.presentation.request.SendMessageRequest;
 import com.wanted.backend.domain.chat.presentation.response.ChatErrorMessage;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -22,11 +24,16 @@ public class ChatMessageController {
 
     private final ChatMessageCommandUseCase chatMessageCommandUseCase;
     private final ChatTypingUseCase chatTypingUseCase;
+    private final Counter messagesSentCounter;
 
     public ChatMessageController(ChatMessageCommandUseCase chatMessageCommandUseCase,
-                                 ChatTypingUseCase chatTypingUseCase) {
+                                 ChatTypingUseCase chatTypingUseCase,
+                                 MeterRegistry meterRegistry) {
         this.chatMessageCommandUseCase = chatMessageCommandUseCase;
         this.chatTypingUseCase = chatTypingUseCase;
+        this.messagesSentCounter = Counter.builder("chat.messages.sent")
+                .description("STOMP로 전송에 성공한 채팅 메시지 수")
+                .register(meterRegistry);
     }
 
     @MessageMapping("/chat-rooms/{chatRoomId}")
@@ -36,6 +43,7 @@ public class ChatMessageController {
 
         chatMessageCommandUseCase.send(new SendMessageCommand(
                 chatRoomId, extractMemberId(principal), request.content()));
+        messagesSentCounter.increment();
     }
 
     @MessageMapping("/chat-rooms/{chatRoomId}/typing")

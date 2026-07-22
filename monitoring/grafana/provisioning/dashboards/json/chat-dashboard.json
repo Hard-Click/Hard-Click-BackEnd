@@ -1,0 +1,186 @@
+{
+  "uid": "chat-live-metrics",
+  "title": "실시간 채팅 — Live Metrics",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-5m", "to": "now" },
+  "style": "dark",
+  "panels": [
+    {
+      "id": 1,
+      "title": "현재 접속자 수",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#5794F2", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "chat_presence_online{application=\"hard-click\"}",
+        "legendFormat": "online",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "초당 메시지 전송",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "color": { "mode": "fixed", "fixedColor": "#37872D" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#37872D", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "sum(rate(chat_messages_sent_total{application=\"hard-click\"}[1m]))",
+        "legendFormat": "msg/s",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "누적 메시지 수",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "#B877D9" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#B877D9", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "sum(chat_messages_sent_total{application=\"hard-click\"})",
+        "legendFormat": "total",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "소켓 티켓 발급 (연결 시도)",
+      "type": "stat",
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "color": { "mode": "fixed", "fixedColor": "#E0B400" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "#E0B400", "value": null } ] },
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto", "textMode": "value", "colorMode": "value",
+        "graphMode": "area", "justifyMode": "auto"
+      },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+        "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/api/chat/socket-tickets\", application=\"hard-click\"}[1m]))",
+        "legendFormat": "tickets/s",
+        "refId": "A"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "메시지 전송 추이",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line", "lineWidth": 2, "fillOpacity": 12,
+            "pointSize": 4, "showPoints": "never", "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "expr": "sum(rate(chat_messages_sent_total{application=\"hard-click\"}[1m]))",
+          "legendFormat": "msg/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "접속자 수 추이",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line", "lineWidth": 2, "fillOpacity": 12,
+            "pointSize": 4, "showPoints": "never", "spanNulls": true,
+            "gradientMode": "opacity"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus_ds" },
+          "expr": "chat_presence_online{application=\"hard-click\"}",
+          "legendFormat": "online",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

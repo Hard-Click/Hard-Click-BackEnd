@@ -8,6 +8,8 @@ import com.wanted.backend.domain.chat.presentation.request.SendMessageRequest;
 import com.wanted.backend.domain.chat.presentation.response.ChatErrorMessage;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,12 +30,14 @@ class ChatMessageControllerTest {
     @Mock
     private ChatTypingUseCase chatTypingUseCase;
 
+    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
     private ChatMessageController controller;
 
     @Test
     @DisplayName("메시지 전송 시 Principal의 memberId로 커맨드를 만들어 위임한다")
     void sendMessage_delegatesWithSenderIdFromPrincipal() {
-        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
 
         controller.sendMessage(45L, new SendMessageRequest("안녕하세요"), new ChatPrincipal(1L));
 
@@ -45,9 +49,20 @@ class ChatMessageControllerTest {
     }
 
     @Test
+    @DisplayName("메시지 전송에 성공하면 chat.messages.sent 카운터가 증가한다")
+    void sendMessage_incrementsMessagesSentCounter() {
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
+
+        controller.sendMessage(45L, new SendMessageRequest("첫 메시지"), new ChatPrincipal(1L));
+        controller.sendMessage(45L, new SendMessageRequest("두번째 메시지"), new ChatPrincipal(1L));
+
+        assertThat(meterRegistry.counter("chat.messages.sent").count()).isEqualTo(2.0);
+    }
+
+    @Test
     @DisplayName("타이핑 알림 시 Principal의 memberId로 위임한다")
     void notifyTyping_delegatesWithMemberIdFromPrincipal() {
-        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
 
         controller.notifyTyping(45L, new ChatPrincipal(1L));
 
@@ -57,7 +72,7 @@ class ChatMessageControllerTest {
     @Test
     @DisplayName("인증되지 않은 Principal이면 예외가 발생한다")
     void sendMessage_fail_unauthenticatedPrincipal() {
-        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
 
         assertThatThrownBy(() -> controller.sendMessage(45L, new SendMessageRequest("내용"), null))
                 .isInstanceOf(IllegalStateException.class);
@@ -66,7 +81,7 @@ class ChatMessageControllerTest {
     @Test
     @DisplayName("BusinessException은 에러 코드와 메시지를 담은 ChatErrorMessage로 변환된다")
     void handleBusinessException_convertsToChatErrorMessage() {
-        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
 
         ChatErrorMessage result = controller.handleBusinessException(new BusinessException(ErrorCode.CHAT_FORBIDDEN));
 
@@ -77,7 +92,7 @@ class ChatMessageControllerTest {
     @Test
     @DisplayName("BusinessException 외의 예외(예: 인증 정보 없음)도 에러 프레임으로 변환된다")
     void handleUnexpectedException_convertsToChatErrorMessage() {
-        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase);
+        controller = new ChatMessageController(chatMessageCommandUseCase, chatTypingUseCase, meterRegistry);
 
         ChatErrorMessage result = controller.handleUnexpectedException(new IllegalStateException("STOMP 세션에 인증 정보가 없습니다."));
 
