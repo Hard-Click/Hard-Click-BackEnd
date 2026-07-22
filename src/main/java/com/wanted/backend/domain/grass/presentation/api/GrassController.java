@@ -89,7 +89,8 @@ public class GrassController {
     )
     public ResponseEntity<ApiResponse<List<LessonGrassResponse>>> lessons(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "조회할 연도 (미지정 시 올해)", example = "2026") @RequestParam(required = false) Integer year
+            @Parameter(description = "조회할 연도 (미지정 시 올해)", example = "2026") @RequestParam(required = false) Integer year,
+            @Parameter(description = "조회할 월 (1~12, 미지정 시 연간 전체)", example = "7") @RequestParam(required = false) Integer month
     ) {
         Long memberId = userDetails != null ? userDetails.getMemberId() : null;
         if (memberId == null) {
@@ -99,7 +100,8 @@ public class GrassController {
         List<GetLessonGrassUseCase.LessonGrassView> result =
                 getLessonGrassUseCase.handle(new GetLessonGrassQuery(
                         memberId,
-                        year
+                        year,
+                        month
                 ));
 
         return ApiResponse.success(
@@ -115,7 +117,8 @@ public class GrassController {
     )
     public ResponseEntity<ApiResponse<List<StudyTimeGrassResponse>>> studyTime(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "조회할 연도 (미지정 시 올해)", example = "2026") @RequestParam(required = false) Integer year
+            @Parameter(description = "조회할 연도 (미지정 시 올해)", example = "2026") @RequestParam(required = false) Integer year,
+            @Parameter(description = "조회할 월 (1~12, 미지정 시 연간 전체)", example = "7") @RequestParam(required = false) Integer month
     ) {
         Long memberId = userDetails != null ? userDetails.getMemberId() : null;
         if (memberId == null) {
@@ -125,7 +128,8 @@ public class GrassController {
         List<GetStudyTimeGrassUseCase.StudyTimeGrassView> result =
                 getStudyTimeGrassUseCase.handle(new GetStudyTimeGrassQuery(
                         memberId,
-                        year
+                        year,
+                        month
                 ));
 
         return ApiResponse.success(

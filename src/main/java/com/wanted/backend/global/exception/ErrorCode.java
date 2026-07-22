@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C002", "서버 내부 오류가 발생했습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "C003", "인증이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "C004", "접근 권한이 없습니다."),
+    ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND, "C011", "요청하신 경로를 찾을 수 없습니다."),
 
     /* =========================================================================
        2. 회원 및 계정 관련 예외 (U000)

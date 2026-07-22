@@ -17,6 +17,10 @@ public interface QuizRepository {
     // 문항 id 목록으로 직접 조회 — 유사퀴즈 채점(②)에서 저장된 문항만 로딩한다(코스 전체 로딩 회피).
     List<QuizQuestion> findQuestionsByIds(List<Long> questionIds);
 
+    // questionIds 중 실제로 courseId 소속인 것만 반환 — 복습 그룹 영속 전, 추천기가 준 courseId를
+    // 신뢰하지 않고 DB 기준으로 문항 소속을 검증하기 위해 사용.
+    List<Long> findQuestionIdsBelongingToCourse(List<Long> questionIds, Long courseId);
+
     // 활성(soft-delete 안 된) 퀴즈만 조회 — 응시/수정/상세 경로에서 사용.
     Optional<Quiz> findById(Long id);
 
