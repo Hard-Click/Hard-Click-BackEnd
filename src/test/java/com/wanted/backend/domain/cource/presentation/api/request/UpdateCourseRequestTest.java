@@ -38,6 +38,11 @@ class UpdateCourseRequestTest {
                         { "lessonId": 625, "title": "지수와 로그", "description": "지수와 로그", "orderIndex": 0, "durationSeconds": 596 },
                         { "title": "새 강의", "description": "새 강의", "orderIndex": 1, "durationSeconds": 0 }
                       ]
+                    },
+                    {
+                      "title": "신규 섹션",
+                      "orderIndex": 1,
+                      "lessons": []
                     }
                   ]
                 }
@@ -48,17 +53,20 @@ class UpdateCourseRequestTest {
         UpdateCourseCommand command = request.toCommand(104L, 1L);
 
         // then — 기존 섹션/레슨은 식별자가 살아있어야 재생성이 아니라 제자리 갱신 경로를 탄다
-        assertThat(request.sections()).hasSize(1);
+        assertThat(request.sections()).hasSize(2);
         UpdateSectionRequest section = request.sections().get(0);
         assertThat(section.sectionId()).isEqualTo(12L);
         assertThat(section.lessons().get(0).lessonId()).isEqualTo(625L);
         // 신규 레슨은 식별자 키가 없으므로 null → 신규로 처리
         assertThat(section.lessons().get(1).lessonId()).isNull();
+        // 신규 섹션은 sectionId 키가 없으므로 null → 신규로 처리
+        assertThat(request.sections().get(1).sectionId()).isNull();
 
         // command 매핑까지 식별자가 보존되는지 확인
         UpdateCourseCommand.SectionCommand sectionCommand = command.sections().get(0);
         assertThat(sectionCommand.id()).isEqualTo(12L);
         assertThat(sectionCommand.lessons().get(0).id()).isEqualTo(625L);
         assertThat(sectionCommand.lessons().get(1).id()).isNull();
+        assertThat(command.sections().get(1).id()).isNull();
     }
 }
