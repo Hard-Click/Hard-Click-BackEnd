@@ -6,4 +6,5 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public interface NotificationSsePort {
     SseEmitter connect(Long memberId);
     void send(Long memberId, NotificationPayload payload);
+    void sendHeartbeat();
 }
