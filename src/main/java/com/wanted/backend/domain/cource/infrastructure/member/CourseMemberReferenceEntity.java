@@ -1,7 +1,10 @@
 package com.wanted.backend.domain.cource.infrastructure.member;
 
+import com.wanted.backend.domain.identity.domain.model.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -24,8 +27,10 @@ public class CourseMemberReferenceEntity {
     @Column(name = "member_id", insertable = false, updatable = false)
     private Long id;
 
-    // members.role은 enum 컬럼이라, String 매핑 시 ddl-auto=validate가 타입 불일치(enum↔varchar)로 실패한다.
-    // 읽기 전용(insertable=false, updatable=false)으로 둬 타입 검증을 우회한다(notice MemberReferenceEntity와 동일).
-    @Column(name = "role", insertable = false, updatable = false)
-    private String role;
+    // members.role은 enum 컬럼. 같은 members 테이블을 매핑하는 엔티티들은 하나의 Table 모델에 role 컬럼을
+    // 공유하므로, canonical MemberJpaEntity와 동일하게 Role enum + @Enumerated(STRING)으로 매핑해야
+    // ddl-auto=validate가 enum↔varchar 불일치 없이 통과한다(String 매핑 시 varchar로 인식돼 실패).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role;
 }

@@ -63,7 +63,7 @@ public class CourseCommandService implements CourseCommandUseCase {
     // 강도 상한 미입력 시 적용할 전역 기본 하루 학습 상한(분).
     private static final int DEFAULT_DAILY_MAX_MINUTES = 120;
 
-    // 강의 쓰기 권한: 소유 강사이거나 관리자(ROLE_ADMIN)면 허용.
+    // 강의 쓰기 권한: 소유 강사이거나 관리자(members.role = Role.ADMIN)면 허용.
     // 기획상 관리자는 소유 강사가 아니어도 모든 강의를 등록·수정·삭제·공개전환할 수 있다.
     private void authorizeCourseWrite(Long authorId, Long requesterId) {
         if (!authorId.equals(requesterId) && !courseAdminCheckPort.isAdmin(requesterId)) {

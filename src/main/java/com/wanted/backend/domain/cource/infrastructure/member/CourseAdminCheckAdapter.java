@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.cource.infrastructure.member;
 
 import com.wanted.backend.domain.cource.application.port.CourseAdminCheckPort;
+import com.wanted.backend.domain.identity.domain.model.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +16,7 @@ public class CourseAdminCheckAdapter implements CourseAdminCheckPort {
     @Override
     public boolean isAdmin(Long memberId) {
         return memberReferenceRepository.findById(memberId)
-                .map(member -> "ADMIN".equals(member.getRole()))
+                .map(member -> member.getRole() == Role.ADMIN)
                 .orElse(false);
     }
 }

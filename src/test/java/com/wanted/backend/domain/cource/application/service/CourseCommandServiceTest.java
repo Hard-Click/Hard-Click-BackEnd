@@ -4,6 +4,7 @@ import com.wanted.backend.domain.cource.application.command.ChangeCourseStatusCo
 import com.wanted.backend.domain.cource.application.command.ConfirmVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.RequestVideoUploadCommand;
 import com.wanted.backend.domain.cource.application.command.UpdateCourseCommand;
+import com.wanted.backend.domain.cource.application.command.UploadCourseThumbnailCommand;
 import com.wanted.backend.domain.cource.application.port.CourseAdminCheckPort;
 import com.wanted.backend.domain.cource.application.port.CourseLearningPolicyPort;
 import com.wanted.backend.domain.cource.application.port.CourseVideoCatalogSyncPort;
@@ -40,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -50,6 +52,7 @@ class CourseCommandServiceTest {
     private CourseRepository courseRepository;
     private LessonRepository lessonRepository;
     private VideoStoragePort videoStoragePort;
+    private ThumbnailStoragePort thumbnailStoragePort;
     private CourseVideoCatalogSyncPort videoCatalogSyncPort;
     private ApplicationEventPublisher eventPublisher;
     private CourseAdminCheckPort courseAdminCheckPort;
@@ -61,7 +64,7 @@ class CourseCommandServiceTest {
         courseRepository = mock(CourseRepository.class);
         lessonRepository = mock(LessonRepository.class);
         videoStoragePort = mock(VideoStoragePort.class);
-        ThumbnailStoragePort thumbnailStoragePort = mock(ThumbnailStoragePort.class);
+        thumbnailStoragePort = mock(ThumbnailStoragePort.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         NotificationRepository notificationRepository = mock(NotificationRepository.class);
         videoCatalogSyncPort = mock(CourseVideoCatalogSyncPort.class);
@@ -326,6 +329,106 @@ class CourseCommandServiceTest {
         service.changeStatus(new ChangeCourseStatusCommand(courseId, 99L, CourseStatus.DRAFT));
 
         verify(courseRepository).save(course);
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_영상_업로드_presignedURL을_발급받을_수_있다() {
+        Long lessonId = 10L, authorId = 1L, adminId = 99L;
+        when(lessonRepository.findCourseAuthorInfo(lessonId))
+                .thenReturn(Optional.of(new CourseAuthorInfo(100L, authorId, CourseStatus.PUBLISHED)));
+        when(courseAdminCheckPort.isAdmin(adminId)).thenReturn(true);
+        when(videoStoragePort.generatePresignedPutUrl(lessonId, "lecture.mp4"))
+                .thenReturn(new VideoStoragePort.PresignedUpload(
+                        "https://s3.example.com/presigned", "videos/10_uuid.mp4", "video/mp4"));
+
+        assertThatCode(() -> service.requestVideoUpload(
+                new RequestVideoUploadCommand(lessonId, adminId, "lecture.mp4")))
+                .doesNotThrowAnyException();
+
+        verify(videoStoragePort).generatePresignedPutUrl(lessonId, "lecture.mp4");
+    }
+
+    @Test
+    void 소유자도_관리자도_아니면_영상_업로드_요청이_거부된다_CR004() {
+        Long lessonId = 10L, authorId = 1L, otherId = 77L;
+        when(lessonRepository.findCourseAuthorInfo(lessonId))
+                .thenReturn(Optional.of(new CourseAuthorInfo(100L, authorId, CourseStatus.PUBLISHED)));
+        when(courseAdminCheckPort.isAdmin(otherId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.requestVideoUpload(
+                new RequestVideoUploadCommand(lessonId, otherId, "lecture.mp4")))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_ACCESS_DENIED);
+
+        verify(videoStoragePort, never()).generatePresignedPutUrl(any(), any());
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_영상_업로드를_확인할_수_있다() {
+        Long lessonId = 10L, authorId = 1L, adminId = 99L, courseId = 100L;
+        Lesson lesson = Lesson.create(5L, "1강", "설명", 0, null, Instant.now());
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(lesson));
+        when(lessonRepository.findCourseAuthorInfo(lessonId))
+                .thenReturn(Optional.of(new CourseAuthorInfo(courseId, authorId, CourseStatus.PUBLISHED)));
+        when(lessonRepository.save(any(Lesson.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(videoStoragePort.getObjectSize("videos/10_uuid.mp4")).thenReturn(1024L);
+        when(courseAdminCheckPort.isAdmin(adminId)).thenReturn(true);
+
+        assertThatCode(() -> confirmInTransaction(
+                new ConfirmVideoUploadCommand(lessonId, adminId, "videos/10_uuid.mp4", 120)))
+                .doesNotThrowAnyException();
+
+        verify(lessonRepository).save(any(Lesson.class));
+    }
+
+    @Test
+    void 소유자도_관리자도_아니면_영상_업로드_확인이_거부된다_CR004() {
+        Long lessonId = 10L, authorId = 1L, otherId = 77L;
+        Lesson lesson = Lesson.create(5L, "1강", "설명", 0, null, Instant.now());
+        when(lessonRepository.findById(lessonId)).thenReturn(Optional.of(lesson));
+        when(lessonRepository.findCourseAuthorInfo(lessonId))
+                .thenReturn(Optional.of(new CourseAuthorInfo(100L, authorId, CourseStatus.PUBLISHED)));
+        when(courseAdminCheckPort.isAdmin(otherId)).thenReturn(false);
+
+        assertThatThrownBy(() -> confirmInTransaction(
+                new ConfirmVideoUploadCommand(lessonId, otherId, "videos/10_uuid.mp4", 120)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_ACCESS_DENIED);
+
+        verify(lessonRepository, never()).save(any());
+    }
+
+    @Test
+    void 관리자는_소유_강사가_아니어도_썸네일을_업로드할_수_있다() {
+        Long courseId = 86L, authorId = 10L, adminId = 99L;
+        Course course = courseWithSections(courseId, authorId, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(courseAdminCheckPort.isAdmin(adminId)).thenReturn(true);
+        when(thumbnailStoragePort.store(eq(courseId), any(), any()))
+                .thenReturn(new ThumbnailStoragePort.StoredThumbnail(
+                        "thumbnails/86.png", "https://s3.example.com/thumb-presigned"));
+
+        String url = service.uploadCourseThumbnail(
+                new UploadCourseThumbnailCommand(courseId, adminId, "thumb.png", new byte[]{1, 2, 3}));
+
+        assertThat(url).isEqualTo("https://s3.example.com/thumb-presigned");
+        verify(courseRepository).save(course);
+    }
+
+    @Test
+    void 소유자도_관리자도_아니면_썸네일_업로드가_거부된다_CR004() {
+        Long courseId = 86L, authorId = 10L, otherId = 77L;
+        Course course = courseWithSections(courseId, authorId, 1L);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(courseAdminCheckPort.isAdmin(otherId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.uploadCourseThumbnail(
+                new UploadCourseThumbnailCommand(courseId, otherId, "thumb.png", new byte[]{1, 2, 3})))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COURSE_ACCESS_DENIED);
+
+        verify(courseRepository, never()).save(any(Course.class));
     }
 
     private void updateInTransaction(UpdateCourseCommand command) {
