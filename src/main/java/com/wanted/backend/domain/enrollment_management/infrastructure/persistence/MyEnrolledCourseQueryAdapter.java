@@ -31,8 +31,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class MyEnrolledCourseQueryAdapter implements MyEnrolledCourseQueryPort {
 
-    // course.status 의 소프트 삭제 값. 수강 목록에서 이 상태의 강의는 제외한다.
-    private static final String COURSE_STATUS_DELETED = "DELETED";
+    // 수강 목록에 노출할 강의 상태. 삭제(DELETED)·비공개(DRAFT)는 빼고 PUBLISHED 만 보여준다.
+    private static final String COURSE_STATUS_PUBLISHED = "PUBLISHED";
 
     // 여러 참조 테이블에서 가져온 조회 결과를 화면 응답에 필요한 포트 데이터로 조합한다.
     private final EnrollmentRepository enrollmentRepository;
@@ -54,10 +54,10 @@ public class MyEnrolledCourseQueryAdapter implements MyEnrolledCourseQueryPort {
                 .toList();
 
         // 강의/레슨/진도 정보를 한 번씩 조회한 뒤 courseId 기준으로 묶어서 N+1 조회를 피한다.
-        // 소프트 삭제(status=DELETED)된 강의는 조회 대상에서 빼, 목록에 남지 않게 한다
-        // (상세는 삭제 강의에 COURSE_NOT_FOUND 를 내므로 목록에만 남으면 클릭 시 404로 불일치).
+        // PUBLISHED 강의만 조회 대상에 넣어, 삭제(DELETED)·비공개(DRAFT) 강의는 목록에서 뺀다
+        // (게시 중단된 강의를 수강 목록에 남기지 않는다).
         Map<Long, CourseReferenceEntity> courseById =
-                courseRepository.findByIdInAndStatusNot(courseIds, COURSE_STATUS_DELETED).stream()
+                courseRepository.findByIdInAndStatus(courseIds, COURSE_STATUS_PUBLISHED).stream()
                         .collect(Collectors.toMap(CourseReferenceEntity::getId, Function.identity()));
         Map<Long, List<EnrolledLessonReferenceEntity>> lessonsByCourseId = findLessonsByCourseId(courseIds);
         Map<Long, List<VideoProgressReferenceEntity>> progressesByCourseId = progressRepository
@@ -65,7 +65,7 @@ public class MyEnrolledCourseQueryAdapter implements MyEnrolledCourseQueryPort {
                 .collect(Collectors.groupingBy(VideoProgressReferenceEntity::getCourseId));
 
         return enrollments.stream()
-                // 삭제된(courseById 에 없는) 강의의 수강 건은 목록에서 제외한다.
+                // PUBLISHED 가 아닌(courseById 에 없는 = 삭제/비공개) 강의의 수강 건은 목록에서 제외한다.
                 .filter(enrollment -> courseById.containsKey(enrollment.getCourseId()))
                 .map(enrollment -> toData(
                         enrollment.getCourseId(),
