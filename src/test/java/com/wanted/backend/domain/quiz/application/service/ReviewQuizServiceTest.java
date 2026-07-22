@@ -55,6 +55,12 @@ class ReviewQuizServiceTest {
                 QuizOption.restore(id * 10 + 4, 4, "오답", false)));
     }
 
+    /** courseId 검증이 항상 통과하도록(요청한 문항 id를 그대로 소속 확인됨으로 돌려줌) 스텁한다. */
+    private void stubCourseValidationPassesForAll() {
+        when(quizRepository.findQuestionIdsBelongingToCourse(anyList(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
     /** 저장된 SimilarQuiz에 순차 id(1001, 1002, ...)를 부여해 돌려주는 passthrough. */
     private void stubSaveWithSequentialIds() {
         AtomicLong seq = new AtomicLong(1000);
@@ -75,6 +81,7 @@ class ReviewQuizServiceTest {
         // 코스 경계 없이 by-id 로 조립한다(섹션/코스가 달라도 조회).
         when(quizRepository.findQuestionsByIds(anyList())).thenReturn(List.of(
                 question(201L, "유사201"), question(202L, "유사202"), question(301L, "유사301")));
+        stubCourseValidationPassesForAll();
         stubSaveWithSequentialIds();
 
         ReviewQuizResult result = service.generateForStudent(MEMBER_ID);
@@ -115,6 +122,44 @@ class ReviewQuizServiceTest {
     }
 
     @Test
+    void generateSkipsPersistenceWhenCourseIdIsNegative() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        // courseId <= 0 경계값(-1) — 0과 동일하게 저장을 건너뛴다.
+        when(recommender.recommendReview(eq(MEMBER_ID), anyInt())).thenReturn(List.of(
+                new ReviewItem(1101L, 137L, -1L, List.of(201L))));
+        when(quizRepository.findQuestionsByIds(anyList())).thenReturn(List.of(question(201L, "유사201")));
+
+        ReviewQuizResult result = service.generateForStudent(MEMBER_ID);
+
+        assertThat(result).isNotNull();
+        assertThat(result.reviews().get(0).similarQuizId()).isNull();
+        verify(similarQuizRepository, never()).save(any());
+    }
+
+    @Test
+    void generateSkipsPersistenceWhenQuestionDoesNotBelongToClaimedCourse() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        // 추천기가 courseId=88을 줬지만, DB 검증 결과 문항 202는 다른 코스 소속 — 그룹 전체 저장을 건너뛴다.
+        when(recommender.recommendReview(eq(MEMBER_ID), anyInt())).thenReturn(List.of(
+                new ReviewItem(1101L, 137L, 88L, List.of(201L, 202L))));
+        when(quizRepository.findQuestionsByIds(anyList())).thenReturn(List.of(
+                question(201L, "유사201"), question(202L, "유사202")));
+        when(quizRepository.findQuestionIdsBelongingToCourse(eq(List.of(201L, 202L)), eq(88L)))
+                .thenReturn(List.of(201L)); // 202는 코스 88 소속이 아님
+
+        ReviewQuizResult result = service.generateForStudent(MEMBER_ID);
+
+        assertThat(result).isNotNull();
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).similarQuizId()).isNull();
+        // 응시 화면에는 추천기가 준 유사문제 그대로 노출하되, 제출용 영속만 막는다.
+        assertThat(result.reviews().get(0).similar())
+                .extracting(ReviewQuizResult.Question::questionId)
+                .containsExactly(201L, 202L);
+        verify(similarQuizRepository, never()).save(any());
+    }
+
+    @Test
     void generateRejectsWhenNotSubscribed() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(false);
 
@@ -141,6 +186,7 @@ class ReviewQuizServiceTest {
                 new ReviewItem(1101L, 137L, 88L, List.of(201L, 201L, 202L))));
         when(quizRepository.findQuestionsByIds(anyList())).thenReturn(List.of(
                 question(201L, "유사201"), question(202L, "유사202")));
+        stubCourseValidationPassesForAll();
         stubSaveWithSequentialIds();
 
         ReviewQuizResult result = service.generateForStudent(MEMBER_ID);

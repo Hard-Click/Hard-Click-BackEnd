@@ -84,6 +84,17 @@ public class QuizRepositoryAdapter implements QuizRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Long> findQuestionIdsBelongingToCourse(List<Long> questionIds, Long courseId) {
+        if (questionIds.isEmpty()) {
+            return List.of();
+        }
+        return quizQuestionJpaRepository.findByIdInAndQuiz_CourseId(questionIds, courseId).stream()
+                .map(QuizQuestionJpaEntity::getId)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public Quiz update(Quiz quiz) {
         QuizJpaEntity entity = quizJpaRepository.findWithQuestionsByIdAndDeletedAtIsNull(quiz.getId())

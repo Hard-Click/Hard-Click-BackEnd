@@ -96,10 +96,16 @@ public class ReviewQuizService implements ReviewQuizUseCase {
 
     /**
      * 그룹을 그 코스의 SimilarQuiz로 저장하고 제출용 id를 돌려준다.
-     * 코스 미상(courseId≤0)이면 저장을 건너뛰고 null(응시만, 제출 불가) — 부분 데이터가 전체를 막지 않게.
+     * 코스 미상(courseId≤0)이거나, 추천기가 준 courseId를 DB 기준으로 검증했을 때 문항 중
+     * 하나라도 그 코스 소속이 아니면(오래된/잘못된 추천 결과) 저장을 건너뛰고 null(응시만, 제출 불가)
+     * — 부분 데이터가 전체를 막지 않게 하면서도, 다른 코스 문항이 잘못된 코스로 영속되지 않게 한다.
      */
     private Long persistGroup(Long memberId, long courseId, List<Long> questionIds) {
         if (courseId <= 0) {
+            return null;
+        }
+        List<Long> verifiedIds = quizRepository.findQuestionIdsBelongingToCourse(questionIds, courseId);
+        if (verifiedIds.size() != questionIds.size()) {
             return null;
         }
         SimilarQuiz saved = similarQuizRepository.save(
