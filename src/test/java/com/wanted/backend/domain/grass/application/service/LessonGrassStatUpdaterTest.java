@@ -63,4 +63,25 @@ class LessonGrassStatUpdaterTest {
         verify(cache).evict("77:2026:2026-01-03");
         verify(cache).evict("77:2026-1:2026-01-03");
     }
+
+    @Test
+    void evictsPastYearKeysWhenCompletionProcessedAfterNewYearMidnight() {
+        // 완료는 2025-12-31 23:59(KST) 인데 AFTER_COMMIT 처리는 자정을 넘겨 2026-01-01 00:30(KST)에 일어나는 경우.
+        // 조회 시점(now)이 2026 이라 2025 는 '과거 연도' → resolveCacheKey 는 today suffix 없는 고정 키를 쓴다.
+        // now = 2026-01-01 00:30 KST
+        Clock clock = Clock.fixed(Instant.parse("2025-12-31T15:30:00Z"), KST);
+        LessonGrassStatUpdater updaterAfterMidnight =
+                new LessonGrassStatUpdater(countWriter, cacheManager, clock);
+        // occurredAt = 2025-12-31 23:59 KST
+        VideoCompletedEvent event = new VideoCompletedEvent(
+                77L, 55L, 42L, Instant.parse("2025-12-31T14:59:00Z"));
+
+        updaterAfterMidnight.handle(event);
+
+        // 집계는 완료일(2025-12-31) 버킷에 +1
+        verify(countWriter).increment(eq(77L), eq(LocalDate.of(2025, 12, 31)));
+        // 과거 연도 → today suffix 없는 고정 키를 evict (statDate 를 suffix 로 쓰면 이 키를 놓쳐 stale 이 남음)
+        verify(cache).evict("77:2025");       // 연간뷰(2025) 과거연도 키
+        verify(cache).evict("77:2025-12");    // 월간뷰(2025-12) 과거연도 키
+    }
 }
