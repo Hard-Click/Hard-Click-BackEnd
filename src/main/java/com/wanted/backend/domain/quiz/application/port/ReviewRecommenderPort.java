@@ -16,7 +16,9 @@ public interface ReviewRecommenderPort {
 
     /**
      * 복습 항목 하나 = 원문제 + 그 원문제의 유사문제 id들.
-     * problemId = quiz_question.id(원문제), sectionId = 원문제가 속한 섹션, similarIds = 유사문제 문항 id.
+     * problemId = quiz_question.id(원문제), sectionId = 원문제가 속한 섹션,
+     * courseId = 원문제(=유사문제)가 속한 코스(그룹별 SimilarQuiz 저장에 사용, 미상이면 0),
+     * similarIds = 유사문제 문항 id.
      */
-    record ReviewItem(long problemId, long sectionId, List<Long> similarIds) {}
+    record ReviewItem(long problemId, long sectionId, long courseId, List<Long> similarIds) {}
 }
