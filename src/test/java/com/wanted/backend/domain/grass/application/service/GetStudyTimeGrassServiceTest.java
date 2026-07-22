@@ -3,6 +3,7 @@ package com.wanted.backend.domain.grass.application.service;
 import com.wanted.backend.domain.grass.application.query.GetStudyTimeGrassQuery;
 import com.wanted.backend.domain.grass.application.usecase.GetStudyTimeGrassUseCase;
 import com.wanted.backend.domain.grass.domain.model.StudyTimeGrassStat;
+import com.wanted.backend.domain.grass.domain.policy.MonthlyGrassPeriodPolicy;
 import com.wanted.backend.domain.grass.domain.policy.StudyTimeGrassLevelPolicy;
 import com.wanted.backend.domain.grass.domain.policy.YearlyGrassPeriodPolicy;
 import com.wanted.backend.domain.grass.domain.repository.StudyTimeGrassRepository;
@@ -35,6 +36,7 @@ class GetStudyTimeGrassServiceTest {
                 repository,
                 new StudyTimeGrassLevelPolicy(List.of(1, 1800, 3600, 7200)),
                 new YearlyGrassPeriodPolicy(),
+                new MonthlyGrassPeriodPolicy(),
                 clock
         );
     }
@@ -78,6 +80,7 @@ class GetStudyTimeGrassServiceTest {
                 repository,
                 new StudyTimeGrassLevelPolicy(List.of(1, 1800, 3600, 7200)),
                 new YearlyGrassPeriodPolicy(),
+                new MonthlyGrassPeriodPolicy(),
                 leapYearClock
         );
 
@@ -156,9 +159,79 @@ class GetStudyTimeGrassServiceTest {
     }
 
     @Test
+    void returnsOnlyRequestedMonthWhenMonthGiven() {
+        // 오늘=2026-01-03, month=1 → 1/1~1/31 만, 조회 범위는 1/1~오늘(1/3)
+        when(repository.findByMemberIdAndDateBetween(
+                1L,
+                LocalDate.parse("2026-01-01"),
+                LocalDate.parse("2026-01-03")
+        )).thenReturn(List.of(
+                new StudyTimeGrassStat(1L, LocalDate.parse("2026-01-02"), 3600)
+        ));
+
+        List<GetStudyTimeGrassUseCase.StudyTimeGrassView> result =
+                service.handle(new GetStudyTimeGrassQuery(1L, 2026, 1));
+
+        assertThat(result).hasSize(31);
+        assertThat(result.get(0).date()).isEqualTo(LocalDate.parse("2026-01-01"));
+        assertThat(result.get(30).date()).isEqualTo(LocalDate.parse("2026-01-31"));
+        assertThat(result.get(1).studySeconds()).isEqualTo(3600);
+        assertThat(result.get(1).isFuture()).isFalse();
+        assertThat(result.get(30).isFuture()).isTrue();
+        // 연간 전체가 아니라 해당 월(오늘까지)만 조회한다
+        verify(repository).findByMemberIdAndDateBetween(
+                1L, LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-03"));
+    }
+
+    @Test
     void rejectsNullMemberId() {
         assertThatThrownBy(() -> service.handle(new GetStudyTimeGrassQuery(null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("회원 ID는 필수입니다.");
+    }
+
+    // month 경계: 0/13은 정책이 IllegalArgumentException을 던지고(전역 핸들러가 400 매핑), 조회는 일어나지 않는다.
+    @Test
+    void rejectsMonthBelowRange() {
+        assertThatThrownBy(() -> service.handle(new GetStudyTimeGrassQuery(1L, 2026, 0)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 월은 1~12 사이여야 합니다.");
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void rejectsMonthAboveRange() {
+        assertThatThrownBy(() -> service.handle(new GetStudyTimeGrassQuery(1L, 2026, 13)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 월은 1~12 사이여야 합니다.");
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    // 오늘(2026-01-03)보다 전 구간이 미래인 월(2026-12)은 저장소 조회 없이 전부 0/future로 채운다.
+    @Test
+    void returnsEmptyFutureMonthWithoutQuerying() {
+        List<GetStudyTimeGrassUseCase.StudyTimeGrassView> result =
+                service.handle(new GetStudyTimeGrassQuery(1L, 2026, 12));
+
+        assertThat(result).hasSize(31);
+        assertThat(result.get(0).date()).isEqualTo(LocalDate.parse("2026-12-01"));
+        assertThat(result.get(30).date()).isEqualTo(LocalDate.parse("2026-12-31"));
+        assertThat(result).allMatch(view -> view.studySeconds() == 0 && view.isFuture());
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 }
