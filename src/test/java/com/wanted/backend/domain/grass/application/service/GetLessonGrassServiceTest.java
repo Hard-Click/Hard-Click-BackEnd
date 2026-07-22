@@ -160,4 +160,49 @@ class GetLessonGrassServiceTest {
                 org.mockito.ArgumentMatchers.any()
         );
     }
+
+    // month 경계: 0/13은 정책이 IllegalArgumentException을 던지고(전역 핸들러가 400 매핑), 조회는 일어나지 않는다.
+    @Test
+    void rejectsMonthBelowRange() {
+        assertThatThrownBy(() -> service.handle(new GetLessonGrassQuery(1L, 2026, 0)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 월은 1~12 사이여야 합니다.");
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void rejectsMonthAboveRange() {
+        assertThatThrownBy(() -> service.handle(new GetLessonGrassQuery(1L, 2026, 13)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("조회 월은 1~12 사이여야 합니다.");
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    // 오늘(2026-01-03)보다 전 구간이 미래인 월(2026-12)은 저장소 조회 없이 전부 0/future로 채운다.
+    @Test
+    void returnsEmptyFutureMonthWithoutQuerying() {
+        List<GetLessonGrassUseCase.LessonGrassView> result =
+                service.handle(new GetLessonGrassQuery(1L, 2026, 12));
+
+        assertThat(result).hasSize(31);
+        assertThat(result.get(0).date()).isEqualTo(LocalDate.parse("2026-12-01"));
+        assertThat(result.get(30).date()).isEqualTo(LocalDate.parse("2026-12-31"));
+        assertThat(result).allMatch(view -> view.watchedLessonCount() == 0 && view.level() == 0 && view.isFuture());
+
+        verify(repository, never()).findByMemberIdAndDateBetween(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
 }
