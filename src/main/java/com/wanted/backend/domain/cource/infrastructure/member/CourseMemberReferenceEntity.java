@@ -21,9 +21,11 @@ import org.hibernate.annotations.Immutable;
 public class CourseMemberReferenceEntity {
 
     @Id
-    @Column(name = "member_id")
+    @Column(name = "member_id", insertable = false, updatable = false)
     private Long id;
 
-    @Column(name = "role")
+    // members.role은 enum 컬럼이라, String 매핑 시 ddl-auto=validate가 타입 불일치(enum↔varchar)로 실패한다.
+    // 읽기 전용(insertable=false, updatable=false)으로 둬 타입 검증을 우회한다(notice MemberReferenceEntity와 동일).
+    @Column(name = "role", insertable = false, updatable = false)
     private String role;
 }

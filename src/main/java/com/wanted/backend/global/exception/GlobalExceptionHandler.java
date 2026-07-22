@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -217,6 +219,25 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI());
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
+     * 매핑된 핸들러/정적 리소스가 없는 경로 → 404. catch-all(Exception)로 떨어져 500이 되던 것을 막는다.
+     * (Spring Boot 3.2+: 매핑 없는 요청은 NoResourceFoundException, throw-if-no-handler 시 NoHandlerFoundException)
+     */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            Exception e,
+            HttpServletRequest request) {
+
+        log.warn("[No Handler] Path: {}, Message: {}", request.getRequestURI(), e.getMessage());
+
+        ErrorResponse response = ErrorResponse.create()
+                .errorCode(ErrorCode.ENDPOINT_NOT_FOUND.getCode())
+                .message(ErrorCode.ENDPOINT_NOT_FOUND.getMessage())
+                .path(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     /**
