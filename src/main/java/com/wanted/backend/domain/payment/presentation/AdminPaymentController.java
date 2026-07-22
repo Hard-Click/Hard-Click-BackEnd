@@ -1,8 +1,8 @@
 package com.wanted.backend.domain.payment.presentation;
 
+import com.wanted.backend.domain.order.application.usecase.AdminRefundOrderUseCase;
 import com.wanted.backend.domain.payment.application.port.AdminPaymentQueryPort;
 import com.wanted.backend.domain.payment.application.usecase.GetAdminPaymentsUseCase;
-import com.wanted.backend.domain.payment.application.usecase.RefundPaymentUseCase;
 import com.wanted.backend.domain.payment.domain.model.PaymentStatus;
 import com.wanted.backend.domain.payment.presentation.response.AdminPaymentListResponse;
 import com.wanted.backend.global.common.ApiResponse;
@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPaymentController {
 
     private final GetAdminPaymentsUseCase getAdminPaymentsUseCase;
-    private final RefundPaymentUseCase refundPaymentUseCase;
+    private final AdminRefundOrderUseCase adminRefundOrderUseCase;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -75,9 +75,9 @@ public class AdminPaymentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 환불된 결제이거나 환불 불가 상태")
     })
     public ResponseEntity<ApiResponse<Void>> refund(
-            @Parameter(description = "환불할 결제 ID", example = "1")
+            @Parameter(description = "환불할 결제 ID (= 주문 ID, 목록의 paymentId)", example = "203")
             @PathVariable Long paymentId) {
-        refundPaymentUseCase.handle(paymentId);
+        adminRefundOrderUseCase.refund(paymentId);
         return ApiResponse.successNoContent("환불이 처리되었습니다.");
     }
 }
