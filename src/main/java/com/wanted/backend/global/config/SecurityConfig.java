@@ -76,11 +76,12 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/ws-chat/**"
                         ).permitAll()
-                        // Prometheus는 같은 Docker 네트워크(브리지 대역) 또는 localhost에서만 스크랩하므로
-                        // 외부 인터넷으로 메트릭이 그대로 노출되지 않도록 발신 IP를 제한한다.
+                        // Prometheus는 같은 Docker 네트워크(브리지 대역), localhost, 또는 별도 모니터링
+                        // EC2 인스턴스(VPC 사설 대역)에서만 스크랩하므로 외부 인터넷으로 메트릭이
+                        // 그대로 노출되지 않도록 발신 IP를 제한한다.
                         .requestMatchers("/actuator/prometheus").access(
                                 new WebExpressionAuthorizationManager(
-                                        "hasIpAddress('127.0.0.1') or hasIpAddress('::1') or hasIpAddress('172.16.0.0/12')"))
+                                        "hasIpAddress('127.0.0.1') or hasIpAddress('::1') or hasIpAddress('172.16.0.0/12') or hasIpAddress('10.20.0.0/16')"))
                         // 가입 전(무인증) 프로필 이미지 업로드 — POST만 공개해 표면을 최소화
                         .requestMatchers(HttpMethod.POST, "/api/auth/profile-image").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/*","/api/courses/*/reviews").permitAll()
