@@ -1,12 +1,15 @@
 package com.wanted.backend.domain.quiz.presentation;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
+import com.wanted.backend.domain.quiz.application.result.ReviewQuizResult;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizResult;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
+import com.wanted.backend.domain.quiz.application.usecase.ReviewQuizUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.SimilarQuizUseCase;
 import com.wanted.backend.domain.quiz.application.usecase.SubmitSimilarQuizUseCase;
 import com.wanted.backend.domain.quiz.presentation.request.SimilarQuizRequest;
 import com.wanted.backend.domain.quiz.presentation.request.SimilarQuizSubmitRequest;
+import com.wanted.backend.domain.quiz.presentation.response.ReviewQuizResponse;
 import com.wanted.backend.domain.quiz.presentation.response.SimilarQuizResponse;
 import com.wanted.backend.domain.quiz.presentation.response.SimilarQuizSubmitResponse;
 import com.wanted.backend.global.common.ApiResponse;
@@ -33,6 +36,7 @@ public class SimilarQuizController {
 
     private final SimilarQuizUseCase similarQuizUseCase;
     private final SubmitSimilarQuizUseCase submitSimilarQuizUseCase;
+    private final ReviewQuizUseCase reviewQuizUseCase;
 
     @PostMapping
     @Operation(summary = "유사퀴즈 생성", description = "강의(course) 오답 기반 유사문제 세트를 생성·영속한다. 구독 회원 전용(403). 오답/유사문제 없으면 data=null(정상 empty).")
@@ -44,6 +48,16 @@ public class SimilarQuizController {
                 userDetails.getMemberId(), request.courseId(), request.week());
         SimilarQuizResponse body = result == null ? null : SimilarQuizResponse.from(result);
         return ApiResponse.success("유사퀴즈 조회 성공", body);
+    }
+
+    @PostMapping("/review")
+    @Operation(summary = "복습 추천 생성('안 B')", description = "학생 전체 이력 기반으로 추천기가 원문제를 선정하고 유사문제까지 붙여 급한 순으로 반환한다. courseId 불필요(student-global). 구독 회원 전용(403). 추천 근거/조립 문항 없으면 data=null(정상 empty).")
+    public ResponseEntity<ApiResponse<ReviewQuizResponse>> generateReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        ReviewQuizResult result = reviewQuizUseCase.generateForStudent(userDetails.getMemberId());
+        ReviewQuizResponse body = result == null ? null : ReviewQuizResponse.from(result);
+        return ApiResponse.success("복습 추천 조회 성공", body);
     }
 
     @PostMapping("/{similarQuizId}/submit")

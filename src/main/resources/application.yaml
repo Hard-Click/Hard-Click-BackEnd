@@ -106,6 +106,8 @@ quiz:
     submission-path: ${QUIZ_AI_SUBMISSION_PATH:/quiz/submissions}
     # 유사문제 추천 조회 경로. 추천기 계약: GET {similar-path}/{problemId}?student_id=&k= → {"problems":[원문제, 유사...]}
     similar-path: ${QUIZ_AI_SIMILAR_PATH:/quiz/similar}
+    # 복습 추천('안 B') 조회 경로. 계약: GET {review-path}/{studentId}?k= → {"reviews":[{problem_id,section_id,similar:[...]}]}
+    review-path: ${QUIZ_AI_REVIEW_PATH:/quiz/review}
     enabled: ${QUIZ_AI_ENABLED:false}
 
 server:
