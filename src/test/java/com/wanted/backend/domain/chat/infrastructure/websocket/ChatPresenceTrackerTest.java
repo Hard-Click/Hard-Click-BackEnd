@@ -5,8 +5,6 @@ import com.wanted.backend.domain.chat.application.port.MemberNamePort;
 import com.wanted.backend.domain.chat.domain.repository.ChatRoomParticipantRepository;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.ParticipantPresenceMessage;
 import com.wanted.backend.domain.chat.infrastructure.websocket.message.PresenceUpdateMessage;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,7 +67,6 @@ class ChatPresenceTrackerTest {
 
     private final Map<String, Set<String>> fakeSets = new HashMap<>();
     private final Map<String, String> fakeValues = new HashMap<>();
-    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private ChatPresenceTracker tracker;
 
@@ -103,31 +100,7 @@ class ChatPresenceTrackerTest {
         lenient().when(redisTemplate.delete(anyString())).thenAnswer(invocation ->
                 fakeValues.remove((String) invocation.getArgument(0)) != null);
 
-        tracker = new ChatPresenceTracker(chatRoomParticipantRepository, memberNamePort, chatBroadcastPort, redisTemplate, meterRegistry);
-    }
-
-    @Test
-    @DisplayName("구독할 때마다 chat.presence.online 게이지가 증가한다")
-    void handleSubscribe_incrementsOnlineGauge() {
-        given(chatRoomParticipantRepository.findMemberIdsByChatRoomId(45L)).willReturn(List.of(1L, 2L));
-        given(memberNamePort.getNamesByMemberIds(any())).willReturn(Map.of(1L, "이지연", 2L, "김민수"));
-
-        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-1", new ChatPrincipal(1L))));
-        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-2", new ChatPrincipal(2L))));
-
-        assertThat(meterRegistry.get("chat.presence.online").gauge().value()).isEqualTo(2.0);
-    }
-
-    @Test
-    @DisplayName("연결이 끊기면 chat.presence.online 게이지가 감소한다")
-    void handleDisconnect_decrementsOnlineGauge() {
-        given(chatRoomParticipantRepository.findMemberIdsByChatRoomId(45L)).willReturn(List.of(1L));
-        given(memberNamePort.getNamesByMemberIds(any())).willReturn(Map.of(1L, "이지연"));
-        tracker.handleSubscribe(new SessionSubscribeEvent(this, subscribeMessage("/sub/chat-rooms/45", "session-1", new ChatPrincipal(1L))));
-
-        tracker.handleDisconnect(new SessionDisconnectEvent(this, disconnectMessage(), "session-1", CloseStatus.NORMAL, new ChatPrincipal(1L)));
-
-        assertThat(meterRegistry.get("chat.presence.online").gauge().value()).isEqualTo(0.0);
+        tracker = new ChatPresenceTracker(chatRoomParticipantRepository, memberNamePort, chatBroadcastPort, redisTemplate);
     }
 
     @Test
