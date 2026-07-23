@@ -68,19 +68,21 @@ public class VideoProgressRepositoryAdapter implements VideoProgressRepository {
         } catch (DataIntegrityViolationException violation) {
             // NOT NULL·FK 위반도 같은 타입이라, 무조건 경합으로 단정하면 진짜 원인이 가려진다.
             // 실제로 행이 생겨 있을 때만 경합으로 보고 복구하고, 아니면 원래 예외를 그대로 올린다.
-            VideoProgressJpaEntity entity = repository
-                    .findByMemberIdAndVideoId(progress.memberId(), progress.videoId())
+            //
+            // 복구 read는 반드시 새 트랜잭션(inserter.updateExisting=REQUIRES_NEW)에서 해야 한다.
+            // 이 바깥 트랜잭션의 스냅샷은 경합 상대가 커밋하기 전(reader의 첫 조회 시점)에 고정돼
+            // 있어(MySQL REPEATABLE READ), 방금 커밋된 행을 여기서 읽으면 보이지 않아 복구가 실패한다.
+            return inserter.updateExisting(
+                            progress.memberId(),
+                            progress.videoId(),
+                            progress.lastPositionSec(),
+                            progress.watchTimeSec(),
+                            progress.completed(),
+                            progress.completedAt(),
+                            now
+                    )
+                    .map(this::toDomain)
                     .orElseThrow(() -> violation);
-
-            entity.updateProgress(
-                    progress.lastPositionSec(),
-                    progress.watchTimeSec(),
-                    progress.completed(),
-                    progress.completedAt(),
-                    now
-            );
-
-            return toDomain(repository.save(entity));
         }
     }
 

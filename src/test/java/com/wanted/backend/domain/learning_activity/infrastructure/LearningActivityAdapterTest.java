@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest(properties = {
         "spring.jpa.hibernate.ddl-auto=none",
@@ -207,6 +208,19 @@ class LearningActivityAdapterTest {
                 .hasSize(1);
         assertThat(videoProgressRepositoryAdapter.findByMemberIdAndVideoId(1L, 10L))
                 .isPresent();
+    }
+
+    @Test
+    void 영상_진도_저장소_어댑터가_경합이_아닌_진짜_제약_위반은_삼키지_않고_그대로_던진다() {
+        // 기존 행이 없는 (member, video)에 course_id=null로 INSERT → NOT NULL 위반.
+        // 경합 복구는 "위반 후 실제로 행이 생겨 있을 때"만 동작해야 하고, 행이 없으면
+        // 원래 제약 위반(C001)이 그대로 상승해 진짜 원인이 로그에 드러나야 한다.
+        VideoProgress invalid = new VideoProgress(null, 1L, null, 999L, 0, 0, false, null);
+
+        assertThatThrownBy(() -> videoProgressRepositoryAdapter.save(invalid))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        assertThat(videoProgressRepositoryAdapter.findByMemberIdAndVideoId(1L, 999L)).isEmpty();
     }
 
     @Test
