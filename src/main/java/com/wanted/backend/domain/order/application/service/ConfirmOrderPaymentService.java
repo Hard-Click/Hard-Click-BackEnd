@@ -75,8 +75,12 @@ public class ConfirmOrderPaymentService implements ConfirmOrderPaymentUseCase {
     private Result doConfirm(Long memberId, String orderNo, String paymentKey, Integer amount, String idempotencyKey) {
         Order order = findOwnedOrder(memberId, orderNo);
 
-        // 이미 처리된 주문이면 PG 재호출 없이 즉시 멱등 응답
+        // 이미 처리된 주문이면 PG 재호출 없이 즉시 멱등 응답.
+        // 단, PAID인데 직전 시도에서 지급(dispatchAccessGrant)만 실패했을 수 있으므로 재시도한다.
         if (order.getStatus() != OrderStatus.READY) {
+            if (order.getStatus() == OrderStatus.PAID) {
+                dispatchAccessGrant(order);
+            }
             return new Result(orderNo, order.getStatus(), null, true);
         }
 
@@ -134,7 +138,7 @@ public class ConfirmOrderPaymentService implements ConfirmOrderPaymentUseCase {
     private void dispatchAccessGrant(Order order) {
         try {
             if (order.getType() == OrderType.SUBSCRIPTION) {
-                subscribeUseCase.handle(order.getMemberId(), order.getId(), order.getFinalAmount());
+                grantSubscription(order);
                 orderCartDeletePort.deleteAllByMemberId(order.getMemberId());
             } else {
                 List<Long> purchasedCourseIds = order.getItems().stream()
@@ -163,6 +167,18 @@ public class ConfirmOrderPaymentService implements ConfirmOrderPaymentUseCase {
             enrollUseCase.handle(new EnrollCommand(memberId, courseId));
         } catch (BusinessException e) {
             if (e.getErrorCode() != ErrorCode.ENROLLMENT_ALREADY_EXISTS) {
+                throw e;
+            }
+        }
+    }
+
+    // 재시도(멱등 경로)에서 이미 지급이 끝난 상태로 들어오면 SUBSCRIPTION_ALREADY_ACTIVE가 던져진다.
+    // 이는 실패가 아니라 "이미 성공했음"을 의미하므로 정상 종료로 처리한다.
+    private void grantSubscription(Order order) {
+        try {
+            subscribeUseCase.handle(order.getMemberId(), order.getId(), order.getFinalAmount());
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != ErrorCode.SUBSCRIPTION_ALREADY_ACTIVE) {
                 throw e;
             }
         }
