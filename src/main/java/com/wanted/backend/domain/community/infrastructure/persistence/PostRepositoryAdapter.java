@@ -232,7 +232,7 @@ public class PostRepositoryAdapter implements PostRepository {
 
     @Override
     public Optional<Post> findByIdForUpdate(Long postId) {
-        return repository.findByIdForUpdate(postId).map(this::toDomain);
+        return repository.findWithLockById(postId).map(this::toDomain);
     }
 
     @Override
