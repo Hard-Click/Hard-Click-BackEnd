@@ -6,26 +6,34 @@ import com.wanted.backend.domain.ranking.application.port.RankingScoreWriter;
 import com.wanted.backend.domain.ranking.domain.model.RankingMetric;
 import com.wanted.backend.domain.ranking.domain.model.RankingPeriod;
 import com.wanted.backend.domain.study_timer.domain.event.StudySessionEndedEvent;
+import com.wanted.backend.global.idempotency.VideoCompletionDedup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class RankingScoreUpdaterTest {
 
     private RankingScoreWriter rankingScoreWriter;
+    private VideoCompletionDedup videoCompletionDedup;
     private RankingScoreUpdater updater;
 
     @BeforeEach
     void setUp() {
         rankingScoreWriter = mock(RankingScoreWriter.class);
-        updater = new RankingScoreUpdater(rankingScoreWriter);
+        videoCompletionDedup = mock(VideoCompletionDedup.class);
+        // 기본: 최초 선점 성공(집계 진행). 중복 스킵 검증 테스트에서만 false로 재정의한다.
+        when(videoCompletionDedup.claim(any(), any(), any())).thenReturn(true);
+        updater = new RankingScoreUpdater(rankingScoreWriter, videoCompletionDedup);
     }
 
     @Test
@@ -106,7 +114,7 @@ class RankingScoreUpdaterTest {
     void incrementsLessonScoresForAllPeriods() {
         VideoCompletedEvent event = VideoCompletedEvent.of(1L, 10L, 20L);
 
-        updater.handle(event);
+        updater.process(event);
 
         verify(rankingScoreWriter).incrementScore(RankingMetric.LESSON, RankingPeriod.DAILY, 1L, 1L);
         verify(rankingScoreWriter).incrementScore(RankingMetric.LESSON, RankingPeriod.WEEKLY, 1L, 1L);
@@ -120,11 +128,22 @@ class RankingScoreUpdaterTest {
                 .when(rankingScoreWriter)
                 .incrementScore(RankingMetric.LESSON, RankingPeriod.DAILY, 1L, 1L);
 
-        updater.handle(event);
+        updater.process(event);
 
         verify(rankingScoreWriter).incrementScore(RankingMetric.LESSON, RankingPeriod.DAILY, 1L, 1L);
         verify(rankingScoreWriter).incrementScore(RankingMetric.LESSON, RankingPeriod.WEEKLY, 1L, 1L);
         verify(rankingScoreWriter).incrementScore(RankingMetric.LESSON, RankingPeriod.MONTHLY, 1L, 1L);
+    }
+
+    @Test
+    void skipsLessonScoreWhenCompletionAlreadyProcessed() {
+        VideoCompletedEvent event = VideoCompletedEvent.of(1L, 10L, 20L);
+        // 이미 처리된 완료 — 선점 실패(dedup)
+        when(videoCompletionDedup.claim(eq("ranking_lesson"), eq(1L), eq(10L))).thenReturn(false);
+
+        updater.process(event);
+
+        verifyNoInteractions(rankingScoreWriter);
     }
 
     @Test

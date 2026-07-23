@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.learning_activity.application.service;
 
 import com.wanted.backend.domain.learning_activity.application.command.MemberVideoCommand;
+import com.wanted.backend.domain.learning_activity.application.outbox.VideoCompletionOutboxStore;
 import com.wanted.backend.domain.learning_activity.application.policy.VideoCompletionPolicy;
 import com.wanted.backend.domain.learning_activity.application.usecase.CompleteVideoUseCase;
 import com.wanted.backend.domain.learning_activity.domain.event.VideoCompletedEvent;
@@ -30,6 +31,7 @@ public class CompleteVideoService implements CompleteVideoUseCase {
     private final VideoCompletionPolicy videoCompletionPolicy;
     private final LearningActivityMetricRecorder metricRecorder;
     private final ApplicationEventPublisher eventPublisher;
+    private final VideoCompletionOutboxStore videoCompletionOutboxStore;
 
     @Override
     public void handle(MemberVideoCommand command) {
@@ -57,7 +59,13 @@ public class CompleteVideoService implements CompleteVideoUseCase {
             }
 
             videoProgressRepository.save(progress.complete(LocalDateTime.now()));
-            eventPublisher.publishEvent(VideoCompletedEvent.of(memberId, videoId, accessInfo.courseId()));
+            VideoCompletedEvent event = VideoCompletedEvent.of(memberId, videoId, accessInfo.courseId());
+            // 즉시경로: 상태기반·멱등인 EnrollmentStatusUpdater(AFTER_COMMIT)만 이 이벤트를 구독한다.
+            eventPublisher.publishEvent(event);
+            // durable 경로: 랭킹·수강량 잔디는 완료 트랜잭션과 '같은 커밋'으로 outbox에 적재해, 크래시·다운스트림
+            // 장애로도 유실되지 않게 한다. 실제 전달·재시도는 relay가 맡는다(소비자는 멱등).
+            videoCompletionOutboxStore.enqueue(
+                    event.memberId(), event.videoId(), event.courseId(), event.occurredAt());
             errorCode = null;
         } catch (BusinessException e) {
             errorCode = e.getErrorCode().name();

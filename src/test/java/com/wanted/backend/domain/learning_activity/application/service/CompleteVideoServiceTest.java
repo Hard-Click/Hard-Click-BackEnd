@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.learning_activity.application.service;
 
 import com.wanted.backend.domain.learning_activity.application.command.MemberVideoCommand;
+import com.wanted.backend.domain.learning_activity.application.outbox.VideoCompletionOutboxStore;
 import com.wanted.backend.domain.learning_activity.application.policy.VideoCompletionPolicy;
 import com.wanted.backend.domain.learning_activity.application.port.VideoCatalogPort;
 import com.wanted.backend.domain.learning_activity.domain.event.VideoCompletedEvent;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,6 +35,7 @@ class CompleteVideoServiceTest {
     private VideoAccessService videoAccessService;
     private LearningActivityMetricRecorder metricRecorder;
     private ApplicationEventPublisher eventPublisher;
+    private VideoCompletionOutboxStore videoCompletionOutboxStore;
     private CompleteVideoService service;
 
     @BeforeEach
@@ -42,6 +45,7 @@ class CompleteVideoServiceTest {
         videoAccessService = mock(VideoAccessService.class);
         metricRecorder = mock(LearningActivityMetricRecorder.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        videoCompletionOutboxStore = mock(VideoCompletionOutboxStore.class);
         PlayableVideoProgressReader playableVideoProgressReader =
                 new PlayableVideoProgressReader(videoCatalogPort, videoProgressRepository, videoAccessService);
         service = new CompleteVideoService(
@@ -49,7 +53,8 @@ class CompleteVideoServiceTest {
                 videoProgressRepository,
                 new VideoCompletionPolicy(),
                 metricRecorder,
-                eventPublisher
+                eventPublisher,
+                videoCompletionOutboxStore
         );
     }
 
@@ -144,6 +149,8 @@ class CompleteVideoServiceTest {
         assertThat(captor.getValue().memberId()).isEqualTo(1L);
         assertThat(captor.getValue().videoId()).isEqualTo(10L);
         assertThat(captor.getValue().courseId()).isEqualTo(20L);
+        // durable 경로: 완료 트랜잭션 안에서 outbox에도 적재된다(랭킹·잔디는 relay가 전달)
+        verify(videoCompletionOutboxStore).enqueue(eq(1L), eq(10L), eq(20L), any());
     }
 
     @Test
@@ -157,9 +164,10 @@ class CompleteVideoServiceTest {
 
         service.handle(new MemberVideoCommand(1L, 10L));
 
-        // 멱등 no-op: 재저장·이벤트 재발행 없음, 메트릭은 성공(null)
+        // 멱등 no-op: 재저장·이벤트 재발행·outbox 적재 없음, 메트릭은 성공(null)
         verify(videoProgressRepository, never()).save(any(VideoProgress.class));
         verify(eventPublisher, never()).publishEvent(any());
+        verify(videoCompletionOutboxStore, never()).enqueue(any(), any(), any(), any());
         verify(metricRecorder).recordResult(LearningActivityAction.COMPLETE_VIDEO, null);
     }
 
