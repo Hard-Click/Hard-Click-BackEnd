@@ -30,6 +30,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlConfig;
 
@@ -213,14 +214,29 @@ class LearningActivityAdapterTest {
     @Test
     void 영상_진도_저장소_어댑터가_경합이_아닌_진짜_제약_위반은_삼키지_않고_그대로_던진다() {
         // 기존 행이 없는 (member, video)에 course_id=null로 INSERT → NOT NULL 위반.
-        // 경합 복구는 "위반 후 실제로 행이 생겨 있을 때"만 동작해야 하고, 행이 없으면
-        // 원래 제약 위반(C001)이 그대로 상승해 진짜 원인이 로그에 드러나야 한다.
+        // 유니크 경합이 아니므로 복구하지 않고, 원래 제약 위반(C001)이 그대로 상승해
+        // 진짜 원인이 로그에 드러나야 한다.
         VideoProgress invalid = new VideoProgress(null, 1L, null, 999L, 0, 0, false, null);
 
         assertThatThrownBy(() -> videoProgressRepositoryAdapter.save(invalid))
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+                .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(videoProgressRepositoryAdapter.findByMemberIdAndVideoId(1L, 999L)).isEmpty();
+    }
+
+    @Test
+    void 영상_진도_저장소_어댑터가_기존_행이_있어도_유니크_경합이_아닌_위반은_전파하고_기존_행을_덮어쓰지_않는다() {
+        // 기존 행(100: member1/video10, watch_time=120, last_position=42)이 있는 상태에서
+        // INSERT 경로(id=null)로 course_id=null 요청이 오면 NOT NULL 위반이다. 이는 유니크
+        // 경합이 아니므로 복구 대상이 아니고, 예외를 그대로 전파하며 기존 행을 절대 덮어써선 안 된다.
+        VideoProgress invalidForExistingRow = new VideoProgress(null, 1L, null, 10L, 0, 999, true, null);
+
+        assertThatThrownBy(() -> videoProgressRepositoryAdapter.save(invalidForExistingRow))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        VideoProgress unchanged = videoProgressRepositoryAdapter.findByMemberIdAndVideoId(1L, 10L).orElseThrow();
+        assertThat(unchanged.watchTimeSec()).isEqualTo(120);
+        assertThat(unchanged.lastPositionSec()).isEqualTo(42);
     }
 
     @Test
