@@ -6,10 +6,16 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
 @EnableAsync
 public class AsyncConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AsyncConfig.class);
 
     @Bean(name = "fileProcessingExecutor")
     public Executor fileProcessingExecutor() {
@@ -63,7 +69,13 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("SchedulerAi-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
-        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        // 포화 시 CallerRunsPolicy는 수강 요청 스레드에서 최대 60초 Python 호출을 동기 실행해
+        // 수강 API를 지연/차단시킨다. 즉시 생성은 best-effort이고 미생성분은 주간 배치(weekly_reflow)가
+        // 백업하므로, 포화 시엔 요청 스레드를 막지 않고 폐기 + 경고 로그만 남긴다.
+        AtomicLong schedulerAiDiscarded = new AtomicLong();
+        executor.setRejectedExecutionHandler((r, e) ->
+                log.warn("schedulerAiExecutor 포화 — 즉시 스케줄 생성 작업 폐기(주간 배치가 백업). 누적 폐기 건수={}",
+                        schedulerAiDiscarded.incrementAndGet()));
         executor.initialize();
         return executor;
     }
