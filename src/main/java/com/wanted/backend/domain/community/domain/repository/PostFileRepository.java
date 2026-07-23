@@ -14,4 +14,7 @@ public interface PostFileRepository {
 
     //게시글 삭제 시 첨부파일 같이 삭제
     void deleteByPostId(Long postId);
+
+    // 지정한 첨부파일만 삭제 (게시글 수정 시 기존 파일만 제거, 신규 파일은 보존)
+    void deleteByIdIn(List<Long> ids);
 }

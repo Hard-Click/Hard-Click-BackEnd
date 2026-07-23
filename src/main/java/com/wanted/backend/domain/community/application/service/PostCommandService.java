@@ -129,7 +129,10 @@ public class PostCommandService implements PostCommandUseCase {
         // [5단계] 변경된 게시글 DB 저장
         Post saved = postRepository.save(post);
 
-        // [6단계] 새 파일 S3 업로드 (파일 있을 때만) — 기존 파일 삭제 전에 먼저 업로드
+        // [6단계] 기존 첨부파일 스냅샷 확보 (신규 업로드 전) — 7단계에서 "기존 것만" 지정 삭제하기 위함
+        List<PostFile> oldFiles = postFileRepository.findByPostId(command.postId());
+
+        // [7단계] 새 파일 S3 업로드 (파일 있을 때만) — 기존 파일 삭제 전에 먼저 업로드
         List<String> uploadedUrls = new ArrayList<>();
         if (fileCount > 0) {
             try {
@@ -145,11 +148,9 @@ public class PostCommandService implements PostCommandUseCase {
             }
         }
 
-        // [7단계] 기존 첨부파일 S3 삭제 및 DB 삭제 — 새 업로드 성공 후에 삭제
-        postFileRepository.findByPostId(command.postId()).stream()
-                .filter(file -> !uploadedUrls.contains(file.getFileUrl()))
-                .forEach(file -> storagePort.delete(file.getFileUrl()));
-        postFileRepository.deleteByPostId(command.postId());
+        // [8단계] 기존 첨부파일만 S3·DB에서 삭제 — 신규 업로드 성공 후, 기존 스냅샷 대상으로만 삭제
+        oldFiles.forEach(file -> storagePort.delete(file.getFileUrl()));
+        postFileRepository.deleteByIdIn(oldFiles.stream().map(PostFile::getId).toList());
 
         return saved.getId();
     }
