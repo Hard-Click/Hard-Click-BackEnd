@@ -52,6 +52,22 @@ public class AsyncConfig {
         return executor;
     }
 
+    // 수강 시작 시 AI 스케줄러(Python) 즉시 생성 호출 전용 풀.
+    // CP-SAT 최적화는 수 초~수십 초 걸릴 수 있어(readTimeout 60초) 다른 비동기 작업과 분리한다.
+    @Bean(name = "schedulerAiExecutor")
+    public Executor schedulerAiExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("SchedulerAi-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
     // STOMP 구독 시점의 자동 읽음 처리(DB write)를 clientInboundChannel 스레드 풀과 분리한다.
     // preSend는 한정된 STOMP 스레드 풀에서 동기 실행되므로, 여기서 DB I/O를 직접 하면
     // 트래픽이 몰릴 때 스레드 풀 고갈로 전체 채팅 기능이 멎을 수 있다.

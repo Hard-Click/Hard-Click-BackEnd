@@ -2,12 +2,14 @@ package com.wanted.backend.domain.enrollment_management.application.service;
 
 import com.wanted.backend.domain.enrollment_management.application.command.EnrollCommand;
 import com.wanted.backend.domain.enrollment_management.application.usecase.EnrollUseCase;
+import com.wanted.backend.domain.enrollment_management.domain.event.EnrollmentStartedEvent;
 import com.wanted.backend.domain.enrollment_management.domain.model.Enrollment;
 import com.wanted.backend.domain.enrollment_management.domain.model.EnrollmentStatus;
 import com.wanted.backend.domain.enrollment_management.domain.repository.EnrollmentRepository;
 import com.wanted.backend.global.exception.BusinessException;
 import com.wanted.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ public class EnrollService implements EnrollUseCase {
 
     private final EnrollmentRepository enrollmentRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public Long handle(EnrollCommand command) {
@@ -40,13 +43,20 @@ public class EnrollService implements EnrollUseCase {
             // enrollment 테이블에 uk_enrollment_member_course(member_id, course_id) 유니크 제약이
             // 있어 새 행 INSERT는 제약 위반으로 실패하므로, 반드시 기존 행 UPDATE로 처리한다.
             enrollment.reactivate(Instant.now(clock));
-            return enrollmentRepository.save(enrollment).getId();
+            Long reactivatedId = enrollmentRepository.save(enrollment).getId();
+            // 이벤트 발행 — 커밋 후 @Async 리스너가 AI 스케줄러에 즉시 생성을 요청한다.
+            eventPublisher.publishEvent(new EnrollmentStartedEvent(
+                    command.memberId(), reactivatedId, command.courseId()));
+            return reactivatedId;
         }
 
         Enrollment enrollment = Enrollment.create(command.memberId(), command.courseId(), Instant.now(clock));
         try {
             // IDENTITY 전략이라 save 시 INSERT가 즉시 flush됨 → 동시 최초 등록 레이스는 여기서 표면화된다.
-            return enrollmentRepository.save(enrollment).getId();
+            Long createdId = enrollmentRepository.save(enrollment).getId();
+            eventPublisher.publishEvent(new EnrollmentStartedEvent(
+                    command.memberId(), createdId, command.courseId()));
+            return createdId;
         } catch (DataIntegrityViolationException e) {
             // 동시 요청으로 다른 스레드가 먼저 INSERT하여 uk_enrollment_member_course 위반 →
             // 이미 수강 중인 것과 동일하므로 500 대신 멱등하게 ENROLLMENT_ALREADY_EXISTS로 매핑한다.
