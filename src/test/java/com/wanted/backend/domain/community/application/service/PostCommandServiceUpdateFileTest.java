@@ -10,6 +10,8 @@ import com.wanted.backend.domain.community.domain.model.PostStatus;
 import com.wanted.backend.domain.community.domain.repository.PostFileRepository;
 import com.wanted.backend.domain.community.domain.repository.PostRepository;
 import com.wanted.backend.domain.notification.domain.repository.NotificationRepository;
+import com.wanted.backend.global.exception.BusinessException;
+import com.wanted.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -134,5 +137,44 @@ class PostCommandServiceUpdateFileTest {
         verify(postFileRepository).deleteByIdIn(eq(List.of(20L)));
         verify(postFileRepository, never()).deleteByPostId(anyLong());
         verify(storagePort).delete("https://s3/posts/old.png");
+    }
+
+    @Test
+    @DisplayName("신규 업로드 도중 실패하면 기존 파일은 삭제되지 않고 업로드된 신규 파일만 정리된다")
+    void update_whenUploadFails_preservesOldFiles_cleansUpUploadedNewFile() {
+        // given: 기존 첨부 2장, 신규 2장 중 두 번째 업로드에서 S3 실패
+        Post post = existingPost();
+        List<PostFile> oldFiles = List.of(
+                PostFile.restore(10L, POST_ID, "https://s3/posts/old-1.png", 1),
+                PostFile.restore(11L, POST_ID, "https://s3/posts/old-2.png", 2)
+        );
+        List<MultipartFile> newFiles = List.of(
+                new MockMultipartFile("files", "new-1.png", "image/png", new byte[]{1}),
+                new MockMultipartFile("files", "new-2.png", "image/png", new byte[]{2})
+        );
+        UpdatePostCommand command = new UpdatePostCommand(
+                MEMBER_ID, POST_ID, null, "새 제목", "새 내용", newFiles);
+
+        given(postRepository.findById(POST_ID)).willReturn(Optional.of(post));
+        given(postRepository.save(any(Post.class))).willReturn(post);
+        given(postFileRepository.findByPostId(POST_ID)).willReturn(oldFiles);
+        // 첫 파일은 성공, 두 번째 파일 업로드에서 예외
+        given(storagePort.store(any(MultipartFile.class), anyString(), anyLong()))
+                .willReturn("https://s3/posts/new-1.png")
+                .willThrow(new RuntimeException("S3 unavailable"));
+
+        // when & then: FILE_UPLOAD_FAILED 로 실패
+        assertThatThrownBy(() -> postCommandService.update(command))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ErrorCode.FILE_UPLOAD_FAILED.getMessage());
+
+        // then: 이미 업로드된 신규 파일(new-1)만 S3에서 롤백 정리
+        verify(storagePort).delete("https://s3/posts/new-1.png");
+
+        // then: 기존 파일은 S3·DB 어느 쪽에서도 삭제되지 않음 (삭제 단계 도달 전 예외)
+        verify(storagePort, never()).delete("https://s3/posts/old-1.png");
+        verify(storagePort, never()).delete("https://s3/posts/old-2.png");
+        verify(postFileRepository, never()).deleteByIdIn(any());
+        verify(postFileRepository, never()).deleteByPostId(anyLong());
     }
 }
