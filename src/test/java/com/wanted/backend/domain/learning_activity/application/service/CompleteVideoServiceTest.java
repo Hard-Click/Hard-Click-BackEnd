@@ -149,8 +149,9 @@ class CompleteVideoServiceTest {
     @Test
     void 이미_완료된_영상을_다시_완료하면_이벤트를_재발행하지_않고_재저장도_하지_않는다() {
         VideoAccessInfo accessInfo = accessInfo();
-        // completed=true, completedAt 존재 → 이미 완료된 진도
-        VideoProgress completed = new VideoProgress(100L, 1L, 20L, 10L, 300, 300, true, java.time.LocalDateTime.now());
+        // completed=true 이되 진행값(100/300)은 완료 조건(임계 270) 미충족 → 완료 정책이 다시 실행되면 예외로 실패한다.
+        // 따라서 이 테스트가 통과하려면 isCompleted() 가드가 정책 검사보다 먼저 조기종료해야만 한다.
+        VideoProgress completed = new VideoProgress(100L, 1L, 20L, 10L, 42, 100, true, java.time.LocalDateTime.now());
         when(videoCatalogPort.findByVideoId(10L)).thenReturn(Optional.of(accessInfo));
         when(videoProgressRepository.findByMemberIdAndVideoId(1L, 10L)).thenReturn(Optional.of(completed));
 
