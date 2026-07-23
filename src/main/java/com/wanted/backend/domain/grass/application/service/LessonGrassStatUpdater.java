@@ -10,6 +10,8 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -49,12 +51,32 @@ public class LessonGrassStatUpdater implements VideoCompletionConsumer {
         LocalDate statDate = event.occurredAt().atZone(clock.getZone()).toLocalDate();
         // 증가 실패는 예외를 그대로 올려 트랜잭션(선점 포함)을 롤백 → relay가 재시도한다.
         lessonGrassCountWriter.increment(event.memberId(), statDate);
+        // 캐시 무효화는 집계 커밋 이후로 미룬다 — 커밋 전에 evict하면 그 사이 동시 조회가 이전(증가 전) 값을
+        // 다시 캐싱해 stale이 남을 수 있다(커밋 후 무효화 흐름이 없으므로). 캐시는 트랜잭션 밖 자원이라 실패해도 삼킨다.
+        evictLessonGrassCacheAfterCommit(event.memberId(), statDate, event.videoId());
+    }
+
+    private void evictLessonGrassCacheAfterCommit(Long memberId, LocalDate statDate, Long videoId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 활성 트랜잭션이 없으면(단위테스트 등) 즉시 무효화로 폴백한다.
+            safeEvictLessonGrassCache(memberId, statDate, videoId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                safeEvictLessonGrassCache(memberId, statDate, videoId);
+            }
+        });
+    }
+
+    private void safeEvictLessonGrassCache(Long memberId, LocalDate statDate, Long videoId) {
         try {
-            evictLessonGrassCache(event.memberId(), statDate);
+            evictLessonGrassCache(memberId, statDate);
         } catch (Exception exception) {
             // 캐시 무효화 실패로 집계까지 롤백되면 안 된다(캐시는 트랜잭션 밖 자원). 스테일은 조회 시 자연 갱신된다.
             log.warn("[LessonGrass] 캐시 무효화 실패(집계는 반영됨). memberId={}, videoId={}",
-                    event.memberId(), event.videoId(), exception);
+                    memberId, videoId, exception);
         }
     }
 

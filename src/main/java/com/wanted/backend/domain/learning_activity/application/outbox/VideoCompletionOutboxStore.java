@@ -17,9 +17,15 @@ public interface VideoCompletionOutboxStore {
     /** 처리 가능한 행을 최대 {@code limit}개 선점(PROCESSING)해 가져온다. */
     List<OutboxMessage> claimBatch(int limit);
 
-    /** 전달 성공 — 해당 행을 DONE으로 종료한다. */
-    void markDone(Long id);
+    /**
+     * 전달 성공 — 해당 행을 DONE으로 종료한다.
+     * {@code claimedAttempt}가 현재 lease 세대와 일치하고 아직 PROCESSING일 때만 반영한다(그 외엔 무시).
+     */
+    void markDone(Long id, int claimedAttempt);
 
-    /** 전달 실패 — backoff 후 재시도 예약하거나, 최대 시도를 넘으면 DEAD로 종료한다. */
-    void markFailed(Long id, String error);
+    /**
+     * 전달 실패 — backoff 후 재시도 예약하거나, 최대 시도를 넘으면 DEAD로 종료한다.
+     * {@code claimedAttempt}가 현재 lease 세대와 일치하고 아직 PROCESSING일 때만 반영한다(그 외엔 무시).
+     */
+    void markFailed(Long id, String error, int claimedAttempt);
 }

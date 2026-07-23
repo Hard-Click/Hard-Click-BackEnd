@@ -69,11 +69,19 @@ public class VideoCompletionOutboxJpaEntity {
         this.nextAttemptAt = nextAttemptAt;
     }
 
-    /** relay 선점: PROCESSING으로 바꾸고 시도 횟수를 올리며, 가시성 타임아웃까지 다음 시도를 미룬다. */
+    /** relay 선점: PROCESSING으로 바꾸고 시도 횟수(=lease 세대)를 올리며, 가시성 타임아웃까지 다음 시도를 미룬다. */
     public void markProcessing(LocalDateTime visibilityDeadline) {
         this.status = OutboxStatus.PROCESSING;
         this.attempts += 1;
         this.nextAttemptAt = visibilityDeadline;
+    }
+
+    /**
+     * 이 행이 아직 {@code claimedAttempt} 세대의 relay에게 선점된 상태인지 — PROCESSING이고 시도 횟수가
+     * 선점 시점과 같을 때만 참. 가시성 타임아웃 후 재선점(attempts 증가)되면 이전 relay는 소유권을 잃는다.
+     */
+    public boolean isHeldBy(int claimedAttempt) {
+        return this.status == OutboxStatus.PROCESSING && this.attempts == claimedAttempt;
     }
 
     public void markDone(LocalDateTime now) {

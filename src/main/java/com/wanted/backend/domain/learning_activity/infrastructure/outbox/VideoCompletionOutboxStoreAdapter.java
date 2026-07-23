@@ -61,26 +61,32 @@ public class VideoCompletionOutboxStoreAdapter implements VideoCompletionOutboxS
                     row.getMemberId(),
                     row.getVideoId(),
                     row.getCourseId(),
-                    row.getOccurredAt().toInstant(ZoneOffset.UTC)));
+                    row.getOccurredAt().toInstant(ZoneOffset.UTC),
+                    row.getAttempts()));   // 선점 시점의 lease 세대 — 종료 전이 시 소유권 검증에 쓴다
         }
         return messages;
     }
 
     @Override
     @Transactional
-    public void markDone(Long id) {
-        repository.findById(id).ifPresent(row -> row.markDone(LocalDateTime.now(clock)));
+    public void markDone(Long id, int claimedAttempt) {
+        // 잠금 조회로 최신 커밋값을 읽어, 재선점 여부를 놓치지 않는다.
+        repository.findWithLockById(id)
+                .filter(row -> row.isHeldBy(claimedAttempt))   // 아직 이 relay 세대가 소유 중일 때만
+                .ifPresent(row -> row.markDone(LocalDateTime.now(clock)));
     }
 
     @Override
     @Transactional
-    public void markFailed(Long id, String error) {
-        repository.findById(id).ifPresent(row -> {
-            LocalDateTime now = LocalDateTime.now(clock);
-            boolean dead = row.getAttempts() >= maxAttempts;
-            LocalDateTime nextAttemptAt = dead ? now : now.plusSeconds(backoffSeconds(row.getAttempts()));
-            row.reschedule(nextAttemptAt, truncate(error), dead);
-        });
+    public void markFailed(Long id, String error, int claimedAttempt) {
+        repository.findWithLockById(id)
+                .filter(row -> row.isHeldBy(claimedAttempt))   // 소유권을 잃은(재선점된) 세대는 상태를 되돌리지 않는다
+                .ifPresent(row -> {
+                    LocalDateTime now = LocalDateTime.now(clock);
+                    boolean dead = row.getAttempts() >= maxAttempts;
+                    LocalDateTime nextAttemptAt = dead ? now : now.plusSeconds(backoffSeconds(row.getAttempts()));
+                    row.reschedule(nextAttemptAt, truncate(error), dead);
+                });
     }
 
     // 지수 backoff: base * 2^(attempts-1), 상한 cap. attempts는 claim 시 이미 증가돼 최소 1이다.

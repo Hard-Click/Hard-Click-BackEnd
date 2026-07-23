@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 class VideoCompletionDispatcherTest {
 
     private final OutboxMessage message =
-            new OutboxMessage(9L, 77L, 55L, 42L, Instant.parse("2026-01-03T00:00:00Z"));
+            new OutboxMessage(9L, 77L, 55L, 42L, Instant.parse("2026-01-03T00:00:00Z"), 1);
 
     @Test
     void 모든_소비자에게_이벤트를_복원해_전달한다() {

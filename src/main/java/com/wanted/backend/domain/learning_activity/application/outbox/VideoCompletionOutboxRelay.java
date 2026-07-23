@@ -31,10 +31,10 @@ public class VideoCompletionOutboxRelay {
         for (OutboxMessage message : batch) {
             try {
                 dispatcher.dispatch(message);
-                outboxStore.markDone(message.id());
+                outboxStore.markDone(message.id(), message.claimedAttempt());
             } catch (Exception exception) {
                 // 전달 실패 — backoff 재시도로 되돌린다. 소비자가 멱등하므로 재전달돼도 중복 집계되지 않는다.
-                outboxStore.markFailed(message.id(), exception.getMessage());
+                outboxStore.markFailed(message.id(), exception.getMessage(), message.claimedAttempt());
             }
         }
     }
