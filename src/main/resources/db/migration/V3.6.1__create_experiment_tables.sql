@@ -4,8 +4,9 @@
 -- 500은 안 났지만, 로그가 전혀 안 쌓여 A/B 분석(calibrate_policy_constants.py)이
 -- 불가능한 상태였다. 정식 집계를 위해 추가.
 
--- 실험 노출 로그: 회원이 어떤 실험의 어떤 variant를 받았는지 1회성 기록
-CREATE TABLE IF NOT EXISTS experiment_exposure (
+-- 실험 노출 로그: 회원이 어떤 실험의 어떤 variant를 받았는지 매 스케줄 생성(weekly_reflow·
+-- generate-for-member)마다 기록하는 시계열 로그 — 회원당 여러 행이 정상(1회성 아님).
+CREATE TABLE experiment_exposure (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     member_id       BIGINT       NOT NULL,
     experiment_name VARCHAR(255) NOT NULL,
@@ -16,7 +17,7 @@ CREATE TABLE IF NOT EXISTS experiment_exposure (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- shadow mode 결정 로그: 실제 스케줄엔 반영하지 않고 "만약 이 variant였다면" 델타만 관측
-CREATE TABLE IF NOT EXISTS experiment_shadow_decision (
+CREATE TABLE experiment_shadow_decision (
     id                       BIGINT       NOT NULL AUTO_INCREMENT,
     member_id                BIGINT       NOT NULL,
     experiment_name          VARCHAR(255) NOT NULL,
