@@ -1,44 +1,59 @@
 package com.wanted.backend.domain.grass.application.service;
 
 import com.wanted.backend.domain.grass.application.port.LessonGrassCountWriter;
+import com.wanted.backend.domain.learning_activity.application.outbox.VideoCompletionConsumer;
 import com.wanted.backend.domain.learning_activity.domain.event.VideoCompletedEvent;
+import com.wanted.backend.global.idempotency.VideoCompletionDedup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
 
 /**
- * 레슨 완료(VideoCompletedEvent) 시 수강량 잔디 집계를 갱신한다 — RankingScoreUpdater 의 LESSON 처리와 동일하게
- * 이벤트당 +1. (재완료 중복 방지는 랭킹과 공유하는 별도 크로스컷 이슈 — 소스 이벤트에 가드가 없음)
+ * 레슨 완료(VideoCompletedEvent) 시 수강량 잔디 집계를 갱신한다 — 이벤트당 +1.
  *
- * <p>커밋 이후(AFTER_COMMIT) 처리해, 완료 트랜잭션이 롤백되면 집계/캐시 무효화도 일어나지 않게 한다.
+ * <p>durable outbox relay가 호출하는 멱등 소비자다(즉시 이벤트 리스너 아님). 선점(dedup)과 집계를 <b>한
+ * 트랜잭션</b>으로 묶어, 증가 실패 시 선점도 함께 롤백돼 relay 재시도가 안전하다(잔디는 DB라 정확히-1회 보장).
+ * 캐시 무효화 실패는 집계를 롤백시키지 않도록 삼킨다(스테일 최소).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class LessonGrassStatUpdater {
+public class LessonGrassStatUpdater implements VideoCompletionConsumer {
 
     private static final String LESSON_GRASS_CACHE = "grassLessons:v3";
+    private static final String DEDUP_CONSUMER = "lesson_grass";
 
     private final LessonGrassCountWriter lessonGrassCountWriter;
     private final CacheManager cacheManager;
+    private final VideoCompletionDedup videoCompletionDedup;
     private final Clock clock;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handle(VideoCompletedEvent event) {
+    @Override
+    public String consumerId() {
+        return DEDUP_CONSUMER;
+    }
+
+    @Override
+    @Transactional
+    public void process(VideoCompletedEvent event) {
+        // 이미 집계된 완료면 스킵 — 동시 최초완료 경합·이벤트 재전달로 인한 '이벤트당 +1' 중복 집계를 막는다.
+        if (!videoCompletionDedup.claim(DEDUP_CONSUMER, event.memberId(), event.videoId())) {
+            return;
+        }
+        LocalDate statDate = event.occurredAt().atZone(clock.getZone()).toLocalDate();
+        // 증가 실패는 예외를 그대로 올려 트랜잭션(선점 포함)을 롤백 → relay가 재시도한다.
+        lessonGrassCountWriter.increment(event.memberId(), statDate);
         try {
-            LocalDate statDate = event.occurredAt().atZone(clock.getZone()).toLocalDate();
-            lessonGrassCountWriter.increment(event.memberId(), statDate);
             evictLessonGrassCache(event.memberId(), statDate);
         } catch (Exception exception) {
-            // 집계/캐시 실패가 완료 처리(이미 커밋됨) 응답에 영향을 주면 안 되므로 로깅만 한다.
-            log.error("[LessonGrass] 수강량 집계 갱신 실패. memberId={}, videoId={}",
+            // 캐시 무효화 실패로 집계까지 롤백되면 안 된다(캐시는 트랜잭션 밖 자원). 스테일은 조회 시 자연 갱신된다.
+            log.warn("[LessonGrass] 캐시 무효화 실패(집계는 반영됨). memberId={}, videoId={}",
                     event.memberId(), event.videoId(), exception);
         }
     }
