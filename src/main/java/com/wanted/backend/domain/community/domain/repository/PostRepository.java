@@ -17,6 +17,9 @@ public interface PostRepository {
     // 단건 조회 (상세 조회, 수정, 삭제용)
     Optional<Post> findById(Long postId);
 
+    // 단건 조회 + 쓰기 잠금 (수정용) — 동시 PATCH의 첨부파일 개수 race를 직렬화로 방지
+    Optional<Post> findByIdForUpdate(Long postId);
+
     // 게시판 타입별 목록 페이징 조회
     List<Post> findByBoardType(BoardType boardType, PostSortType sort,
                                String keyword, int page, int size);

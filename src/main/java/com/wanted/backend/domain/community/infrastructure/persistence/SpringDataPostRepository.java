@@ -2,15 +2,24 @@ package com.wanted.backend.domain.community.infrastructure.persistence;
 
 import com.wanted.backend.domain.community.domain.model.BoardType;
 import com.wanted.backend.domain.community.domain.model.PostStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SpringDataPostRepository extends JpaRepository<PostJpaEntity, Long> {
+
+    // 게시글 수정 시 동시 PATCH의 첨부파일 개수 race 방지 — 게시글 행에 쓰기 잠금을 걸어
+    // 같은 게시글에 대한 수정 요청을 직렬화한다(뒤 요청은 앞 요청 커밋 후 최신 상태를 읽음).
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from PostJpaEntity p where p.id = :id")
+    Optional<PostJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
     // boardType + 키워드 검색 + 페이징
     List<PostJpaEntity> findByBoardTypeAndTitleContainingAndStatus(

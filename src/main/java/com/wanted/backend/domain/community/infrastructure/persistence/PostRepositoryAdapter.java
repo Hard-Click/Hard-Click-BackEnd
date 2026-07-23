@@ -231,6 +231,11 @@ public class PostRepositoryAdapter implements PostRepository {
     }
 
     @Override
+    public Optional<Post> findByIdForUpdate(Long postId) {
+        return repository.findByIdForUpdate(postId).map(this::toDomain);
+    }
+
+    @Override
     public void updateViewCount(Long postId, int viewCount) {
         repository.findById(postId).ifPresent(entity -> {
             entity.updateViewCount(viewCount);
