@@ -10,4 +10,6 @@ public interface SpringDataPostFileRepository
     List<PostFileJpaEntity> findByPostIdOrderBySortOrderAsc(Long postId);
 
     void deleteByPostId(Long postId);
+
+    void deleteByIdIn(List<Long> ids);
 }
