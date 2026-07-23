@@ -23,6 +23,11 @@ services:
       # 파라미터 미설정 시 기본값 false로 기능이 안전하게 꺼진다.
       - QUIZ_AI_ENABLED=${QUIZ_AI_ENABLED:-false}
       - QUIZ_AI_BASE_URL=${QUIZ_AI_BASE_URL:-http://localhost:8000}
+      # 수강→즉시 스케줄 생성 AI(Python 스케줄 엔진, Flask :5000, /generate-for-member).
+      # SSM /hard-click/prod/SCHEDULE_AI_* 파라미터로 주입. BASE_URL을 실제 Python 호스트로
+      # 세팅하기 전까지는 localhost(=no-op, fail-soft)라 수강신청은 정상 동작한다.
+      - SCHEDULE_AI_ENABLED=${SCHEDULE_AI_ENABLED:-true}
+      - SCHEDULE_AI_BASE_URL=${SCHEDULE_AI_BASE_URL:-http://localhost:5000}
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
