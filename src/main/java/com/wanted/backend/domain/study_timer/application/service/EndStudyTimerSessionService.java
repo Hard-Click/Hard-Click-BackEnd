@@ -52,16 +52,19 @@ public class EndStudyTimerSessionService implements EndStudyTimerSessionUseCase 
             }
 
             StudyTimerSession endedSession = session.end(command.endedAt(), serverNow);
-            int deltaStudySeconds = calculateDeltaStudySeconds(session, endedSession);
+            // heartbeat/pause는 daily·랭킹 집계에 반영하지 않으므로, 종료 시 세션 '전체 누적'을 집계에 반영한다.
+            // 마지막 heartbeat 이후 증가분(꼬리)만 반영하면 세션 시간 대부분이 집계에서 누락된다.
+            // end()는 세션당 1회만 성공(RUNNING 아니면 예외)하므로 전체 누적을 반영해도 이중 계산되지 않는다.
+            int sessionStudySeconds = endedSession.accumulatedStudySeconds();
             LocalDate studyDate = command.endedAt().atZoneSameInstant(clock.getZone()).toLocalDate();
 
             StudyTimerSession saved = studyTimerSessionRepository.save(endedSession);
-            if (deltaStudySeconds > 0) {
-                dailyStudyStatsRepository.upsertStudySeconds(command.memberId(), studyDate, deltaStudySeconds);
+            if (sessionStudySeconds > 0) {
+                dailyStudyStatsRepository.upsertStudySeconds(command.memberId(), studyDate, sessionStudySeconds);
                 eventPublisher.publishEvent(StudySessionEndedEvent.of(
                         command.memberId(),
                         studyDate,
-                        deltaStudySeconds,
+                        sessionStudySeconds,
                         command.endedAt()
                 ));
             }
@@ -93,9 +96,5 @@ public class EndStudyTimerSessionService implements EndStudyTimerSessionUseCase 
         if (endedAt.toInstant().isAfter(serverNow.toInstant())) {
             throw new BusinessException(ErrorCode.STUDY_TIMER_ENDED_AT_IN_FUTURE);
         }
-    }
-
-    private int calculateDeltaStudySeconds(StudyTimerSession before, StudyTimerSession after) {
-        return Math.max(0, after.accumulatedStudySeconds() - before.accumulatedStudySeconds());
     }
 }

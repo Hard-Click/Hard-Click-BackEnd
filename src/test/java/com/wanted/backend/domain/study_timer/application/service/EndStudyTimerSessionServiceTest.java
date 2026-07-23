@@ -106,11 +106,11 @@ class EndStudyTimerSessionServiceTest {
         assertThat(result.accumulatedStudySeconds()).isEqualTo(500);
         assertThat(result.status()).isEqualTo("ENDED");
         assertThat(result.endedAt()).isEqualTo(endedAt);
-        verify(dailyStudyStatsRepository).upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 300);
+        verify(dailyStudyStatsRepository).upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 500);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().memberId()).isEqualTo(1L);
         assertThat(eventCaptor.getValue().studyDate()).isEqualTo(LocalDate.parse("2026-05-11"));
-        assertThat(eventCaptor.getValue().deltaStudySeconds()).isEqualTo(300);
+        assertThat(eventCaptor.getValue().deltaStudySeconds()).isEqualTo(500);
         assertThat(eventCaptor.getValue().endedAt()).isEqualTo(endedAt);
         verify(metricRecorder).recordResult(StudyTimerAction.END, null);
     }
@@ -136,15 +136,15 @@ class EndStudyTimerSessionServiceTest {
         assertThat(result.accumulatedStudySeconds()).isEqualTo(500);
         assertThat(result.status()).isEqualTo("ENDED");
         assertThat(result.endedAt()).isEqualTo(endedAt);
-        verify(dailyStudyStatsRepository).upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 300);
+        verify(dailyStudyStatsRepository).upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 500);
         verify(eventPublisher).publishEvent(any(Object.class));
         verify(metricRecorder).recordResult(StudyTimerAction.END, null);
     }
 
     @Test
-    void skipsDailyStatsUpsertAndEventWhenDeltaIsZero() {
+    void skipsDailyStatsUpsertAndEventWhenSessionAccumulatedIsZero() {
         OffsetDateTime startedAt = OffsetDateTime.parse("2026-05-11T15:00:00+09:00");
-        OffsetDateTime endedAt = OffsetDateTime.parse("2026-05-11T15:02:00+09:00");
+        OffsetDateTime endedAt = OffsetDateTime.parse("2026-05-11T15:00:00+09:00");
         StudyTimerSession runningSession = new StudyTimerSession(
                 55L,
                 1L,
@@ -152,7 +152,7 @@ class EndStudyTimerSessionServiceTest {
                 null,
                 startedAt,
                 null,
-                200,
+                0,
                 StudyTimerSessionStatus.RUNNING
         );
 
@@ -165,7 +165,7 @@ class EndStudyTimerSessionServiceTest {
                         null,
                         startedAt,
                         endedAt,
-                        200,
+                        0,
                         StudyTimerSessionStatus.ENDED
                 ));
 
@@ -173,6 +173,45 @@ class EndStudyTimerSessionServiceTest {
 
         verify(dailyStudyStatsRepository, never()).upsertStudySeconds(any(), any(), any());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void creditsFullSessionAccumulatedNotTailSinceLastHeartbeat() {
+        // 회귀 방지(실측 버그 session 68): 마지막 heartbeat 누적(1092)과 종료 누적(1093)의
+        // 꼬리(1초)가 아니라, 세션 전체 누적(1093)이 daily·랭킹에 반영되어야 한다.
+        OffsetDateTime startedAt = OffsetDateTime.parse("2026-05-11T14:51:47+09:00");
+        OffsetDateTime endedAt = OffsetDateTime.parse("2026-05-11T15:10:00+09:00");
+        StudyTimerSession runningSession = new StudyTimerSession(
+                55L,
+                1L,
+                null,
+                null,
+                startedAt,
+                null,
+                1092,
+                StudyTimerSessionStatus.RUNNING
+        );
+
+        when(repository.findById(55L)).thenReturn(Optional.of(runningSession));
+        when(repository.save(any(StudyTimerSession.class)))
+                .thenReturn(new StudyTimerSession(
+                        55L,
+                        1L,
+                        null,
+                        null,
+                        startedAt,
+                        endedAt,
+                        1093,
+                        StudyTimerSessionStatus.ENDED
+                ));
+
+        ArgumentCaptor<StudySessionEndedEvent> eventCaptor = ArgumentCaptor.forClass(StudySessionEndedEvent.class);
+
+        service.handle(new EndStudyTimerSessionCommand(1L, 55L, endedAt));
+
+        verify(dailyStudyStatsRepository).upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 1093);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().deltaStudySeconds()).isEqualTo(1093);
     }
 
     @Test
@@ -203,7 +242,7 @@ class EndStudyTimerSessionServiceTest {
                         500,
                         StudyTimerSessionStatus.ENDED
                 ));
-        when(dailyStudyStatsRepository.upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 300))
+        when(dailyStudyStatsRepository.upsertStudySeconds(1L, LocalDate.parse("2026-05-11"), 500))
                 .thenThrow(new RuntimeException("db down"));
 
         assertThatThrownBy(() -> service.handle(command))
