@@ -1,6 +1,8 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
+import com.wanted.backend.domain.quiz.application.port.ReviewCompletionPort;
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
@@ -23,6 +25,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +43,8 @@ class SimilarQuizSubmissionServiceTest {
     private QuizRepository quizRepository;
     private SimilarQuizSubmissionRepository submissionRepository;
     private SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
+    private EnrollmentAccessPort enrollmentAccessPort;
+    private ReviewCompletionPort reviewCompletionPort;
     private SimilarQuizSubmissionService service;
 
     @BeforeEach
@@ -47,8 +53,11 @@ class SimilarQuizSubmissionServiceTest {
         quizRepository = mock(QuizRepository.class);
         submissionRepository = mock(SimilarQuizSubmissionRepository.class);
         subscriptionAccessPort = mock(SimilarQuizSubscriptionAccessPort.class);
+        enrollmentAccessPort = mock(EnrollmentAccessPort.class);
+        reviewCompletionPort = mock(ReviewCompletionPort.class);
         service = new SimilarQuizSubmissionService(
-                similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort);
+                similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort,
+                enrollmentAccessPort, reviewCompletionPort);
     }
 
     // 유사퀴즈가 참조하는 원문항 두 개. 정답 위치(answerIndex)를 인자로 명시한다.
@@ -86,6 +95,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitGradesWithAnswersExplanationsAndScore() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
         // Q1은 정답 선택, Q2는 오답 선택
@@ -117,6 +127,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitTreatsUnansweredQuestionAsIncorrectWithNullSelectedIndex() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
         // Q1만 정답 제출, Q2 미응답
@@ -136,6 +147,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitPersistsSubmissionWithPerQuestionTimeAndCorrectness() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
         // Q1 정답+70초, Q2 오답+시간 미측정(null)
@@ -167,6 +179,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitNullifiesOutOfRangeTimeSpent() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
         // 음수·상한 초과(3600s 초과)는 신뢰 불가 → null(미측정). 보기 인덱스는 이 테스트와 무관해 정답 위치로 채운다.
@@ -185,6 +198,7 @@ class SimilarQuizSubmissionServiceTest {
     void submitKeepsBoundaryTimeSpent() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
         when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
         when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
 
         // 경계값: 0초(즉답도 진짜값)와 3600초(상한 포함)는 유지. 초과(3601+)만 이상치로 null 처리하므로
@@ -209,6 +223,49 @@ class SimilarQuizSubmissionServiceTest {
     }
 
     @Test
+    void submitCompletesTodayReviewsAfterPersistWithSameTimestamp() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(true);
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 30)));
+
+        service.submit(command);
+
+        // 제출 성공 = 그 코스의 오늘 복습 완료 → 복습 카드 전진 트리거(member·course 전달).
+        ArgumentCaptor<SimilarQuizSubmission> savedCaptor = ArgumentCaptor.forClass(SimilarQuizSubmission.class);
+        ArgumentCaptor<LocalDateTime> completedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(submissionRepository).save(savedCaptor.capture());
+        verify(reviewCompletionPort).completeTodayReviews(eq(MEMBER_ID), eq(COURSE_ID), completedAtCaptor.capture());
+
+        // 저장 시각과 복습 전진에 전달한 시각이 동일해야 한다(같은 제출의 일관된 타임스탬프).
+        assertThat(completedAtCaptor.getValue()).isEqualTo(savedCaptor.getValue().getSubmittedAt());
+        // 복습 완료는 반드시 제출 이력 저장 이후에 호출된다.
+        var order = inOrder(submissionRepository, reviewCompletionPort);
+        order.verify(submissionRepository).save(savedCaptor.getValue());
+        order.verify(reviewCompletionPort)
+                .completeTodayReviews(eq(MEMBER_ID), eq(COURSE_ID), eq(completedAtCaptor.getValue()));
+    }
+
+    @Test
+    void submitRejectsWhenNotEnrolled() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(enrollmentAccessPort.hasActiveEnrollment(MEMBER_ID, COURSE_ID)).thenReturn(false);
+
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of());
+
+        assertThatThrownBy(() -> service.submit(command))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        // 미수강이면 제출 저장·복습 전진 모두 일어나지 않는다.
+        verifyNoInteractions(submissionRepository);
+        verifyNoInteractions(reviewCompletionPort);
+    }
+
+    @Test
     void submitRejectsWhenNotSubscribed() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(false);
 
@@ -218,6 +275,7 @@ class SimilarQuizSubmissionServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SIMILAR_QUIZ_SUBSCRIPTION_REQUIRED);
         verifyNoInteractions(submissionRepository); // 거부 시 이력 저장 안 함
+        verifyNoInteractions(reviewCompletionPort); // 거부 시 복습 완료 트리거 안 함
     }
 
     @Test
