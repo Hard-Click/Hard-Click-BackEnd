@@ -18,7 +18,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +50,12 @@ class SimilarQuizSubmissionServiceTest {
     private ReviewCompletionPort reviewCompletionPort;
     private SimilarQuizSubmissionService service;
 
+    // 결정론을 위해 시간 고정(팀 표준 타임존 Asia/Seoul).
+    // 버그가 재현되던 KST 새벽 경계(00:00~08:59)로 고정한다: UTC 23:30 → KST 익일 08:30.
+    // now(clock) 이 아니라 raw now() 로 되돌아가면 KST_NOW 절대값 단언이 깨져 회귀를 잡는다.
+    private static final LocalDateTime KST_NOW = LocalDateTime.of(2026, 5, 12, 8, 30);
+    private final Clock clock = Clock.fixed(Instant.parse("2026-05-11T23:30:00Z"), ZoneId.of("Asia/Seoul"));
+
     @BeforeEach
     void setUp() {
         similarQuizRepository = mock(SimilarQuizRepository.class);
@@ -57,7 +66,7 @@ class SimilarQuizSubmissionServiceTest {
         reviewCompletionPort = mock(ReviewCompletionPort.class);
         service = new SimilarQuizSubmissionService(
                 similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort,
-                enrollmentAccessPort, reviewCompletionPort);
+                enrollmentAccessPort, reviewCompletionPort, clock);
     }
 
     // 유사퀴즈가 참조하는 원문항 두 개. 정답 위치(answerIndex)를 인자로 명시한다.
@@ -240,6 +249,10 @@ class SimilarQuizSubmissionServiceTest {
         verify(submissionRepository).save(savedCaptor.capture());
         verify(reviewCompletionPort).completeTodayReviews(eq(MEMBER_ID), eq(COURSE_ID), completedAtCaptor.capture());
 
+        // 제출 시각은 주입 Clock(Asia/Seoul) 기준이어야 한다 — KST 새벽 경계(08:30)를 절대값으로 단언해
+        // 구현이 raw LocalDateTime.now() 로 되돌아가면 이 테스트가 실패하도록 한다(회귀 방어).
+        assertThat(completedAtCaptor.getValue()).isEqualTo(KST_NOW);
+        assertThat(savedCaptor.getValue().getSubmittedAt()).isEqualTo(KST_NOW);
         // 저장 시각과 복습 전진에 전달한 시각이 동일해야 한다(같은 제출의 일관된 타임스탬프).
         assertThat(completedAtCaptor.getValue()).isEqualTo(savedCaptor.getValue().getSubmittedAt());
         // 복습 완료는 반드시 제출 이력 저장 이후에 호출된다.
