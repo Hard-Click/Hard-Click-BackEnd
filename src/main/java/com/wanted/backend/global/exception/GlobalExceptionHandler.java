@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -238,6 +239,26 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI());
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * 매핑된 경로에 지원하지 않는 HTTP 메서드로 요청 → 405. catch-all(Exception)로 떨어져 500이 되던 것을 막는다.
+     * (예: POST 전용 엔드포인트에 GET 요청 — 클라이언트 오류이므로 500/ERROR가 아니라 405/WARN으로 처리한다.)
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException e,
+            HttpServletRequest request) {
+
+        log.warn("[Method Not Allowed] Path: {}, Method: {}, Message: {}",
+                request.getRequestURI(), request.getMethod(), e.getMessage());
+
+        ErrorResponse response = ErrorResponse.create()
+                .errorCode(ErrorCode.METHOD_NOT_ALLOWED.getCode())
+                .message(ErrorCode.METHOD_NOT_ALLOWED.getMessage())
+                .path(request.getRequestURI());
+
+        return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus()).body(response);
     }
 
     /**
