@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.ReviewCompletionPort;
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
 import com.wanted.backend.domain.quiz.domain.model.QuizOption;
@@ -23,6 +24,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +42,7 @@ class SimilarQuizSubmissionServiceTest {
     private QuizRepository quizRepository;
     private SimilarQuizSubmissionRepository submissionRepository;
     private SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
+    private ReviewCompletionPort reviewCompletionPort;
     private SimilarQuizSubmissionService service;
 
     @BeforeEach
@@ -47,8 +51,10 @@ class SimilarQuizSubmissionServiceTest {
         quizRepository = mock(QuizRepository.class);
         submissionRepository = mock(SimilarQuizSubmissionRepository.class);
         subscriptionAccessPort = mock(SimilarQuizSubscriptionAccessPort.class);
+        reviewCompletionPort = mock(ReviewCompletionPort.class);
         service = new SimilarQuizSubmissionService(
-                similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort);
+                similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort,
+                reviewCompletionPort);
     }
 
     // 유사퀴즈가 참조하는 원문항 두 개. 정답 위치(answerIndex)를 인자로 명시한다.
@@ -209,6 +215,21 @@ class SimilarQuizSubmissionServiceTest {
     }
 
     @Test
+    void submitCompletesTodayReviewsForThatCourse() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(similarQuizRepository.findById(SIMILAR_QUIZ_ID)).thenReturn(Optional.of(similarQuiz(MEMBER_ID)));
+        when(quizRepository.findQuestionsByIds(List.of(Q1_ID, Q2_ID))).thenReturn(courseQuestions());
+
+        SubmitSimilarQuizCommand command = new SubmitSimilarQuizCommand(SIMILAR_QUIZ_ID, MEMBER_ID, List.of(
+                new SubmitSimilarQuizCommand.AnswerCommand(Q1_ID, Q1_ANSWER_INDEX, 30)));
+
+        service.submit(command);
+
+        // 제출 성공 = 그 코스의 오늘 복습 완료 → 복습 카드 전진 트리거(member·course 전달).
+        verify(reviewCompletionPort).completeTodayReviews(eq(MEMBER_ID), eq(COURSE_ID), any());
+    }
+
+    @Test
     void submitRejectsWhenNotSubscribed() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(false);
 
@@ -218,6 +239,7 @@ class SimilarQuizSubmissionServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SIMILAR_QUIZ_SUBSCRIPTION_REQUIRED);
         verifyNoInteractions(submissionRepository); // 거부 시 이력 저장 안 함
+        verifyNoInteractions(reviewCompletionPort); // 거부 시 복습 완료 트리거 안 함
     }
 
     @Test
