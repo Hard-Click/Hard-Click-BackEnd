@@ -31,6 +31,8 @@ public class ReviewCompletionAdapter implements ReviewCompletionPort {
     @Transactional
     public int completeTodayReviews(Long memberId, Long courseId, LocalDateTime completedAt) {
         LocalDate today = completedAt.toLocalDate();
+        // 내일 자정(exclusive) 상한. date(rc.due) 함수 대신 범위 비교를 써서 idx_card_due 인덱스를 살린다.
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
         // 오늘까지 due 인(= 밀린 것 포함) 카드만 대상. 이미 완료돼 due 가 미래인 카드는 잡히지 않아 멱등하다.
         @SuppressWarnings("unchecked")
@@ -41,11 +43,11 @@ public class ReviewCompletionAdapter implements ReviewCompletionPort {
                 where e.member_id = :memberId
                   and e.course_id = :courseId
                   and rc.due is not null
-                  and date(rc.due) <= :today
+                  and rc.due < :tomorrowStart
                 """)
                 .setParameter("memberId", memberId)
                 .setParameter("courseId", courseId)
-                .setParameter("today", today)
+                .setParameter("tomorrowStart", tomorrowStart)
                 .getResultList();
 
         int advanced = 0;
@@ -55,6 +57,8 @@ public class ReviewCompletionAdapter implements ReviewCompletionPort {
             int intervalDays = nextIntervalDays(reps);
             LocalDate nextDue = today.plusDays(intervalDays);
 
+            // UPDATE 에도 due 상한을 걸어, 동시 제출로 다른 트랜잭션이 이미 전진시킨 카드는 0 rows 가 되게 한다
+            // (SELECT 조건만으로는 두 트랜잭션이 같은 행을 읽어 reps 가 이중 증가할 수 있다).
             Query update = entityManager.createNativeQuery("""
                     update review_card
                     set reps = reps + 1,
@@ -63,11 +67,13 @@ public class ReviewCompletionAdapter implements ReviewCompletionPort {
                         scheduled_days = :intervalDays,
                         state = 'REVIEW'
                     where id = :cardId
+                      and due < :tomorrowStart
                     """)
                     .setParameter("now", completedAt)
                     .setParameter("nextDue", nextDue.atStartOfDay())
                     .setParameter("intervalDays", intervalDays)
-                    .setParameter("cardId", cardId);
+                    .setParameter("cardId", cardId)
+                    .setParameter("tomorrowStart", tomorrowStart);
             advanced += update.executeUpdate();
         }
         return advanced;

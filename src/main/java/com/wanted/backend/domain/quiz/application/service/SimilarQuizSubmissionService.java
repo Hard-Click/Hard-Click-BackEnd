@@ -1,6 +1,7 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
 import com.wanted.backend.domain.quiz.application.port.ReviewCompletionPort;
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
@@ -45,6 +46,7 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
     private final QuizRepository quizRepository;
     private final SimilarQuizSubmissionRepository submissionRepository;
     private final SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
+    private final EnrollmentAccessPort enrollmentAccessPort;
     private final ReviewCompletionPort reviewCompletionPort;
 
     @Override
@@ -58,6 +60,12 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
         SimilarQuiz similarQuiz = similarQuizRepository.findById(command.similarQuizId())
                 .filter(sq -> sq.isOwnedBy(command.memberId()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.SIMILAR_QUIZ_NOT_FOUND));
+
+        // 수강 만료 후 과거 세트로 제출해 review_card 를 전진시키는 우회를 막는다.
+        // 일반 퀴즈 응시/조회(QuizQueryService)와 동일하게 활성 수강을 요구한다.
+        if (!enrollmentAccessPort.hasActiveEnrollment(command.memberId(), similarQuiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
 
         Map<Long, QuizQuestion> questionById = quizRepository.findQuestionsByIds(similarQuiz.getQuestionIds())
                 .stream().collect(Collectors.toMap(QuizQuestion::getId, Function.identity()));
