@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,7 +93,8 @@ class SimilarQuizServiceTest {
         when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
                 .thenReturn(List.of(wrongOnQuestion10()));
         // 원문제(10, 자기 자신)는 제외되고 20만 유사문제로 조립되어야 한다.
-        when(recommender.recommendSimilar(MEMBER_ID, 10L, 2)).thenReturn(List.of(10L, 20L));
+        // 요청 개수 = SIMILAR_PER_WRONG(2) + 오답 수(1) = 3 (필터 손실 보전용 여유분 포함).
+        when(recommender.recommendSimilar(MEMBER_ID, 10L, 3)).thenReturn(List.of(10L, 20L));
         stubSavePassthrough();
 
         SimilarQuizResult result = service.generateForCourse(MEMBER_ID, COURSE_ID, 3);
@@ -136,9 +138,52 @@ class SimilarQuizServiceTest {
         when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
                 .thenReturn(List.of(wrongOnQuestion10()));
         // 추천 결과가 코스 밖 문항(999)뿐 → 조립 결과 없음.
-        when(recommender.recommendSimilar(MEMBER_ID, 10L, 2)).thenReturn(List.of(999L));
+        when(recommender.recommendSimilar(MEMBER_ID, 10L, 3)).thenReturn(List.of(999L));
 
         assertThat(service.generateForCourse(MEMBER_ID, COURSE_ID, 3)).isNull();
         verify(similarQuizRepository, never()).save(any());
+    }
+
+    // 회귀: 오답 {10,20}의 최근접 이웃이 서로인 경우 → SIMILAR_PER_WRONG(2)개만 요청하면
+    // 자기자신·이미틀림 필터로 후보가 전부 상쇄돼 data:null이 된다.
+    // 여유 요청(2 + 오답 2 = 4)으로 코스 내 문항 30을 확보해야 한다.
+    @Test
+    void generateOverFetchesSoMutuallyNeighboringWrongAnswersDoNotCancelOut() {
+        when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
+        when(quizRepository.findAllByCourseId(COURSE_ID)).thenReturn(List.of(courseQuizWithThirdQuestion()));
+        when(quizSubmissionRepository.findByMemberIdAndQuizIdIn(eq(MEMBER_ID), anyList()))
+                .thenReturn(List.of(wrongOnQuestions10And20()));
+        // 여유분이 없었다면 앞 2개(자기자신+이미틀림)에서 잘려 결과가 비었을 배치.
+        when(recommender.recommendSimilar(MEMBER_ID, 10L, 4)).thenReturn(List.of(10L, 20L, 30L));
+        when(recommender.recommendSimilar(MEMBER_ID, 20L, 4)).thenReturn(List.of(20L, 10L, 30L));
+        stubSavePassthrough();
+
+        SimilarQuizResult result = service.generateForCourse(MEMBER_ID, COURSE_ID, 3);
+
+        assertThat(result).isNotNull();
+        assertThat(result.questions()).hasSize(1);
+        assertThat(result.questions().get(0).questionId()).isEqualTo(30L);
+    }
+
+    // 문항 10·20(둘 다 오답)에 더해, 유사문제로 살아남아야 할 30을 가진 코스 퀴즈.
+    private Quiz courseQuizWithThirdQuestion() {
+        Quiz base = courseQuiz();
+        QuizQuestion q30 = QuizQuestion.restore(30L, 3, "질문30", "해설30", List.of(
+                QuizOption.restore(301L, 1, "정답", true),
+                QuizOption.restore(302L, 2, "오답", false),
+                QuizOption.restore(303L, 3, "오답", false),
+                QuizOption.restore(304L, 4, "오답", false)));
+        List<QuizQuestion> questions = new ArrayList<>(base.getQuestions());
+        questions.add(q30);
+        return Quiz.restore(QUIZ_ID, 1L, COURSE_ID, 100L, "국어", questions, base.getCreatedAt());
+    }
+
+    // 문항 10과 20을 모두 틀린 제출.
+    private QuizSubmission wrongOnQuestions10And20() {
+        return QuizSubmission.restore(56L, QUIZ_ID, MEMBER_ID, 0, 2, 0,
+                LocalDateTime.of(2026, 5, 11, 9, 0),
+                List.of(
+                        QuizSubmissionAnswer.restore(1L, 10L, 101L, false, null),
+                        QuizSubmissionAnswer.restore(2L, 20L, 202L, false, null)));
     }
 }

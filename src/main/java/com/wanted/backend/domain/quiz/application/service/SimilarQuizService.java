@@ -79,17 +79,26 @@ public class SimilarQuizService implements SimilarQuizUseCase {
             return null;
         }
 
+        // 추천기는 원문제를 포함해 반환하고, 그 결과에 아래 3개 필터(자기자신·이미틀림·코스밖)가 걸린다.
+        // 딱 SIMILAR_PER_WRONG개만 요청하면 오답들이 서로 최근접 이웃일 때 후보가 전부 상쇄된다
+        // — 예: 오답이 연속된 문항들이면 이웃으로 돌아오는 게 그 오답들 자신이라 조립 결과가 비어 data:null.
+        // 필터로 빠질 수 있는 최대 개수(= 오답 전체, 자기 자신 포함)를 더해 여유 있게 요청한다.
+        int recommendCount = SIMILAR_PER_WRONG + wrongQuestionIds.size();
         Set<Long> similarIds = new LinkedHashSet<>();
         for (Long wrongId : wrongQuestionIds) {
-            for (Long similarId : recommender.recommendSimilar(memberId, wrongId, SIMILAR_PER_WRONG)) {
+            int addedForWrongId = 0;
+            for (Long similarId : recommender.recommendSimilar(memberId, wrongId, recommendCount)) {
+                if (addedForWrongId == SIMILAR_PER_WRONG) {
+                    break; // 오답 1건당 상한은 그대로 — 여유분은 필터 손실 보전용이지 결과 확대용이 아니다
+                }
                 if (similarId.equals(wrongId)) {
                     continue; // 원문제(자기 자신) 제외
                 }
                 if (wrongQuestionIds.contains(similarId)) {
                     continue; // 이미 틀린 문제 제외
                 }
-                if (questionById.containsKey(similarId)) {
-                    similarIds.add(similarId); // 코스 내 문항만 조립
+                if (questionById.containsKey(similarId) && similarIds.add(similarId)) {
+                    addedForWrongId++; // 코스 내 문항만 조립
                 }
             }
         }
