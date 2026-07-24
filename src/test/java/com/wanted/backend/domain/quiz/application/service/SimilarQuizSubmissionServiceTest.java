@@ -18,7 +18,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +50,9 @@ class SimilarQuizSubmissionServiceTest {
     private ReviewCompletionPort reviewCompletionPort;
     private SimilarQuizSubmissionService service;
 
+    // 결정론을 위해 시간 고정(팀 표준 타임존 Asia/Seoul).
+    private final Clock clock = Clock.fixed(Instant.parse("2026-05-12T01:00:00Z"), ZoneId.of("Asia/Seoul"));
+
     @BeforeEach
     void setUp() {
         similarQuizRepository = mock(SimilarQuizRepository.class);
@@ -57,7 +63,7 @@ class SimilarQuizSubmissionServiceTest {
         reviewCompletionPort = mock(ReviewCompletionPort.class);
         service = new SimilarQuizSubmissionService(
                 similarQuizRepository, quizRepository, submissionRepository, subscriptionAccessPort,
-                enrollmentAccessPort, reviewCompletionPort);
+                enrollmentAccessPort, reviewCompletionPort, clock);
     }
 
     // 유사퀴즈가 참조하는 원문항 두 개. 정답 위치(answerIndex)를 인자로 명시한다.
