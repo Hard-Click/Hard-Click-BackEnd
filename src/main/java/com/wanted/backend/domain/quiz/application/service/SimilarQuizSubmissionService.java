@@ -1,6 +1,8 @@
 package com.wanted.backend.domain.quiz.application.service;
 
 import com.wanted.backend.domain.quiz.application.command.SubmitSimilarQuizCommand;
+import com.wanted.backend.domain.quiz.application.port.EnrollmentAccessPort;
+import com.wanted.backend.domain.quiz.application.port.ReviewCompletionPort;
 import com.wanted.backend.domain.quiz.application.port.SimilarQuizSubscriptionAccessPort;
 import com.wanted.backend.domain.quiz.application.result.SimilarQuizSubmissionResult;
 import com.wanted.backend.domain.quiz.application.usecase.SubmitSimilarQuizUseCase;
@@ -44,6 +46,8 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
     private final QuizRepository quizRepository;
     private final SimilarQuizSubmissionRepository submissionRepository;
     private final SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
+    private final EnrollmentAccessPort enrollmentAccessPort;
+    private final ReviewCompletionPort reviewCompletionPort;
 
     @Override
     @Transactional
@@ -56,6 +60,12 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
         SimilarQuiz similarQuiz = similarQuizRepository.findById(command.similarQuizId())
                 .filter(sq -> sq.isOwnedBy(command.memberId()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.SIMILAR_QUIZ_NOT_FOUND));
+
+        // 수강 만료 후 과거 세트로 제출해 review_card 를 전진시키는 우회를 막는다.
+        // 일반 퀴즈 응시/조회(QuizQueryService)와 동일하게 활성 수강을 요구한다.
+        if (!enrollmentAccessPort.hasActiveEnrollment(command.memberId(), similarQuiz.getCourseId())) {
+            throw new BusinessException(ErrorCode.QUIZ_ENROLLMENT_REQUIRED);
+        }
 
         Map<Long, QuizQuestion> questionById = quizRepository.findQuestionsByIds(similarQuiz.getQuestionIds())
                 .stream().collect(Collectors.toMap(QuizQuestion::getId, Function.identity()));
@@ -95,10 +105,17 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
         int totalCount = questions.size();
         int score = totalCount == 0 ? 0 : Math.round((float) correctCount * 100 / totalCount);
 
+        LocalDateTime submittedAt = LocalDateTime.now();
+
         // 복습 이력 저장(재응시 허용 → 시간순 누적). 추천기가 이 이력으로 난이도·시간 신호를 판정한다.
         submissionRepository.save(SimilarQuizSubmission.create(
                 similarQuiz.getId(), command.memberId(), score, totalCount, correctCount,
-                LocalDateTime.now(), answersToPersist));
+                submittedAt, answersToPersist));
+
+        // 제출 = 그 코스의 '오늘 복습 완료' → 오늘 due 복습 카드를 다음 주기로 전진(캘린더에서 빠짐).
+        // 같은 트랜잭션에서 동기 처리해야 제출 응답 시점에 캘린더가 이미 최신이다(FE revalidate 직후 페치 레이스 방지).
+        // 오늘 due 카드가 없으면 no-op — 완료 대상 없음은 정상이므로 예외로 다루지 않는다.
+        reviewCompletionPort.completeTodayReviews(command.memberId(), similarQuiz.getCourseId(), submittedAt);
 
         return new SimilarQuizSubmissionResult(similarQuiz.getId(), score, correctCount, totalCount, questions);
     }
