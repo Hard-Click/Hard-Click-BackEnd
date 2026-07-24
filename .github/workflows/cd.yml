@@ -38,8 +38,24 @@ jobs:
           role-to-assume: arn:aws:iam::635249349258:role/hard-click-ci-deploy-role
           aws-region: ap-northeast-2
 
-      - name: ASG 인스턴스에 SSM으로 재배포 명령 전송
+      # 이전엔 전체 인스턴스에 SSM 명령을 동시에 보내서 재시작했다 — deploy.sh가 ALB 대상 그룹에서
+      # 자신을 빼는 로직 없이 컨테이너를 그냥 강제 재시작(docker rm -f)하는 방식이라, 모든 인스턴스가
+      # 같은 순간에 재시작되면 그 짧은 창 동안 전체 대상이 비정상이 될 이론적 위험이 있었다.
+      # 그래서 인스턴스 1대씩 순차적으로 "ALB에서 빼기 → 드레이닝 대기 → 배포 → 헬스체크 통과 대기 →
+      # ALB에 다시 넣기"를 반복하는 롤링 배포로 바꾼다 — 항상 나머지 인스턴스가 트래픽을 받는 상태를 유지.
+      - name: 대상 그룹 ARN 조회
+        id: tg
         run: |
+          TG_ARN=$(aws elbv2 describe-target-groups \
+            --names hard-click-app-tg \
+            --query "TargetGroups[0].TargetGroupArn" \
+            --output text)
+          echo "tg_arn=$TG_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: 인스턴스 1대씩 순차 롤링 배포
+        run: |
+          TG_ARN="${{ steps.tg.outputs.tg_arn }}"
+
           INSTANCE_IDS=$(aws ec2 describe-instances \
             --filters "Name=tag:Role,Values=app" "Name=instance-state-name,Values=running" \
             --query "Reservations[*].Instances[*].InstanceId" \
@@ -50,8 +66,31 @@ jobs:
             exit 1
           fi
 
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --instance-ids $INSTANCE_IDS \
-            --parameters commands='["curl -fsSL https://raw.githubusercontent.com/Hard-Click/Hard-Click-BackEnd/main/infra/deploy.sh -o /tmp/deploy.sh","chmod +x /tmp/deploy.sh","sudo /tmp/deploy.sh"]' \
-            --comment "GitHub Actions 배포 ${{ github.sha }}"
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            echo "=== $INSTANCE_ID 배포 시작 ==="
+
+            echo "1) 대상 그룹에서 제외 (신규 요청 차단)"
+            aws elbv2 deregister-targets --target-group-arn "$TG_ARN" --targets Id="$INSTANCE_ID"
+
+            echo "2) 드레이닝 완료 대기"
+            aws elbv2 wait target-deregistered --target-group-arn "$TG_ARN" --targets Id="$INSTANCE_ID"
+
+            echo "3) 이 인스턴스에만 배포 명령 전송"
+            COMMAND_ID=$(aws ssm send-command \
+              --document-name "AWS-RunShellScript" \
+              --instance-ids "$INSTANCE_ID" \
+              --parameters commands='["curl -fsSL https://raw.githubusercontent.com/Hard-Click/Hard-Click-BackEnd/main/infra/deploy.sh -o /tmp/deploy.sh","chmod +x /tmp/deploy.sh","sudo /tmp/deploy.sh"]' \
+              --comment "GitHub Actions 롤링 배포 ${{ github.sha }}" \
+              --query "Command.CommandId" --output text)
+
+            echo "4) 배포 명령 완료 대기"
+            aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+
+            echo "5) 대상 그룹에 재등록"
+            aws elbv2 register-targets --target-group-arn "$TG_ARN" --targets Id="$INSTANCE_ID"
+
+            echo "6) 헬스체크 통과 대기 (정상 판정까지)"
+            aws elbv2 wait target-in-service --target-group-arn "$TG_ARN" --targets Id="$INSTANCE_ID"
+
+            echo "=== $INSTANCE_ID 배포 완료 ==="
+          done
