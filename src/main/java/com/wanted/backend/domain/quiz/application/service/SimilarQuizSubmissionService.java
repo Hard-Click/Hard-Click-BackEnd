@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,6 +49,9 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
     private final SimilarQuizSubscriptionAccessPort subscriptionAccessPort;
     private final EnrollmentAccessPort enrollmentAccessPort;
     private final ReviewCompletionPort reviewCompletionPort;
+    // 제출 시각은 JVM 기본 타임존(컨테이너 UTC)이 아니라 팀 표준 Clock(Asia/Seoul)으로 계산한다.
+    // 복습 완료 전진의 '오늘'이 스케줄 조회(ScheduleController)의 KST '오늘'과 어긋나지 않게 하기 위함.
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -105,7 +109,7 @@ public class SimilarQuizSubmissionService implements SubmitSimilarQuizUseCase {
         int totalCount = questions.size();
         int score = totalCount == 0 ? 0 : Math.round((float) correctCount * 100 / totalCount);
 
-        LocalDateTime submittedAt = LocalDateTime.now();
+        LocalDateTime submittedAt = LocalDateTime.now(clock);
 
         // 복습 이력 저장(재응시 허용 → 시간순 누적). 추천기가 이 이력으로 난이도·시간 신호를 판정한다.
         submissionRepository.save(SimilarQuizSubmission.create(
