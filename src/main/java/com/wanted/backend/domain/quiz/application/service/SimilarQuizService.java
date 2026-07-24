@@ -81,7 +81,7 @@ public class SimilarQuizService implements SimilarQuizUseCase {
 
         // 추천기는 원문제를 포함해 반환하고, 그 결과에 아래 3개 필터(자기자신·이미틀림·코스밖)가 걸린다.
         // 딱 SIMILAR_PER_WRONG개만 요청하면 오답들이 서로 최근접 이웃일 때 후보가 전부 상쇄된다
-        // — 실측(2026-07-24, course 111): 오답 {1357,1358,1359}에 k=2 이웃이 정확히 그 집합이라 data:null.
+        // — 예: 오답이 연속된 문항들이면 이웃으로 돌아오는 게 그 오답들 자신이라 조립 결과가 비어 data:null.
         // 필터로 빠질 수 있는 최대 개수(= 오답 전체, 자기 자신 포함)를 더해 여유 있게 요청한다.
         int recommendCount = SIMILAR_PER_WRONG + wrongQuestionIds.size();
         Set<Long> similarIds = new LinkedHashSet<>();

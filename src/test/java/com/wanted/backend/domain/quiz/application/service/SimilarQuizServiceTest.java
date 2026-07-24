@@ -144,9 +144,9 @@ class SimilarQuizServiceTest {
         verify(similarQuizRepository, never()).save(any());
     }
 
-    // 실측 버그 재현(2026-07-24, 라이브 course 111 / member 9213):
-    // 오답 {10,20}의 최근접 이웃이 서로였다 → SIMILAR_PER_WRONG(2)개만 요청하면 자기자신·이미틀림으로
-    // 후보가 전부 상쇄돼 data:null. 여유 요청(2+오답2=4)으로 코스 내 30을 확보해야 한다.
+    // 회귀: 오답 {10,20}의 최근접 이웃이 서로인 경우 → SIMILAR_PER_WRONG(2)개만 요청하면
+    // 자기자신·이미틀림 필터로 후보가 전부 상쇄돼 data:null이 된다.
+    // 여유 요청(2 + 오답 2 = 4)으로 코스 내 문항 30을 확보해야 한다.
     @Test
     void generateOverFetchesSoMutuallyNeighboringWrongAnswersDoNotCancelOut() {
         when(subscriptionAccessPort.hasActiveSubscription(MEMBER_ID)).thenReturn(true);
